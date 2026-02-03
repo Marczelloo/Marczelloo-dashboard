@@ -403,10 +403,8 @@ const server = http.createServer(async (req, res) => {
       if (SSH_ENABLED && fs.existsSync(SSH_KEY_PATH)) {
         // Use SSH to execute command on host
         // Build the remote command with cd if cwd specified
-        const remoteCommand = cwd 
-          ? `cd ${JSON.stringify(cwd)} && ${command}`
-          : command;
-        
+        const remoteCommand = cwd ? `cd ${JSON.stringify(cwd)} && ${command}` : command;
+
         shellCommand = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i ${SSH_KEY_PATH} ${SSH_USER}@${SSH_HOST} ${JSON.stringify(remoteCommand)}`;
         execOptions = {
           timeout: 60000,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Header } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Skeleton } from "@/components/ui";
 import { DeployAllButton } from "@/components/features/deploy-all-button";
+import { DeployProjectButton } from "@/components/features/deploy-project-button";
 import { projects, services, workItems, deploys } from "@/server/atlashub";
 import { formatRelativeTime, formatDateTime } from "@/lib/utils";
 import {
@@ -112,6 +113,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               Back
             </Button>
           </Link>
+          <DeployProjectButton projectId={id} projectName={project.name} />
           <Link href={`/projects/${id}/edit`}>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4" />
@@ -457,7 +459,7 @@ async function DeploysSection({ projectId }: { projectId: string }) {
   );
 }
 
-function SectionSkeleton({ title }: { title: string }) {
+function SectionSkeleton({ title: _title }: { title: string }) {
   return (
     <Card>
       <CardHeader>

@@ -423,7 +423,7 @@ export function Terminal({ className }: TerminalProps) {
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck={false}
-                style={{ outline: 'none', boxShadow: 'none' }}
+                style={{ outline: "none", boxShadow: "none" }}
               />
               {isLoading && <span className="absolute left-0 top-0 text-zinc-500 animate-pulse">Running...</span>}
             </div>

@@ -1,8 +1,8 @@
 # Runner service Dockerfile
 FROM node:20-alpine
 
-# Install Docker CLI for container management, SSH client for host access
-RUN apk add --no-cache docker-cli git openssh-client
+# Install Docker CLI for container management, SSH client for host access, wget for healthchecks
+RUN apk add --no-cache docker-cli git openssh-client wget
 
 WORKDIR /app
 

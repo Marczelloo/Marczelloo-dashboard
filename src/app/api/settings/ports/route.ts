@@ -53,26 +53,20 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await response.json();
-    console.log(`[Port Scanner] Runner result:`, { 
-      success: result.success, 
+    console.log(`[Port Scanner] Runner result:`, {
+      success: result.success,
       ssh_enabled: result.ssh_enabled,
       exit_code: result.exit_code,
       stdout_length: result.stdout?.length || 0,
-      stderr: result.stderr || ""
+      stderr: result.stderr || "",
     });
 
     if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.stderr || "Command failed on host" },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: result.stderr || "Command failed on host" }, { status: 500 });
     }
 
     if (result.stdout?.includes("NO_TOOL")) {
-      return NextResponse.json(
-        { success: false, error: "Neither ss nor netstat available on host" },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: "Neither ss nor netstat available on host" }, { status: 500 });
     }
 
     let ports: PortInfo[] = [];

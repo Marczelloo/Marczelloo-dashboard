@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Logs API] Fetching logs for container ${containerId} on endpoint ${endpointNum}`);
-    
+
     let result;
     try {
       result = await portainer.getContainerLogs(endpointNum, containerId, tail);
     } catch (portainerError) {
       console.error("[Logs API] Portainer error:", portainerError);
       const errorMessage = portainerError instanceof Error ? portainerError.message : "Portainer request failed";
-      
+
       if (errorMessage.includes("404")) {
         return NextResponse.json({ error: "Container not found" }, { status: 404 });
       }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       if (errorMessage.includes("PORTAINER_URL") || errorMessage.includes("not set")) {
         return NextResponse.json({ error: "Portainer not configured" }, { status: 500 });
       }
-      
+
       return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 

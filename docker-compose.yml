@@ -90,6 +90,12 @@ services:
       - runner_data:/app/data
       # Mount SSH key for host access (create with: ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner)
       - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - marczelloo
 

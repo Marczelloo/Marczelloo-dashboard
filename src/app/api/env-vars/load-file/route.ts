@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     // List available .env files
     async function listEnvFiles(): Promise<string[]> {
       console.log(`[Env Load] Listing files in ${repoPath}`);
-      
+
       // First check if directory exists
       const checkDirResponse = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
           command: `test -d "${repoPath}" && echo "EXISTS" || echo "NOT_FOUND"`,
         }),
       });
-      
+
       if (checkDirResponse.ok) {
         const checkResult = await checkDirResponse.json();
         console.log(`[Env Load] Dir check:`, checkResult.stdout?.trim());
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
           return [];
         }
       }
-      
+
       // Simple command: list all .env* files
       const listResponse = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
@@ -56,25 +56,25 @@ export async function POST(request: Request) {
       });
 
       console.log(`[Env Load] List response status: ${listResponse.status}`);
-      
+
       if (listResponse.ok) {
         const listResult = await listResponse.json();
-        console.log(`[Env Load] List result:`, { 
+        console.log(`[Env Load] List result:`, {
           success: listResult.success,
           ssh_enabled: listResult.ssh_enabled,
           stdout: listResult.stdout?.substring(0, 200),
-          stderr: listResult.stderr
+          stderr: listResult.stderr,
         });
-        
+
         const files = (listResult.stdout || "")
           .split("\n")
           .map((f: string) => f.trim())
           .filter((f: string) => f && f.startsWith(".env"));
-        
+
         console.log(`[Env Load] Found files:`, files);
         return files;
       }
-      
+
       const errorText = await listResponse.text();
       console.log(`[Env Load] List request failed:`, errorText);
       return [];
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     // Read the .env file from the repo path
     const fileName = filename || ".env";
     const filePath = `${repoPath}/${fileName}`;
-    
+
     console.log(`[Env Load] Reading file: ${filePath}`);
 
     const response = await fetch(`${RUNNER_URL}/shell`, {
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     console.log(`[Env Load] Cat result:`, {
       success: result.success,
       stdout_length: result.stdout?.length || 0,
-      stderr: result.stderr
+      stderr: result.stderr,
     });
 
     if (result.stdout?.includes("__FILE_NOT_FOUND__")) {

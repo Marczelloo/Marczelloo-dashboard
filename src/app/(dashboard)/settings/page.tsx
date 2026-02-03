@@ -663,13 +663,13 @@ function PortTrackerSettings() {
     try {
       const response = await fetch(`/api/settings/ports?start=${rangeStart}&end=${rangeEnd}`);
       const text = await response.text();
-      
+
       // Check if response is HTML (error page)
       if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
         setError("API returned error page. Check server logs.");
         return;
       }
-      
+
       const result = JSON.parse(text);
       if (result.success) {
         setPorts(result.ports || []);
@@ -753,11 +753,7 @@ function PortTrackerSettings() {
           </div>
         )}
 
-        {error && (
-          <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
-            {error}
-          </div>
-        )}
+        {error && <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">{error}</div>}
 
         {!loading && ports.length === 0 && !error && (
           <p className="text-sm text-muted-foreground">

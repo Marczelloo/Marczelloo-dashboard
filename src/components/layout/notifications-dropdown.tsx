@@ -24,7 +24,7 @@ export function NotificationsDropdown() {
   // Load notifications on mount and poll every 30 seconds
   useEffect(() => {
     loadNotifications();
-    
+
     const pollInterval = setInterval(() => {
       loadNotifications();
     }, 30000); // 30 seconds

@@ -121,12 +121,12 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           }),
         });
         const fileResult = await fileResponse.json();
-        
+
         if (!fileResult.success) {
           setError(fileResult.error || "Failed to save to file");
           return;
         }
-        
+
         // Show success
         setNewKey("");
         setNewValue("");
@@ -535,14 +535,11 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
               </div>
             ) : (
               <div className="text-sm text-muted-foreground space-y-2">
-                <p>
-                  {loadingFromFile 
-                    ? "Searching for .env files..." 
-                    : `No .env files found at ${repoPath}`}
-                </p>
+                <p>{loadingFromFile ? "Searching for .env files..." : `No .env files found at ${repoPath}`}</p>
                 {!loadingFromFile && (
                   <p className="text-xs">
-                    Make sure the path is correct and .env files exist. You can also use &quot;Import&quot; to paste env vars directly.
+                    Make sure the path is correct and .env files exist. You can also use &quot;Import&quot; to paste env
+                    vars directly.
                   </p>
                 )}
               </div>

@@ -12,7 +12,9 @@ export async function POST(request: Request) {
   try {
     const { repoPath, filename, vars, action } = await request.json();
 
-    console.log(`[Env Save] Request: repoPath=${repoPath}, filename=${filename}, action=${action}, vars count=${vars?.length}`);
+    console.log(
+      `[Env Save] Request: repoPath=${repoPath}, filename=${filename}, action=${action}, vars count=${vars?.length}`
+    );
 
     if (!repoPath) {
       return NextResponse.json({ success: false, error: "repoPath is required" }, { status: 400 });
@@ -29,10 +31,10 @@ export async function POST(request: Request) {
     // Action: append a single variable
     if (action === "append" && vars?.length === 1) {
       const { key, value } = vars[0] as EnvVar;
-      
+
       // Escape value for shell (use single quotes, escape existing single quotes)
       const escapedValue = value.replace(/'/g, "'\\''");
-      
+
       // Check if key already exists
       const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
@@ -90,13 +92,11 @@ export async function POST(request: Request) {
     // Action: write entire file
     if (action === "write" && Array.isArray(vars)) {
       // Build the .env content
-      const content = vars
-        .map((v: EnvVar) => `${v.key}=${v.value}`)
-        .join("\n");
+      const content = vars.map((v: EnvVar) => `${v.key}=${v.value}`).join("\n");
 
       // Write to temp file first, then move (atomic operation)
       const tempFile = `${filePath}.tmp.${Date.now()}`;
-      
+
       // Use printf to handle special characters better
       const response = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
@@ -139,7 +139,7 @@ mv "${tempFile}" "${filePath}"`,
     // Action: delete a variable
     if (action === "delete" && vars?.length === 1) {
       const { key } = vars[0] as EnvVar;
-      
+
       const response = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
         headers: {
@@ -165,7 +165,10 @@ mv "${tempFile}" "${filePath}"`,
       });
     }
 
-    return NextResponse.json({ success: false, error: "Invalid action. Use 'append', 'write', or 'delete'" }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: "Invalid action. Use 'append', 'write', or 'delete'" },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("[Env Save] Error:", error);
     return NextResponse.json(

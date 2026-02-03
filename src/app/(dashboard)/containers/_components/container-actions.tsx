@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Play, Square, RotateCcw, FileText, Loader2 } from "lucide-react";
+import { Play, Square, RotateCcw, FileText, Loader2, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface ContainerActionsProps {
@@ -11,6 +11,8 @@ interface ContainerActionsProps {
   endpointId: number;
   isRunning: boolean;
 }
+
+const LOG_TAIL_SIZE = 1000; // Fetch last 1000 lines
 
 export function ContainerActions({ containerId, endpointId, isRunning }: ContainerActionsProps) {
   const router = useRouter();
@@ -57,7 +59,7 @@ export function ContainerActions({ containerId, endpointId, isRunning }: Contain
       const response = await fetch("/api/containers/logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpointId, containerId, tail: 100 }),
+        body: JSON.stringify({ endpointId, containerId, tail: LOG_TAIL_SIZE }),
       });
 
       const result = await response.json();
@@ -121,12 +123,30 @@ export function ContainerActions({ containerId, endpointId, isRunning }: Contain
       </div>
 
       <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Container Logs</DialogTitle>
-            <DialogDescription>Last 100 lines from container {containerId.slice(0, 12)}</DialogDescription>
+        <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Container Logs</DialogTitle>
+                <DialogDescription>Last {LOG_TAIL_SIZE} lines from container {containerId.slice(0, 12)}</DialogDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchLogs} 
+                disabled={logsLoading}
+                className="mr-8"
+              >
+                {logsLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Refresh
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="flex-1 overflow-auto bg-secondary/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
+          <div className="flex-1 min-h-0 overflow-auto bg-secondary/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
             {logsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
