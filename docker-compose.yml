@@ -1,0 +1,103 @@
+# ================================
+# Marczelloo Dashboard - Docker Compose
+# ================================
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose logs -f dashboard  # View logs
+#   docker-compose down               # Stop all services
+#
+# Environment variables should be in .env file or passed via docker-compose
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marczelloo-dashboard
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      # App port (changed from 3000 to avoid conflict with AtlasHub)
+      - PORT=3100
+
+      # AtlasHub Configuration
+      - ATLASHUB_API_URL=${ATLASHUB_API_URL:-https://api-atlashub.marczelloo.dev}
+      - ATLASHUB_SECRET_KEY=${ATLASHUB_SECRET_KEY}
+
+      # Portainer Configuration (internal Docker network)
+      - PORTAINER_URL=${PORTAINER_URL:-http://portainer:9000}
+      - PORTAINER_TOKEN=${PORTAINER_TOKEN}
+
+      # Runner Configuration (internal Docker network)
+      - RUNNER_URL=http://runner:8787
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+
+      # App Configuration
+      - DEV_USER_EMAIL=${DEV_USER_EMAIL:-admin@marczelloo.local}
+      - DEV_SKIP_PIN=${DEV_SKIP_PIN:-false}
+      - OWNER_EMAILS=${OWNER_EMAILS:-${DEV_USER_EMAIL:-admin@marczelloo.local}}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3100}
+
+      # Monitoring Configuration
+      - CRON_SECRET=${CRON_SECRET}
+      - MONITORING_INTERVAL_MS=${MONITORING_INTERVAL_MS:-300000}
+
+      # Discord Notifications (optional)
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - runner
+      - portainer
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - marczelloo
+
+  runner:
+    build:
+      context: ./runner
+      dockerfile: Dockerfile
+    container_name: marczelloo-runner
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      - RUNNER_PORT=8787
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+    volumes:
+      # Mount host Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount project directories for git operations
+      - ${PROJECTS_DIR:-/home/pi/projects}:/projects:rw
+      # Persist allowlist configuration
+      - runner_data:/app/data
+    networks:
+      - marczelloo
+
+  # Portainer - Docker management UI
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: marczelloo-portainer
+    restart: unless-stopped
+    ports:
+      - "9201:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - marczelloo
+
+volumes:
+  runner_data:
+  portainer_data:
+
+networks:
+  marczelloo:
+    driver: bridge

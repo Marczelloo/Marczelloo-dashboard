@@ -1,0 +1,21 @@
+{
+  "name": "marczelloo-runner",
+  "version": "1.0.0",
+  "description": "Secure runner service for git and docker operations",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "npx tsx index.ts",
+    "build": "npx tsc",
+    "dev": "npx tsx watch index.ts"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  }
+}
