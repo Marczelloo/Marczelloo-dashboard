@@ -378,7 +378,7 @@ const server = http.createServer(async (req, res) => {
         /\brm\s+-rf\s+\/\s*$/i, // rm -rf /
         /\bmkfs\b/i, // formatting
         /\bdd\s+if=/i, // disk operations
-        />\s*\/dev\//i, // writing to devices
+        />\s*\/dev\/(?!null)/i, // writing to devices (except /dev/null)
         /\bshutdown\b/i, // shutdown commands
         /\breboot\b/i, // reboot commands
         /\bpasswd\b/i, // password changes
