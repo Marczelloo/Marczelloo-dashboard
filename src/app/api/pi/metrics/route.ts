@@ -100,21 +100,48 @@ export async function GET() {
     ]);
 
     // Parse memory from raw free -m output
-    // Format: "              total        used        free      shared  buff/cache   available\nMem:           7851        2134        3892..."
+    // Format varies: "Mem:  total  used  free  shared  buff/cache  available"
+    // or on some systems: "Mem:  total  used  free  shared  buffers  cached"
     let memTotal = 0,
       memUsed = 0,
       memFree = 0,
       memAvailable = 0;
     const memLines = memInfoRaw.split("\n");
     for (const line of memLines) {
-      if (line.startsWith("Mem:")) {
+      // Match "Mem:" case-insensitively, or lines that contain memory values
+      if (line.toLowerCase().includes("mem")) {
         const parts = line.split(/\s+/).filter(Boolean);
         // parts: ["Mem:", total, used, free, shared, buff/cache, available]
-        memTotal = parseInt(parts[1]) || 0;
-        memUsed = parseInt(parts[2]) || 0;
-        memFree = parseInt(parts[3]) || 0;
-        memAvailable = parseInt(parts[6]) || parseInt(parts[3]) || 0;
-        break;
+        // Find the first numeric values after "Mem:"
+        const numericParts = parts.filter((p) => /^\d+$/.test(p));
+        if (numericParts.length >= 3) {
+          memTotal = parseInt(numericParts[0]) || 0;
+          memUsed = parseInt(numericParts[1]) || 0;
+          memFree = parseInt(numericParts[2]) || 0;
+          memAvailable = parseInt(numericParts[5]) || parseInt(numericParts[2]) || 0;
+          break;
+        }
+      }
+    }
+
+    // Fallback: try parsing /proc/meminfo style if free -m failed
+    if (memTotal === 0) {
+      // Try an alternative approach using cat /proc/meminfo
+      try {
+        const meminfoRaw = await runCommand("cat /proc/meminfo");
+        const meminfoLines = meminfoRaw.split("\n");
+        for (const line of meminfoLines) {
+          if (line.startsWith("MemTotal:")) {
+            memTotal = Math.round(parseInt(line.match(/\d+/)?.[0] || "0") / 1024); // KB to MB
+          } else if (line.startsWith("MemFree:")) {
+            memFree = Math.round(parseInt(line.match(/\d+/)?.[0] || "0") / 1024);
+          } else if (line.startsWith("MemAvailable:")) {
+            memAvailable = Math.round(parseInt(line.match(/\d+/)?.[0] || "0") / 1024);
+          }
+        }
+        memUsed = memTotal - memAvailable;
+      } catch {
+        // Ignore fallback errors
       }
     }
 
