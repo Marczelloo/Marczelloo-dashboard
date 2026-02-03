@@ -652,19 +652,35 @@ function RunnerAllowlistSettings() {
 function PortTrackerSettings() {
   const [ports, setPorts] = useState<PortInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [rangeStart, setRangeStart] = useState(3000);
   const [rangeEnd, setRangeEnd] = useState(9999);
 
   async function scanPorts() {
     setLoading(true);
+    setError(null);
+    setPorts([]);
     try {
       const response = await fetch(`/api/settings/ports?start=${rangeStart}&end=${rangeEnd}`);
-      const result = await response.json();
-      if (result.success) {
-        setPorts(result.ports);
+      const text = await response.text();
+      
+      // Check if response is HTML (error page)
+      if (text.startsWith("<!DOCTYPE") || text.startsWith("<html")) {
+        setError("API returned error page. Check server logs.");
+        return;
       }
-    } catch {
-      // Failed to scan
+      
+      const result = JSON.parse(text);
+      if (result.success) {
+        setPorts(result.ports || []);
+        if (result.ports?.length === 0) {
+          setError("No ports found in range. Make sure Runner SSH is configured.");
+        }
+      } else {
+        setError(result.error || "Failed to scan ports");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to scan ports");
     }
     setLoading(false);
   }
@@ -737,7 +753,13 @@ function PortTrackerSettings() {
           </div>
         )}
 
-        {!loading && ports.length === 0 && (
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {!loading && ports.length === 0 && !error && (
           <p className="text-sm text-muted-foreground">
             Click &quot;Scan Ports&quot; to discover which ports are in use.
           </p>

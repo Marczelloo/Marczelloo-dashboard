@@ -270,22 +270,33 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   }
 
   async function handleLoadAvailableFiles() {
-    if (!repoPath) return;
+    if (!repoPath) {
+      setError("No repository path configured for this service");
+      return;
+    }
     setLoadingFromFile(true);
+    setError(null);
     try {
+      console.log("[EnvManager] Loading files from:", repoPath);
       const response = await fetch("/api/env-vars/load-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repoPath, action: "list" }),
       });
       const result = await response.json();
+      console.log("[EnvManager] Load result:", result);
       if (result.success && result.files) {
         setAvailableEnvFiles(result.files);
         if (result.files.length > 0) {
           setSelectedEnvFile(result.files[0]);
+        } else {
+          console.log("[EnvManager] No .env files found in:", repoPath);
         }
+      } else if (result.error) {
+        setError(result.error);
       }
-    } catch {
+    } catch (err) {
+      console.error("[EnvManager] Error:", err);
       setError("Failed to list .env files");
     } finally {
       setLoadingFromFile(false);
@@ -403,10 +414,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         {showLoadFromFile && (
           <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
             <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Load from .env file
-              </Label>
+              <div>
+                <Label className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Load from .env file
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">{repoPath}</p>
+              </div>
               <Button size="sm" variant="ghost" onClick={() => handleLoadAvailableFiles()} disabled={loadingFromFile}>
                 <RefreshCw className={`h-4 w-4 ${loadingFromFile ? "animate-spin" : ""}`} />
               </Button>

@@ -17,8 +17,11 @@ export async function GET(request: NextRequest) {
   const rangeStart = parseInt(searchParams.get("start") || "3000", 10);
   const rangeEnd = parseInt(searchParams.get("end") || "9999", 10);
 
+  console.log(`[Port Scanner] Scanning ports ${rangeStart}-${rangeEnd}`);
+
   try {
     if (!RUNNER_TOKEN) {
+      console.log("[Port Scanner] ERROR: Missing RUNNER_TOKEN");
       return NextResponse.json(
         { success: false, error: "Runner not configured. Set RUNNER_TOKEN in environment." },
         { status: 500 }
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute ss command on host via runner
+    console.log(`[Port Scanner] Calling runner at ${RUNNER_URL}/shell`);
     const response = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -33,19 +37,44 @@ export async function GET(request: NextRequest) {
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: "ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null",
+        command: "ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || echo 'NO_TOOL'",
       }),
     });
 
+    console.log(`[Port Scanner] Runner response status: ${response.status}`);
+
     if (!response.ok) {
       const error = await response.text();
+      console.log(`[Port Scanner] Runner error: ${error}`);
       return NextResponse.json(
-        { success: false, error: `Runner error: ${error}` },
+        { success: false, error: `Runner error (${response.status}): ${error}` },
         { status: response.status }
       );
     }
 
     const result = await response.json();
+    console.log(`[Port Scanner] Runner result:`, { 
+      success: result.success, 
+      ssh_enabled: result.ssh_enabled,
+      exit_code: result.exit_code,
+      stdout_length: result.stdout?.length || 0,
+      stderr: result.stderr || ""
+    });
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.stderr || "Command failed on host" },
+        { status: 500 }
+      );
+    }
+
+    if (result.stdout?.includes("NO_TOOL")) {
+      return NextResponse.json(
+        { success: false, error: "Neither ss nor netstat available on host" },
+        { status: 500 }
+      );
+    }
+
     let ports: PortInfo[] = [];
 
     if (result.stdout) {
@@ -113,13 +142,16 @@ export async function GET(request: NextRequest) {
       label: commonPorts[p.port] || null,
     }));
 
+    console.log(`[Port Scanner] Found ${portsWithLabels.length} ports`);
+
     return NextResponse.json({
       success: true,
       ports: portsWithLabels,
       range: { start: rangeStart, end: rangeEnd },
-      platform: "linux (via runner)",
+      platform: result.ssh_enabled ? "linux (via SSH)" : "linux (local)",
     });
   } catch (error) {
+    console.error("[Port Scanner] Error:", error);
     return NextResponse.json(
       {
         success: false,

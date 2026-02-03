@@ -7,16 +7,20 @@ export async function POST(request: Request) {
   try {
     const { repoPath, filename, action } = await request.json();
 
+    console.log(`[Env Load] Request: repoPath=${repoPath}, action=${action}, filename=${filename}`);
+
     if (!repoPath) {
-      return NextResponse.json({ error: "repoPath is required" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "repoPath is required" }, { status: 400 });
     }
 
     if (!RUNNER_TOKEN) {
-      return NextResponse.json({ error: "Runner not configured" }, { status: 500 });
+      console.log("[Env Load] ERROR: Missing RUNNER_TOKEN");
+      return NextResponse.json({ success: false, error: "Runner not configured" }, { status: 500 });
     }
 
     // List available .env files
     async function listEnvFiles(): Promise<string[]> {
+      console.log(`[Env Load] Listing files in ${repoPath}`);
       const listResponse = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
         headers: {
@@ -24,18 +28,32 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${RUNNER_TOKEN}`,
         },
         body: JSON.stringify({
-          command: `find "${repoPath}" -maxdepth 1 -name ".env*" -type f 2>/dev/null | xargs -I{} basename {} 2>/dev/null | sort`,
-          cwd: repoPath,
+          command: `ls -la "${repoPath}" 2>/dev/null | grep -E "^\-.*\.env" | awk '{print $NF}' | sort 2>/dev/null || find "${repoPath}" -maxdepth 1 -name ".env*" -type f -exec basename {} \\; 2>/dev/null | sort`,
         }),
       });
 
+      console.log(`[Env Load] List response status: ${listResponse.status}`);
+      
       if (listResponse.ok) {
         const listResult = await listResponse.json();
-        return (listResult.stdout || "")
+        console.log(`[Env Load] List result:`, { 
+          success: listResult.success,
+          ssh_enabled: listResult.ssh_enabled,
+          stdout: listResult.stdout?.substring(0, 200),
+          stderr: listResult.stderr
+        });
+        
+        const files = (listResult.stdout || "")
           .split("\n")
           .map((f: string) => f.trim())
           .filter((f: string) => f && f.startsWith(".env"));
+        
+        console.log(`[Env Load] Found files:`, files);
+        return files;
       }
+      
+      const errorText = await listResponse.text();
+      console.log(`[Env Load] List request failed:`, errorText);
       return [];
     }
 
@@ -48,6 +66,8 @@ export async function POST(request: Request) {
     // Read the .env file from the repo path
     const fileName = filename || ".env";
     const filePath = `${repoPath}/${fileName}`;
+    
+    console.log(`[Env Load] Reading file: ${filePath}`);
 
     const response = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
@@ -57,16 +77,21 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         command: `cat "${filePath}" 2>/dev/null || echo "__FILE_NOT_FOUND__"`,
-        cwd: repoPath,
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      return NextResponse.json({ error: `Runner error: ${error}` }, { status: response.status });
+      console.log(`[Env Load] Runner error:`, error);
+      return NextResponse.json({ success: false, error: `Runner error: ${error}` }, { status: response.status });
     }
 
     const result = await response.json();
+    console.log(`[Env Load] Cat result:`, {
+      success: result.success,
+      stdout_length: result.stdout?.length || 0,
+      stderr: result.stderr
+    });
 
     if (result.stdout?.includes("__FILE_NOT_FOUND__")) {
       return NextResponse.json({
@@ -101,15 +126,17 @@ export async function POST(request: Request) {
       }
     }
 
+    console.log(`[Env Load] Parsed ${vars.length} variables`);
+
     return NextResponse.json({
       success: true,
       vars,
       filePath,
     });
   } catch (error) {
-    console.error("Load env file error:", error);
+    console.error("[Env Load] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load env file" },
+      { success: false, error: error instanceof Error ? error.message : "Failed to load env file" },
       { status: 500 }
     );
   }
