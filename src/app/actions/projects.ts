@@ -261,7 +261,7 @@ export async function deployProjectAction(
     }
 
     console.log(`[Deploy] Using path: ${repoPath}`);
-    let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\nBuild timeout: 10 minutes\n\n`;
+    let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\nMode: Background build (to avoid Cloudflare timeout)\n\n`;
 
     // Step 0: Check for docker-compose.yml
     console.log(`[Deploy] Checking for docker-compose.yml...`);
@@ -383,10 +383,13 @@ export async function deployProjectAction(
       console.log(`[Deploy] Services: ${servicesResult.stdout?.trim()}`);
     }
 
-    // Step 3: Docker Compose Build and Up (with long timeout for builds)
-    console.log(`[Deploy] Running docker compose (10 minute timeout)...`);
-    const composeCmd = `cd "${repoPath}" && docker compose ${profileFlags} up -d --build 2>&1`;
+    // Step 3: Docker Compose Build and Up (run in background to avoid Cloudflare timeout)
+    console.log(`[Deploy] Running docker compose in background...`);
+    // Use nohup to run in background, redirect output to a log file
+    const logFile = `/tmp/deploy-${project.slug}-${Date.now()}.log`;
+    const composeCmd = `cd "${repoPath}" && nohup docker compose ${profileFlags} up -d --build > "${logFile}" 2>&1 &`;
     console.log(`[Deploy] Command: ${composeCmd}`);
+    console.log(`[Deploy] Log file: ${logFile}`);
     
     const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
@@ -396,26 +399,30 @@ export async function deployProjectAction(
       },
       body: JSON.stringify({
         command: composeCmd,
-        timeout: 10 * 60 * 1000, // 10 minutes for Docker builds
       }),
     });
 
     if (!composeResponse.ok) {
       const error = await composeResponse.text();
-      console.error(`[Deploy] Docker compose failed: ${error}`);
-      output += `=== Docker Compose ===\nFailed: ${error}`;
+      console.error(`[Deploy] Docker compose failed to start: ${error}`);
+      output += `=== Docker Compose ===\nFailed to start: ${error}`;
       return { success: false, error: output };
     }
 
-    const composeResult = await composeResponse.json();
-    output += `=== Docker Compose ===\n${composeResult.stdout || composeResult.stderr || "No output"}`;
-    console.log(`[Deploy] Docker compose result: success=${composeResult.success}`);
+    // We don't wait for the build to complete - it runs in background
+    await composeResponse.json(); // consume the response
+    
+    output += `=== Docker Compose ===\nBuild started in background.\nLog file: ${logFile}\n\n`;
+    output += `The build is running in the background. Check container status in a few minutes.\n`;
+    output += `To view build progress, SSH to Pi and run: tail -f ${logFile}\n`;
+    console.log(`[Deploy] Docker compose started in background`);
 
     // Log the deployment
     await auditLogs.logAction(user.email, "deploy", "project", id, {
       project: project.name,
       repo_path: repoPath,
-      success: composeResult.success,
+      log_file: logFile,
+      background: true,
     });
 
     revalidatePath(`/projects/${id}`);
