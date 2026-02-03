@@ -52,8 +52,8 @@ next-env.d.ts
 # OS files
 Thumbs.db
 
-# Logs
-logs/
+# Logs (only at root level, not API routes)
+/logs/
 *.log
 
 # Secrets - extra safety
