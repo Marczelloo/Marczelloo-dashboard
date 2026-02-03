@@ -22,7 +22,7 @@ const PORT = parseInt(process.env.RUNNER_PORT || "8787", 10);
 const TOKEN = process.env.RUNNER_TOKEN;
 // SSH configuration for host access
 const SSH_HOST = process.env.SSH_HOST || "host.docker.internal";
-const SSH_USER = process.env.SSH_USER || "pi";
+const SSH_USER = process.env.SSH_USER || "Marczelloo_pi";
 const SSH_KEY_PATH = process.env.SSH_KEY_PATH || "/root/.ssh/id_rsa";
 const SSH_ENABLED = process.env.SSH_ENABLED !== "false"; // Enable SSH by default
 // Use data directory for persistent config (mounted volume in Docker)
@@ -58,7 +58,7 @@ function loadAllowlist(): Allowlist {
 
   // Default allowlist
   return {
-    repo_paths: ["/home/pi/projects/atlas-hub", "/home/pi/projects/marczelloo-dashboard"],
+    repo_paths: ["/home/Marczelloo_pi/projects/atlas-hub", "/home/Marczelloo_pi/projects/marczelloo-dashboard"],
     compose_projects: ["atlas-hub", "marczelloo-dashboard"],
     container_names: ["atlashub-postgres", "atlashub-minio", "portainer"],
   };
@@ -395,7 +395,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const start = Date.now();
-      const workingDir = cwd || process.env.DEFAULT_CWD || "/home/pi";
+      const workingDir = cwd || process.env.DEFAULT_CWD || "/home/Marczelloo_pi";
 
       let shellCommand: string;
       let execOptions: { timeout: number; maxBuffer: number; env?: NodeJS.ProcessEnv };
