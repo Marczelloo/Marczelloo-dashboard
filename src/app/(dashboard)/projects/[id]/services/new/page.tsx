@@ -15,6 +15,7 @@ import {
   Label,
   Badge,
 } from "@/components/ui";
+import { PinDialog } from "@/components/pin-dialog";
 import { createServiceAction } from "@/app/actions/services";
 import { ArrowLeft, Plus, Server, Globe, Cloud, Loader2, Box, Check } from "lucide-react";
 
@@ -41,10 +42,12 @@ export default function NewServicePage({ params }: NewServicePageProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
   // Docker containers
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [loadingContainers, setLoadingContainers] = useState(false);
+  const [containersLoaded, setContainersLoaded] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
   const [showContainerPicker, setShowContainerPicker] = useState(false);
 
@@ -62,10 +65,10 @@ export default function NewServicePage({ params }: NewServicePageProps) {
 
   // Load containers when Docker type is selected
   useEffect(() => {
-    if (formData.type === "docker" && containers.length === 0) {
+    if (formData.type === "docker" && !containersLoaded) {
       loadContainers();
     }
-  }, [formData.type]);
+  }, [formData.type, containersLoaded]);
 
   async function loadContainers() {
     setLoadingContainers(true);
@@ -79,6 +82,7 @@ export default function NewServicePage({ params }: NewServicePageProps) {
       console.error("Failed to load containers");
     } finally {
       setLoadingContainers(false);
+      setContainersLoaded(true);
     }
   }
 
@@ -101,6 +105,10 @@ export default function NewServicePage({ params }: NewServicePageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await submitForm();
+  };
+
+  const submitForm = async () => {
     setIsLoading(true);
     setError(null);
 
@@ -120,6 +128,11 @@ export default function NewServicePage({ params }: NewServicePageProps) {
       });
 
       if (!result.success) {
+        // Check if PIN is required
+        if ((result as { code?: string }).code === "PIN_REQUIRED") {
+          setShowPinDialog(true);
+          return;
+        }
         setError(result.error || "Failed to create service");
         return;
       }
@@ -390,6 +403,15 @@ export default function NewServicePage({ params }: NewServicePageProps) {
           </Card>
         </form>
       </div>
+
+      <PinDialog
+        open={showPinDialog}
+        onSuccess={() => {
+          setShowPinDialog(false);
+          submitForm();
+        }}
+        onCancel={() => setShowPinDialog(false)}
+      />
     </>
   );
 }

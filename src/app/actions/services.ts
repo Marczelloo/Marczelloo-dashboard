@@ -51,6 +51,11 @@ export async function createServiceAction(input: CreateServiceInput) {
     if (error instanceof z.ZodError) {
       return { success: false as const, error: error.errors[0].message };
     }
+    // Return error code for AuthError
+    if (error instanceof Error && error.name === "AuthError") {
+      const authError = error as unknown as { code: string };
+      return { success: false as const, error: error.message, code: authError.code };
+    }
     return { success: false as const, error: "Failed to create service" };
   }
 }
