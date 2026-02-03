@@ -194,7 +194,7 @@ interface StatusColumnProps {
   onStatusChange: (itemId: string, newStatus: WorkItemStatus) => void;
 }
 
-function StatusColumn({ status, title, items, projectId, icon, onStatusChange }: StatusColumnProps) {
+function StatusColumn({ status, title, items, projectId, icon, onStatusChange: _onStatusChange }: StatusColumnProps) {
   const typeIcons: Record<string, string> = {
     todo: "📋",
     bug: "🐛",

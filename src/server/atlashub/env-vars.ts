@@ -94,7 +94,7 @@ export async function getEnvVarsForDisplay(
   const envVars = await getEnvVarsByServiceId(serviceId);
 
   return envVars.map((envVar) => {
-    const { value_encrypted, ...rest } = envVar;
+    const { value_encrypted: _value_encrypted, ...rest } = envVar;
     return {
       ...rest,
       value_masked: envVar.is_secret ? "••••••••" : "(hidden)",

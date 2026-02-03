@@ -86,9 +86,9 @@ async function AuditLogList() {
   };
 
   const entityLinks: Record<string, (id: string) => string> = {
-    project: (id) => `/projects/${id}`,
-    service: (id) => `/services/${id}`,
-    work_item: (id) => `#`, // Work items are nested under projects
+    project: (_id) => `/projects/${_id}`,
+    service: (_id) => `/services/${_id}`,
+    work_item: (_id) => `#`, // Work items are nested under projects
   };
 
   return (

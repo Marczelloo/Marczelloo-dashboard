@@ -49,7 +49,8 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
     if (logFile && !buildComplete && !eventSourceRef.current) {
       startStreaming();
     }
-  }, [logFile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logFile, buildComplete]);
 
   function startStreaming() {
     if (!logFile || eventSourceRef.current) return;

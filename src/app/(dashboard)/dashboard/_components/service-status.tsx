@@ -43,7 +43,7 @@ async function getServiceStatuses(): Promise<ServiceStatusItem[]> {
   const projectMap = new Map(allProjects.map((p: Project) => [p.id, p.name]));
 
   // Fetch container data from Portainer for Docker services
-  let containersMap = new Map<string, PortainerContainer>();
+  const containersMap = new Map<string, PortainerContainer>();
   const dockerServices = allServices.filter(
     (s: Service) => s.type === "docker" && s.container_id && s.portainer_endpoint_id
   );

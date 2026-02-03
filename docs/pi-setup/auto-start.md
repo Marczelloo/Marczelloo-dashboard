@@ -132,7 +132,7 @@ sudo visudo
 
 Add:
 
-```
+```text
 Marczelloo_pi ALL=(ALL) NOPASSWD: /sbin/shutdown, /sbin/reboot
 ```
 

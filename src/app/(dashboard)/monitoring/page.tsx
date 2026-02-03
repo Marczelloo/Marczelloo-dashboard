@@ -9,7 +9,7 @@ import { RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import * as services from "@/server/atlashub/services";
 import * as uptimeChecks from "@/server/atlashub/uptime-checks";
-import type { Service, UptimeCheck } from "@/types";
+import type { Service } from "@/types";
 
 async function runMonitoringChecks() {
   "use server";

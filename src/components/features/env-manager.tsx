@@ -165,7 +165,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       setNewValue("");
       setNewIsSecret(true);
       setShowAddForm(false);
-    } catch (err) {
+    } catch (_err) {
       setError("Failed to add environment variable");
       toast.error("Failed to add variable");
     } finally {

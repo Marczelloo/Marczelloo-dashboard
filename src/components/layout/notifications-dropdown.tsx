@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Bell, ExternalLink, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { Button, Badge } from "@/components/ui";
+import { Bell, ExternalLink, CheckCircle, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface Notification {

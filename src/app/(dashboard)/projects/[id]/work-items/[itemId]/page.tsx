@@ -4,18 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Button,
-  Input,
-  Textarea,
-  Label,
-  Badge,
-  Skeleton,
-} from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Textarea, Label, Skeleton } from "@/components/ui";
 import { updateWorkItemAction, deleteWorkItemAction } from "@/app/actions/work-items";
 import { ArrowLeft, Save, Trash2, CheckCircle2, Circle, Clock, AlertCircle } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types";

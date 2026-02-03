@@ -69,7 +69,7 @@ export async function sendDiscordNotification(payload: NotificationPayload): Pro
 // ========================================
 
 export async function sendEmailNotification(to: string, payload: NotificationPayload): Promise<boolean> {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+  const { SMTP_HOST, SMTP_PORT: _SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM: _SMTP_FROM } = process.env;
 
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     console.warn("SMTP not configured, skipping email notification");

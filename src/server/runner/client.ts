@@ -6,7 +6,7 @@
  */
 
 import "server-only";
-import type { RunnerOperation, RunnerRequest, RunnerResponse } from "@/types";
+import type { RunnerRequest, RunnerResponse } from "@/types";
 
 // ========================================
 // Configuration

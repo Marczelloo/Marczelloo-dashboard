@@ -128,7 +128,7 @@ export default function NewServicePage({ params }: NewServicePageProps) {
     setAddingBatch(true);
     toast.info(`Adding ${projectContainers.length} services from ${composeProjectName}...`);
 
-    const firstContainer = projectContainers[0];
+    const _firstContainer = projectContainers[0];
     const repoPath = `/home/Marczelloo_pi/projects/${composeProjectName}`;
 
     let successCount = 0;

@@ -81,7 +81,7 @@ export async function checkUrl(url: string, healthUrl?: string): Promise<CheckRe
  * Note: This is a simplified implementation. For accurate SSL checking,
  * you may need to use a Node.js-based approach with TLS sockets.
  */
-async function checkSslExpiry(url: string): Promise<number | null> {
+async function checkSslExpiry(_url: string): Promise<number | null> {
   try {
     // Use a TLS check endpoint if available
     // For now, return null as proper SSL checking requires Node.js tls module
