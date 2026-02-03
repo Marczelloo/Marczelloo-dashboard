@@ -1,6 +1,6 @@
 "use server";
 
-import { projects, auditLogs, services, workItems } from "@/server/atlashub";
+import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -176,7 +176,7 @@ const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 export async function deployProjectAction(
   id: string,
   customRepoPath?: string
-): Promise<ActionResult<{ output: string; detectedPath?: string }>> {
+): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string }>> {
   try {
     const user = await requirePinVerification();
 
@@ -193,13 +193,15 @@ export async function deployProjectAction(
       return { success: false, error: "Project not found" };
     }
 
+    // Get project services to link deploy record
+    const projectServices = await services.getServicesByProjectId(id);
+    const primaryService = projectServices.find((s) => s.type === "docker") || projectServices[0];
+
     // Use custom path if provided
     let repoPath: string | null = customRepoPath?.trim() || null;
     let detectedPath: string | undefined;
 
     if (!repoPath) {
-      const projectServices = await services.getServicesByProjectId(id);
-
       // Try to find repo path from services
       for (const service of projectServices) {
         if (service.repo_path) {
@@ -344,7 +346,7 @@ export async function deployProjectAction(
     // Step 2: Check what services and profiles exist in compose file
     console.log(`[Deploy] Checking compose services and profiles...`);
     let profileFlags = "";
-    
+
     const profilesCheckResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -390,7 +392,22 @@ export async function deployProjectAction(
     const composeCmd = `cd "${repoPath}" && nohup docker compose ${profileFlags} up -d --build > "${logFile}" 2>&1 &`;
     console.log(`[Deploy] Command: ${composeCmd}`);
     console.log(`[Deploy] Log file: ${logFile}`);
-    
+
+    // Create deploy record before starting
+    let deployRecord = null;
+    if (primaryService) {
+      try {
+        deployRecord = await deploys.createDeploy({
+          service_id: primaryService.id,
+          triggered_by: user.email,
+        });
+        await deploys.startDeploy(deployRecord.id);
+        console.log(`[Deploy] Created deploy record: ${deployRecord.id}`);
+      } catch (e) {
+        console.error(`[Deploy] Failed to create deploy record:`, e);
+      }
+    }
+
     const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -406,12 +423,18 @@ export async function deployProjectAction(
       const error = await composeResponse.text();
       console.error(`[Deploy] Docker compose failed to start: ${error}`);
       output += `=== Docker Compose ===\nFailed to start: ${error}`;
+
+      // Mark deploy as failed
+      if (deployRecord) {
+        await deploys.completeDeploy(deployRecord.id, false, { error_message: error });
+      }
+
       return { success: false, error: output };
     }
 
     // We don't wait for the build to complete - it runs in background
     await composeResponse.json(); // consume the response
-    
+
     output += `=== Docker Compose ===\nBuild started in background.\nLog file: ${logFile}\n\n`;
     output += `The build is running in the background. Check container status in a few minutes.\n`;
     output += `To view build progress, SSH to Pi and run: tail -f ${logFile}\n`;
@@ -423,12 +446,20 @@ export async function deployProjectAction(
       repo_path: repoPath,
       log_file: logFile,
       background: true,
+      deploy_id: deployRecord?.id,
     });
 
     revalidatePath(`/projects/${id}`);
     revalidatePath("/dashboard");
 
-    return { success: true, data: { output, detectedPath } };
+    return {
+      success: true,
+      data: {
+        output,
+        detectedPath,
+        deployId: deployRecord?.id,
+      },
+    };
   } catch (error) {
     console.error("deployProjectAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Deployment failed" };
@@ -439,7 +470,8 @@ export async function deployProjectAction(
  * Check the status of a background deployment by reading the log file
  */
 export async function checkDeployLogAction(
-  logFile: string
+  logFile: string,
+  deployId?: string
 ): Promise<ActionResult<{ log: string; isComplete: boolean }>> {
   try {
     const user = await getCurrentUser();
@@ -492,6 +524,20 @@ export async function checkDeployLogAction(
 
     const logResult = await logResponse.json();
     const log = logResult.stdout || logResult.stderr || "No log output";
+
+    // If complete and we have a deploy ID, update the deploy status
+    if (isComplete && deployId) {
+      try {
+        // Check if there was an error in the output
+        const hasError = log.toLowerCase().includes("error") && !log.includes("0 errors");
+        await deploys.completeDeploy(deployId, !hasError, {
+          error_message: hasError ? "Build completed with errors (check logs)" : undefined,
+        });
+        revalidatePath("/dashboard");
+      } catch (e) {
+        console.error("[Deploy] Failed to update deploy status:", e);
+      }
+    }
 
     return { success: true, data: { log, isComplete } };
   } catch (error) {

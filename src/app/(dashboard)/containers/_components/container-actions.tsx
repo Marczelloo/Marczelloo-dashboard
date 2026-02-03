@@ -128,20 +128,12 @@ export function ContainerActions({ containerId, endpointId, isRunning }: Contain
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle>Container Logs</DialogTitle>
-                <DialogDescription>Last {LOG_TAIL_SIZE} lines from container {containerId.slice(0, 12)}</DialogDescription>
+                <DialogDescription>
+                  Last {LOG_TAIL_SIZE} lines from container {containerId.slice(0, 12)}
+                </DialogDescription>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={fetchLogs} 
-                disabled={logsLoading}
-                className="mr-8"
-              >
-                {logsLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
+              <Button variant="outline" size="sm" onClick={fetchLogs} disabled={logsLoading} className="mr-8">
+                {logsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 Refresh
               </Button>
             </div>

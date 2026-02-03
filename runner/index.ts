@@ -418,7 +418,9 @@ const server = http.createServer(async (req, res) => {
           timeout: cmdTimeout,
           maxBuffer: 10 * 1024 * 1024, // 10MB for build logs
         };
-        console.log(`[${new Date().toISOString()}] SSH to ${SSH_USER}@${SSH_HOST}: "${command}" (timeout: ${cmdTimeout / 1000}s)`);
+        console.log(
+          `[${new Date().toISOString()}] SSH to ${SSH_USER}@${SSH_HOST}: "${command}" (timeout: ${cmdTimeout / 1000}s)`
+        );
       } else {
         // Fallback to local execution (for development or when SSH not configured)
         console.log(`[${new Date().toISOString()}] Local shell (SSH not configured): "${command}"`);

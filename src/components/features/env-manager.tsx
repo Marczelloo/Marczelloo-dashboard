@@ -27,7 +27,9 @@ import {
   Key,
   FileText,
   RefreshCw,
+  HardDrive,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface EnvVarDisplay {
   id: string;
@@ -48,6 +50,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [envVars, setEnvVars] = useState<EnvVarDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync to file mode - when enabled, all operations sync to .env file
+  const [syncToFile, setSyncToFile] = useState(!!repoPath);
 
   // New env var form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -108,36 +113,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     setAdding(true);
 
     try {
-      // If saving to file, use the save-file endpoint
-      if (saveToFile && repoPath) {
-        const fileResponse = await fetch("/api/env-vars/save-file", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            repoPath,
-            filename: ".env",
-            action: "append",
-            vars: [{ key: newKey.trim(), value: newValue }],
-          }),
-        });
-        const fileResult = await fileResponse.json();
-
-        if (!fileResult.success) {
-          setError(fileResult.error || "Failed to save to file");
-          return;
-        }
-
-        // Show success
-        setNewKey("");
-        setNewValue("");
-        setShowAddForm(false);
-        setError(null);
-        // Show a success message briefly
-        alert(`Added ${newKey} to .env file`);
-        return;
-      }
-
-      // Otherwise save to database (encrypted)
+      // First save to database (encrypted)
       const response = await fetch("/api/env-vars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,17 +126,48 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       });
       const result = await response.json();
 
-      if (result.success) {
-        setEnvVars([...envVars, result.data]);
-        setNewKey("");
-        setNewValue("");
-        setNewIsSecret(true);
-        setShowAddForm(false);
-      } else {
+      if (!result.success) {
         setError(result.error);
+        toast.error("Failed to add variable", { description: result.error });
+        return;
       }
-    } catch {
+
+      setEnvVars([...envVars, result.data]);
+
+      // Also save to .env file if sync is enabled
+      if ((saveToFile || syncToFile) && repoPath) {
+        const fileResponse = await fetch("/api/env-vars/save-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repoPath,
+            filename: ".env",
+            action: "append",
+            vars: [{ key: newKey.trim(), value: newValue }],
+          }),
+        });
+        const fileResult = await fileResponse.json();
+
+        if (fileResult.success) {
+          toast.success(`Added ${newKey}`, {
+            description: syncToFile ? "Saved to DB and .env file" : "Saved to database",
+          });
+        } else {
+          toast.warning(`Added ${newKey} to DB`, {
+            description: `Failed to sync to .env: ${fileResult.error}`,
+          });
+        }
+      } else {
+        toast.success(`Added ${newKey}`, { description: "Saved to database" });
+      }
+
+      setNewKey("");
+      setNewValue("");
+      setNewIsSecret(true);
+      setShowAddForm(false);
+    } catch (err) {
       setError("Failed to add environment variable");
+      toast.error("Failed to add variable");
     } finally {
       setAdding(false);
     }
@@ -168,6 +175,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
   async function handleUpdate(id: string) {
     try {
+      // Get the current env var for the key
+      const currentVar = envVars.find((v) => v.id === id);
+
       const response = await fetch(`/api/env-vars/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -188,16 +198,60 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           delete updated[id];
           return updated;
         });
+
+        // Sync to .env file if enabled and we have a value
+        if (syncToFile && repoPath && editValue) {
+          // If key changed, delete old key first
+          if (currentVar && currentVar.key !== editKey.trim()) {
+            await fetch("/api/env-vars/save-file", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                repoPath,
+                filename: ".env",
+                action: "delete",
+                vars: [{ key: currentVar.key, value: "" }],
+              }),
+            });
+          }
+
+          const fileResponse = await fetch("/api/env-vars/save-file", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              repoPath,
+              filename: ".env",
+              action: "append",
+              vars: [{ key: editKey.trim(), value: editValue }],
+            }),
+          });
+          const fileResult = await fileResponse.json();
+
+          if (fileResult.success) {
+            toast.success(`Updated ${editKey}`, { description: "Synced to DB and .env file" });
+          } else {
+            toast.warning(`Updated ${editKey} in DB`, {
+              description: `Failed to sync to .env: ${fileResult.error}`,
+            });
+          }
+        } else {
+          toast.success(`Updated ${editKey}`, { description: "Saved to database" });
+        }
       } else {
         setError(result.error);
+        toast.error("Failed to update", { description: result.error });
       }
     } catch {
       setError("Failed to update environment variable");
+      toast.error("Failed to update variable");
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this environment variable?")) return;
+    const varToDelete = envVars.find((v) => v.id === id);
+    if (!varToDelete) return;
+
+    if (!confirm(`Are you sure you want to delete ${varToDelete.key}?`)) return;
 
     try {
       const response = await fetch(`/api/env-vars/${id}`, { method: "DELETE" });
@@ -205,11 +259,38 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
       if (result.success) {
         setEnvVars(envVars.filter((v) => v.id !== id));
+
+        // Sync to .env file if enabled
+        if (syncToFile && repoPath) {
+          const fileResponse = await fetch("/api/env-vars/save-file", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              repoPath,
+              filename: ".env",
+              action: "delete",
+              vars: [{ key: varToDelete.key, value: "" }],
+            }),
+          });
+          const fileResult = await fileResponse.json();
+
+          if (fileResult.success) {
+            toast.success(`Deleted ${varToDelete.key}`, { description: "Removed from DB and .env file" });
+          } else {
+            toast.warning(`Deleted ${varToDelete.key} from DB`, {
+              description: `Failed to remove from .env: ${fileResult.error}`,
+            });
+          }
+        } else {
+          toast.success(`Deleted ${varToDelete.key}`);
+        }
       } else {
         setError(result.error);
+        toast.error("Failed to delete", { description: result.error });
       }
     } catch {
       setError("Failed to delete environment variable");
+      toast.error("Failed to delete variable");
     }
   }
 
@@ -407,28 +488,42 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </CardTitle>
           <CardDescription>Manage encrypted environment variables for {serviceName || "this service"}</CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           {repoPath && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setShowLoadFromFile(!showLoadFromFile);
-                if (!showLoadFromFile) handleLoadAvailableFiles();
-              }}
-            >
-              <FileText className="h-4 w-4" />
-              Load .env
-            </Button>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" title="Sync all changes to .env file">
+              <input
+                type="checkbox"
+                checked={syncToFile}
+                onChange={(e) => setSyncToFile(e.target.checked)}
+                className="rounded"
+              />
+              <HardDrive className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Sync to file</span>
+            </label>
           )}
-          <Button variant="outline" size="sm" onClick={() => setShowBulkImport(!showBulkImport)}>
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowAddForm(!showAddForm)}>
-            <Plus className="h-4 w-4" />
-            Add
-          </Button>
+          <div className="flex gap-2">
+            {repoPath && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowLoadFromFile(!showLoadFromFile);
+                  if (!showLoadFromFile) handleLoadAvailableFiles();
+                }}
+              >
+                <FileText className="h-4 w-4" />
+                Load .env
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowBulkImport(!showBulkImport)}>
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddForm(!showAddForm)}>
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -17,7 +17,8 @@ import {
 } from "@/components/ui";
 import { PinDialog } from "@/components/pin-dialog";
 import { createServiceAction } from "@/app/actions/services";
-import { ArrowLeft, Plus, Server, Globe, Cloud, Loader2, Box, Check } from "lucide-react";
+import { ArrowLeft, Plus, Server, Globe, Cloud, Loader2, Box, Check, Layers } from "lucide-react";
+import { toast } from "sonner";
 
 interface DockerContainer {
   id: string;
@@ -50,6 +51,18 @@ export default function NewServicePage({ params }: NewServicePageProps) {
   const [containersLoaded, setContainersLoaded] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
   const [showContainerPicker, setShowContainerPicker] = useState(false);
+  const [addingBatch, setAddingBatch] = useState(false);
+
+  // Group containers by compose project
+  const composeProjects = containers.reduce<Record<string, DockerContainer[]>>((acc, container) => {
+    if (container.composeProject) {
+      if (!acc[container.composeProject]) {
+        acc[container.composeProject] = [];
+      }
+      acc[container.composeProject].push(container);
+    }
+    return acc;
+  }, {});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -107,6 +120,56 @@ export default function NewServicePage({ params }: NewServicePageProps) {
     e.preventDefault();
     await submitForm();
   };
+
+  async function addAllFromCompose(composeProjectName: string) {
+    const projectContainers = composeProjects[composeProjectName];
+    if (!projectContainers || projectContainers.length === 0) return;
+
+    setAddingBatch(true);
+    toast.info(`Adding ${projectContainers.length} services from ${composeProjectName}...`);
+
+    const firstContainer = projectContainers[0];
+    const repoPath = `/home/Marczelloo_pi/projects/${composeProjectName}`;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const container of projectContainers) {
+      try {
+        const result = await createServiceAction({
+          project_id: projectId,
+          name: container.composeService || container.name,
+          type: "docker",
+          portainer_endpoint_id: container.endpointId,
+          container_id: container.name,
+          repo_path: repoPath, // All services share the same repo path
+          compose_project: composeProjectName,
+          deploy_strategy: "compose_up", // Use compose_up for multi-service projects
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          console.error(`Failed to add ${container.name}:`, result.error);
+        }
+      } catch (err) {
+        failCount++;
+        console.error(`Error adding ${container.name}:`, err);
+      }
+    }
+
+    setAddingBatch(false);
+
+    if (successCount > 0) {
+      toast.success(`Added ${successCount} services`, {
+        description: failCount > 0 ? `${failCount} failed` : `From ${composeProjectName}`,
+      });
+      router.push(`/projects/${projectId}`);
+    } else {
+      toast.error("Failed to add services");
+    }
+  }
 
   const submitForm = async () => {
     setIsLoading(true);
@@ -270,7 +333,7 @@ export default function NewServicePage({ params }: NewServicePageProps) {
 
                   {/* Container Picker */}
                   {showContainerPicker && (
-                    <div className="space-y-2 p-4 rounded-lg border border-border bg-secondary/30 max-h-64 overflow-y-auto">
+                    <div className="space-y-4 p-4 rounded-lg border border-border bg-secondary/30 max-h-96 overflow-y-auto">
                       {loadingContainers ? (
                         <div className="flex items-center justify-center py-4">
                           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -280,49 +343,88 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                           No containers found. Make sure Portainer is connected.
                         </p>
                       ) : (
-                        <div className="space-y-2">
-                          {containers.map((container) => (
-                            <button
-                              key={container.id}
-                              type="button"
-                              onClick={() => selectContainer(container)}
-                              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
-                                selectedContainer?.id === container.id
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:border-primary/50 bg-background"
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`h-2 w-2 rounded-full ${
-                                    container.status === "running"
-                                      ? "bg-success"
-                                      : container.status === "stopped"
-                                        ? "bg-muted-foreground"
-                                        : "bg-warning"
-                                  }`}
-                                />
-                                <div>
-                                  <p className="font-medium text-sm">{container.name}</p>
-                                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                    {container.composeProject && (
-                                      <span className="text-primary">[{container.composeProject}] </span>
+                        <>
+                          {/* Batch Add by Compose Project */}
+                          {Object.keys(composeProjects).length > 0 && (
+                            <div className="space-y-2 pb-3 border-b border-border">
+                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                <Layers className="h-3 w-3" />
+                                Quick Add All Services from Project
+                              </p>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {Object.entries(composeProjects).map(([projectName, projectContainers]) => (
+                                  <Button
+                                    key={projectName}
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="justify-start h-auto py-2"
+                                    onClick={() => addAllFromCompose(projectName)}
+                                    disabled={addingBatch}
+                                  >
+                                    {addingBatch ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : (
+                                      <Plus className="h-4 w-4 mr-2" />
                                     )}
-                                    {container.image}
-                                  </p>
+                                    <div className="text-left">
+                                      <p className="font-medium">{projectName}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {projectContainers.length} service{projectContainers.length !== 1 ? "s" : ""}
+                                      </p>
+                                    </div>
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Individual container selection */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Or select individual container</p>
+                            {containers.map((container) => (
+                              <button
+                                key={container.id}
+                                type="button"
+                                onClick={() => selectContainer(container)}
+                                className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
+                                  selectedContainer?.id === container.id
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50 bg-background"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`h-2 w-2 rounded-full ${
+                                      container.status === "running"
+                                        ? "bg-success"
+                                        : container.status === "stopped"
+                                          ? "bg-muted-foreground"
+                                          : "bg-warning"
+                                    }`}
+                                  />
+                                  <div>
+                                    <p className="font-medium text-sm">{container.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                      {container.composeProject && (
+                                        <span className="text-primary">[{container.composeProject}] </span>
+                                      )}
+                                      {container.image}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {container.ports.length > 0 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {container.ports[0]}
-                                  </Badge>
-                                )}
-                                {selectedContainer?.id === container.id && <Check className="h-4 w-4 text-primary" />}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+                                <div className="flex items-center gap-2">
+                                  {container.ports.length > 0 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {container.ports[0]}
+                                    </Badge>
+                                  )}
+                                  {selectedContainer?.id === container.id && <Check className="h-4 w-4 text-primary" />}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}

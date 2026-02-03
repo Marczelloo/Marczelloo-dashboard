@@ -11,7 +11,7 @@ import type {
   ContainerLogs,
   PortainerActionResult,
 } from "@/types";
-import { getPortainerToken } from "@/server/atlashub/settings";
+import { getPortainerToken, setPortainerToken } from "@/server/atlashub/settings";
 
 // ========================================
 // Configuration
@@ -26,12 +26,90 @@ let cachedDbToken: string | null = null;
 let tokenCacheTime = 0;
 const TOKEN_CACHE_TTL = 60_000; // 1 minute
 
+// Track if we're currently refreshing the token
+let isRefreshing = false;
+
 /**
  * Set token in memory (used when DB save fails)
  */
 export function setInMemoryToken(token: string, expiresAt?: Date) {
   inMemoryToken = token;
   inMemoryTokenExpiry = expiresAt || null;
+}
+
+/**
+ * Clear all cached tokens (call on 401 errors)
+ */
+export function clearTokenCache() {
+  inMemoryToken = null;
+  inMemoryTokenExpiry = null;
+  cachedDbToken = null;
+  tokenCacheTime = 0;
+  console.log("[Portainer] Token cache cleared");
+}
+
+/**
+ * Attempt to refresh the Portainer token using stored credentials
+ */
+export async function refreshPortainerToken(): Promise<string | null> {
+  const url = process.env.PORTAINER_URL;
+  const username = process.env.PORTAINER_USERNAME;
+  const password = process.env.PORTAINER_PASSWORD;
+
+  if (!url || !username || !password) {
+    console.log("[Portainer] Cannot refresh token - missing PORTAINER_USERNAME or PORTAINER_PASSWORD");
+    return null;
+  }
+
+  if (isRefreshing) {
+    // Wait for the other refresh to complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return cachedDbToken || inMemoryToken;
+  }
+
+  isRefreshing = true;
+  console.log("[Portainer] Attempting to refresh token...");
+
+  try {
+    const response = await fetch(`${url.replace(/\/$/, "")}/api/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      console.error("[Portainer] Failed to refresh token:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const token = data.jwt;
+
+    if (!token) {
+      console.error("[Portainer] No JWT in auth response");
+      return null;
+    }
+
+    // Token typically expires in 8 hours
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
+    // Save to DB
+    const saved = await setPortainerToken(token, expiresAt);
+
+    // Update in-memory cache
+    inMemoryToken = token;
+    inMemoryTokenExpiry = expiresAt;
+    cachedDbToken = token;
+    tokenCacheTime = Date.now();
+
+    console.log(`[Portainer] Token refreshed successfully (saved to DB: ${saved})`);
+    return token;
+  } catch (error) {
+    console.error("[Portainer] Token refresh error:", error);
+    return null;
+  } finally {
+    isRefreshing = false;
+  }
 }
 
 async function getConfig() {
@@ -80,7 +158,12 @@ async function getConfig() {
 // HTTP Client
 // ========================================
 
-async function portainerRequest<T>(path: string, options: RequestInit = {}, parseJson = true): Promise<T> {
+async function portainerRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  parseJson = true,
+  isRetry = false
+): Promise<T> {
   const config = await getConfig();
   const url = `${config.url}/api${path}`;
 
@@ -93,6 +176,18 @@ async function portainerRequest<T>(path: string, options: RequestInit = {}, pars
     },
     cache: "no-store",
   });
+
+  // Handle 401 Unauthorized - try to refresh token and retry
+  if (response.status === 401 && !isRetry) {
+    console.log("[Portainer] Got 401, attempting token refresh...");
+    clearTokenCache();
+
+    const newToken = await refreshPortainerToken();
+    if (newToken) {
+      // Retry the request with new token
+      return portainerRequest<T>(path, options, parseJson, true);
+    }
+  }
 
   if (!response.ok) {
     const error = await response.text().catch(() => response.statusText);
@@ -158,7 +253,12 @@ export async function getContainer(endpointId: number, containerId: string): Pro
   return container;
 }
 
-export async function getContainerLogs(endpointId: number, containerId: string, tail = 1000): Promise<ContainerLogs> {
+export async function getContainerLogs(
+  endpointId: number,
+  containerId: string,
+  tail = 1000,
+  isRetry = false
+): Promise<ContainerLogs> {
   try {
     const config = await getConfig();
     const url = `${config.url}/api/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=false`;
@@ -170,6 +270,17 @@ export async function getContainerLogs(endpointId: number, containerId: string, 
       },
       cache: "no-store",
     });
+
+    // Handle 401 Unauthorized - try to refresh token and retry
+    if (response.status === 401 && !isRetry) {
+      console.log("[Portainer] Got 401 on logs, attempting token refresh...");
+      clearTokenCache();
+
+      const newToken = await refreshPortainerToken();
+      if (newToken) {
+        return getContainerLogs(endpointId, containerId, tail, true);
+      }
+    }
 
     if (!response.ok) {
       const error = await response.text().catch(() => response.statusText);

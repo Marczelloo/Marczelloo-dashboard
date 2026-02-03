@@ -6,6 +6,7 @@ import { DashboardStats } from "./_components/dashboard-stats";
 import { RecentActivity } from "./_components/recent-activity";
 import { ServiceStatus } from "./_components/service-status";
 import { QuickActions } from "./_components/quick-actions";
+import { RecentDeploysServer } from "./_components/recent-deploys";
 import { Skeleton } from "@/components/ui";
 
 export default function DashboardPage() {
@@ -33,6 +34,11 @@ export default function DashboardPage() {
             <QuickActions />
           </div>
         </div>
+
+        {/* Recent Deploys */}
+        <Suspense fallback={<CardSkeleton className="h-64" />}>
+          <RecentDeploysServer />
+        </Suspense>
 
         {/* Recent Activity */}
         <Suspense fallback={<CardSkeleton className="h-80" />}>

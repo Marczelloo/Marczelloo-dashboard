@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Header } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Skeleton } from "@/components/ui";
 import { getWorkItemsByProjectAction, updateWorkItemAction } from "@/app/actions/work-items";
-import { ArrowLeft, Plus, CheckCircle2, Circle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, Clock, AlertCircle, GripVertical } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types";
 import { formatRelativeTime } from "@/lib/utils";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { toast } from "sonner";
 
 interface WorkItemsPageProps {
   params: Promise<{ id: string }>;
@@ -47,6 +49,37 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
     const result = await updateWorkItemAction(itemId, { status: newStatus });
     if (result.success) {
       setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, status: newStatus } : item)));
+    }
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    const { draggableId, destination, source } = result;
+
+    // Dropped outside any droppable
+    if (!destination) return;
+
+    // Dropped in same position
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+      return;
+    }
+
+    // Get the new status from the destination droppable
+    const newStatus = destination.droppableId as WorkItemStatus;
+    const item = items.find((i) => i.id === draggableId);
+
+    if (!item || item.status === newStatus) return;
+
+    // Optimistically update state
+    setItems((prev) => prev.map((i) => (i.id === draggableId ? { ...i, status: newStatus } : i)));
+
+    // Update on server
+    const result2 = await updateWorkItemAction(draggableId, { status: newStatus });
+    if (result2.success) {
+      toast.success(`Moved to ${newStatus.replace("_", " ")}`);
+    } else {
+      // Revert on failure
+      setItems((prev) => prev.map((i) => (i.id === draggableId ? { ...i, status: item.status } : i)));
+      toast.error("Failed to update status");
     }
   };
 
@@ -96,36 +129,42 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatusColumn
-              title="Open"
-              items={statusGroups.open}
-              projectId={projectId}
-              icon={<Circle className="h-4 w-4" />}
-              onStatusChange={handleStatusChange}
-            />
-            <StatusColumn
-              title="In Progress"
-              items={statusGroups.in_progress}
-              projectId={projectId}
-              icon={<Clock className="h-4 w-4 text-warning" />}
-              onStatusChange={handleStatusChange}
-            />
-            <StatusColumn
-              title="Blocked"
-              items={statusGroups.blocked}
-              projectId={projectId}
-              icon={<AlertCircle className="h-4 w-4 text-destructive" />}
-              onStatusChange={handleStatusChange}
-            />
-            <StatusColumn
-              title="Done"
-              items={statusGroups.done}
-              projectId={projectId}
-              icon={<CheckCircle2 className="h-4 w-4 text-success" />}
-              onStatusChange={handleStatusChange}
-            />
-          </div>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatusColumn
+                status="open"
+                title="Open"
+                items={statusGroups.open}
+                projectId={projectId}
+                icon={<Circle className="h-4 w-4" />}
+                onStatusChange={handleStatusChange}
+              />
+              <StatusColumn
+                status="in_progress"
+                title="In Progress"
+                items={statusGroups.in_progress}
+                projectId={projectId}
+                icon={<Clock className="h-4 w-4 text-warning" />}
+                onStatusChange={handleStatusChange}
+              />
+              <StatusColumn
+                status="blocked"
+                title="Blocked"
+                items={statusGroups.blocked}
+                projectId={projectId}
+                icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+                onStatusChange={handleStatusChange}
+              />
+              <StatusColumn
+                status="done"
+                title="Done"
+                items={statusGroups.done}
+                projectId={projectId}
+                icon={<CheckCircle2 className="h-4 w-4 text-success" />}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
+          </DragDropContext>
         )}
 
         {!isLoading && items.length === 0 && (
@@ -147,6 +186,7 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
 }
 
 interface StatusColumnProps {
+  status: WorkItemStatus;
   title: string;
   items: WorkItem[];
   projectId: string;
@@ -154,7 +194,7 @@ interface StatusColumnProps {
   onStatusChange: (itemId: string, newStatus: WorkItemStatus) => void;
 }
 
-function StatusColumn({ title, items, projectId, icon, onStatusChange }: StatusColumnProps) {
+function StatusColumn({ status, title, items, projectId, icon, onStatusChange }: StatusColumnProps) {
   const typeIcons: Record<string, string> = {
     todo: "📋",
     bug: "🐛",
@@ -177,27 +217,55 @@ function StatusColumn({ title, items, projectId, icon, onStatusChange }: StatusC
           {title} ({items.length})
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {items.map((item) => (
-          <Link key={item.id} href={`/projects/${projectId}/work-items/${item.id}`}>
-            <div className="rounded-lg bg-background border border-border p-3 hover:border-primary/50 transition-colors cursor-pointer">
-              <div className="flex items-start gap-2">
-                <span className="text-sm">{typeIcons[item.type] || "📋"}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium line-clamp-2">{item.title}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant={priorityColors[item.priority]} className="text-xs">
-                      {item.priority}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{formatRelativeTime(item.updated_at)}</span>
+      <Droppable droppableId={status}>
+        {(provided, snapshot) => (
+          <CardContent
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`space-y-3 min-h-[100px] transition-colors ${snapshot.isDraggingOver ? "bg-primary/10" : ""}`}
+          >
+            {items.map((item, index) => (
+              <Draggable key={item.id} draggableId={item.id} index={index}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`rounded-lg bg-background border border-border p-3 transition-all ${
+                      snapshot.isDragging
+                        ? "shadow-lg border-primary ring-2 ring-primary/20"
+                        : "hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div
+                        {...provided.dragHandleProps}
+                        className="mt-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm">{typeIcons[item.type] || "📋"}</span>
+                      <Link
+                        href={`/projects/${projectId}/work-items/${item.id}`}
+                        className="flex-1 min-w-0 hover:text-primary"
+                      >
+                        <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant={priorityColors[item.priority]} className="text-xs">
+                            {item.priority}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{formatRelativeTime(item.updated_at)}</span>
+                        </div>
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-        {items.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No items</p>}
-      </CardContent>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+            {items.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No items</p>}
+          </CardContent>
+        )}
+      </Droppable>
     </Card>
   );
 }
