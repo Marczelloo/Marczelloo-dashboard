@@ -400,6 +400,7 @@ export async function deployProjectAction(
         deployRecord = await deploys.createDeploy({
           service_id: primaryService.id,
           triggered_by: user.email,
+          logs_object_key: logFile, // Store log file path for later retrieval
         });
         await deploys.startDeploy(deployRecord.id);
         console.log(`[Deploy] Created deploy record: ${deployRecord.id}`);
@@ -543,5 +544,94 @@ export async function checkDeployLogAction(
   } catch (error) {
     console.error("checkDeployLogAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to check log" };
+  }
+}
+
+/**
+ * Check and update all stale "running" deploys
+ * Call this periodically or when viewing dashboard
+ */
+export async function refreshRunningDeploysAction(): Promise<ActionResult<{ updated: number }>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    if (!RUNNER_TOKEN) {
+      return { success: false, error: "Runner not configured" };
+    }
+
+    // Get all running deploys
+    const runningDeploys = await deploys.getDeploys({
+      filters: [{ operator: "eq", column: "status", value: "running" }],
+    });
+
+    if (runningDeploys.length === 0) {
+      return { success: true, data: { updated: 0 } };
+    }
+
+    // Check if any docker compose build is still running
+    const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `pgrep -f "docker compose.*up.*build" > /dev/null && echo "RUNNING" || echo "COMPLETE"`,
+      }),
+    });
+
+    let anyBuildRunning = false;
+    if (checkResponse.ok) {
+      const checkResult = await checkResponse.json();
+      anyBuildRunning = checkResult.stdout?.includes("RUNNING") ?? false;
+    }
+
+    let updated = 0;
+
+    for (const deploy of runningDeploys) {
+      // If no build is running, mark as complete
+      if (!anyBuildRunning) {
+        // Try to check the log file for errors if we have a path
+        let hasError = false;
+        if (deploy.logs_object_key) {
+          try {
+            const logResponse = await fetch(`${RUNNER_URL}/shell`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${RUNNER_TOKEN}`,
+              },
+              body: JSON.stringify({
+                command: `tail -100 "${deploy.logs_object_key}" 2>/dev/null || echo ""`,
+              }),
+            });
+            if (logResponse.ok) {
+              const logResult = await logResponse.json();
+              const log = logResult.stdout || "";
+              hasError = log.toLowerCase().includes("error") && !log.includes("0 errors");
+            }
+          } catch {
+            // Ignore log read errors
+          }
+        }
+
+        await deploys.completeDeploy(deploy.id, !hasError, {
+          error_message: hasError ? "Build completed with errors" : undefined,
+        });
+        updated++;
+      }
+    }
+
+    if (updated > 0) {
+      revalidatePath("/dashboard");
+    }
+
+    return { success: true, data: { updated } };
+  } catch (error) {
+    console.error("refreshRunningDeploysAction error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to refresh deploys" };
   }
 }

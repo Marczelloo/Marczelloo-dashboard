@@ -208,6 +208,7 @@ export interface CreateDeployInput {
   service_id: string;
   triggered_by: string;
   commit_sha?: string;
+  logs_object_key?: string;
 }
 
 export interface CreateUptimeCheckInput {

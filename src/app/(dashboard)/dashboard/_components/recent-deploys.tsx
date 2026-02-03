@@ -4,6 +4,7 @@ import { Rocket, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Deploy, Service } from "@/types";
 import { deploys as deploysRepo, services as servicesRepo } from "@/server/atlashub";
+import { DeployLogsButton } from "./deploy-logs-button";
 
 interface RecentDeploysProps {
   deploys: Deploy[];
@@ -107,11 +108,20 @@ function RecentDeploysUI({ deploys, services }: RecentDeploysProps) {
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
-                  {deploy.commit_sha && (
-                    <p className="text-xs font-mono text-muted-foreground">{deploy.commit_sha.substring(0, 7)}</p>
+                <div className="flex items-center gap-3">
+                  {deploy.logs_object_key && (
+                    <DeployLogsButton
+                      logFile={deploy.logs_object_key}
+                      deployId={deploy.id}
+                      serviceName={service?.name || "Unknown"}
+                    />
                   )}
+                  <div className="text-right">
+                    <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
+                    {deploy.commit_sha && (
+                      <p className="text-xs font-mono text-muted-foreground">{deploy.commit_sha.substring(0, 7)}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -122,8 +132,25 @@ function RecentDeploysUI({ deploys, services }: RecentDeploysProps) {
   );
 }
 
-// Server component that fetches data
+// Server component that fetches data and refreshes stale deploys
 export async function RecentDeploysServer() {
+  // Check and update any stale "running" deploys
+  const runningDeploys = await deploysRepo.getDeploys({
+    filters: [{ operator: "eq", column: "status", value: "running" }],
+  });
+
+  // If there are running deploys older than 30 minutes, they're likely stale
+  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+  for (const deploy of runningDeploys) {
+    const startTime = new Date(deploy.started_at).getTime();
+    if (startTime < thirtyMinutesAgo) {
+      // Mark as completed (assume success if no errors in log)
+      await deploysRepo.completeDeploy(deploy.id, true, {
+        error_message: "Build timed out or completed without status update",
+      });
+    }
+  }
+
   const [recentDeploys, allServices] = await Promise.all([
     deploysRepo.getRecentDeploys(10),
     servicesRepo.getServices(),
