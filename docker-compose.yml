@@ -72,6 +72,14 @@ services:
     environment:
       - RUNNER_PORT=8787
       - RUNNER_TOKEN=${RUNNER_TOKEN}
+      # SSH configuration for host access
+      - SSH_ENABLED=true
+      - SSH_HOST=host.docker.internal
+      - SSH_USER=${SSH_USER:-pi}
+      - SSH_KEY_PATH=/root/.ssh/id_rsa
+      - DEFAULT_CWD=${DEFAULT_CWD:-/home/pi}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Mount host Docker socket for container management
       - /var/run/docker.sock:/var/run/docker.sock
@@ -79,6 +87,8 @@ services:
       - ${PROJECTS_DIR:-/home/pi/projects}:/projects:rw
       # Persist allowlist configuration
       - runner_data:/app/data
+      # Mount SSH key for host access (create with: ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner)
+      - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
     networks:
       - marczelloo
 

@@ -20,6 +20,11 @@ const execAsync = promisify(exec);
 // Configuration
 const PORT = parseInt(process.env.RUNNER_PORT || "8787", 10);
 const TOKEN = process.env.RUNNER_TOKEN;
+// SSH configuration for host access
+const SSH_HOST = process.env.SSH_HOST || "host.docker.internal";
+const SSH_USER = process.env.SSH_USER || "pi";
+const SSH_KEY_PATH = process.env.SSH_KEY_PATH || "/root/.ssh/id_rsa";
+const SSH_ENABLED = process.env.SSH_ENABLED !== "false"; // Enable SSH by default
 // Use data directory for persistent config (mounted volume in Docker)
 const DATA_DIR = process.env.RUNNER_DATA_DIR || path.join(__dirname, "data");
 const ALLOWLIST_FILE = path.join(DATA_DIR, "allowlist.json");
@@ -249,11 +254,19 @@ const server = http.createServer(async (req, res) => {
 
   // Status endpoint (no auth required)
   if (req.method === "GET" && url === "/status") {
+    const sshKeyExists = fs.existsSync(SSH_KEY_PATH);
     res.writeHead(200);
     res.end(
       JSON.stringify({
         status: "running",
         uptime: process.uptime(),
+        ssh: {
+          enabled: SSH_ENABLED,
+          configured: sshKeyExists,
+          host: SSH_HOST,
+          user: SSH_USER,
+          key_path: SSH_KEY_PATH,
+        },
         allowlist_count: {
           repos: ALLOWLIST.repo_paths.length,
           projects: ALLOWLIST.compose_projects.length,
@@ -344,7 +357,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /shell - execute shell commands (with safety restrictions)
+  // POST /shell - execute shell commands on HOST via SSH (with safety restrictions)
   if (req.method === "POST" && url === "/shell") {
     let body = "";
     for await (const chunk of req) {
@@ -381,21 +394,42 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Execute with timeout using sh (Alpine compatible) for proper shell handling
       const start = Date.now();
-      const workingDir = cwd || process.env.HOME || "/home/pi";
+      const workingDir = cwd || process.env.DEFAULT_CWD || "/home/pi";
 
-      // Use /bin/sh -c for Alpine compatibility (bash not always available)
-      const shellCommand = `/bin/sh -c ${JSON.stringify(command)}`;
+      let shellCommand: string;
+      let execOptions: { timeout: number; maxBuffer: number; env?: NodeJS.ProcessEnv };
+
+      if (SSH_ENABLED && fs.existsSync(SSH_KEY_PATH)) {
+        // Use SSH to execute command on host
+        // Build the remote command with cd if cwd specified
+        const remoteCommand = cwd 
+          ? `cd ${JSON.stringify(cwd)} && ${command}`
+          : command;
+        
+        shellCommand = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i ${SSH_KEY_PATH} ${SSH_USER}@${SSH_HOST} ${JSON.stringify(remoteCommand)}`;
+        execOptions = {
+          timeout: 60000,
+          maxBuffer: 5 * 1024 * 1024,
+        };
+        console.log(`[${new Date().toISOString()}] SSH to ${SSH_USER}@${SSH_HOST}: "${command}"`);
+      } else {
+        // Fallback to local execution (for development or when SSH not configured)
+        console.log(`[${new Date().toISOString()}] Local shell (SSH not configured): "${command}"`);
+        shellCommand = `/bin/sh -c ${JSON.stringify(command)}`;
+        execOptions = {
+          timeout: 60000,
+          maxBuffer: 5 * 1024 * 1024,
+          env: { ...process.env, TERM: "xterm-256color", HOME: process.env.HOME || "/home/pi" },
+        };
+      }
 
       const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
         exec(
           shellCommand,
           {
-            cwd: workingDir,
-            timeout: 60000, // 60 second timeout for longer operations
-            maxBuffer: 5 * 1024 * 1024, // 5MB buffer
-            env: { ...process.env, TERM: "xterm-256color", HOME: process.env.HOME || "/home/pi" },
+            ...execOptions,
+            cwd: SSH_ENABLED ? undefined : workingDir, // Only set cwd for local execution
           },
           (error, stdout, stderr) => {
             resolve({
@@ -417,11 +451,12 @@ const server = http.createServer(async (req, res) => {
           stderr: result.stderr,
           exit_code: result.code,
           cwd: workingDir,
+          ssh_enabled: SSH_ENABLED && fs.existsSync(SSH_KEY_PATH),
           duration_ms: Date.now() - start,
           timestamp: new Date().toISOString(),
         })
       );
-    } catch (e) {
+    } catch {
       res.writeHead(400);
       res.end(JSON.stringify({ error: "Invalid JSON" }));
     }

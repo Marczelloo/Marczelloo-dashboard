@@ -114,6 +114,58 @@ The runner only executes operations for items in its allowlist. Configure via:
 
 Docker management UI. Dashboard uses Portainer API for container operations.
 
+## Terminal SSH Setup
+
+The dashboard terminal feature requires SSH access from the runner container to the Pi host.
+
+### 1. Generate SSH Key (on Pi)
+
+```bash
+# Generate a dedicated SSH key for the dashboard
+ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
+
+# Add to authorized_keys
+cat ~/.ssh/dashboard_runner.pub >> ~/.ssh/authorized_keys
+
+# Ensure correct permissions
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### 2. Configure Environment
+
+Add to your `.env` file:
+
+```bash
+SSH_USER=pi                          # Your Pi username
+SSH_KEY_PATH=~/.ssh/dashboard_runner # Path to private key
+DEFAULT_CWD=/home/pi                 # Default terminal directory
+PROJECTS_DIR=/home/pi/projects       # Projects directory
+```
+
+### 3. Restart Services
+
+```bash
+docker-compose down
+docker-compose up -d --build
+```
+
+### 4. Verify SSH Connection
+
+Check runner status at `http://localhost:8787/status` - you should see:
+
+```json
+{
+  "ssh": {
+    "enabled": true,
+    "configured": true,
+    "host": "host.docker.internal",
+    "user": "pi"
+  }
+}
+```
+
+**Note:** If `configured: false`, the SSH key mount failed. Check the key path exists.
+
 ## Settings Page Features
 
 ### Monitoring Interval

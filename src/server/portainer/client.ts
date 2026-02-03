@@ -159,16 +159,21 @@ export async function getContainer(endpointId: number, containerId: string): Pro
 }
 
 export async function getContainerLogs(endpointId: number, containerId: string, tail = 100): Promise<ContainerLogs> {
-  const response = await portainerRequest<string>(
-    `/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`,
-    {},
-    false // Don't parse as JSON - logs are raw text
-  );
+  try {
+    const response = await portainerRequest<string>(
+      `/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`,
+      {},
+      false // Don't parse as JSON - logs are raw text
+    );
 
-  return {
-    logs: typeof response === "string" ? response : JSON.stringify(response),
-    timestamp: new Date().toISOString(),
-  };
+    return {
+      logs: typeof response === "string" ? response : JSON.stringify(response),
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error(`[Portainer] Failed to get logs for container ${containerId}:`, error);
+    throw error;
+  }
 }
 
 export async function performContainerAction(

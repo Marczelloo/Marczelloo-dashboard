@@ -1,8 +1,8 @@
 # Runner service Dockerfile
 FROM node:20-alpine
 
-# Install Docker CLI for container management
-RUN apk add --no-cache docker-cli git
+# Install Docker CLI for container management, SSH client for host access
+RUN apk add --no-cache docker-cli git openssh-client
 
 WORKDIR /app
 
@@ -15,8 +15,8 @@ RUN npm install
 # Copy source files
 COPY . .
 
-# Create data directory for persistent config
-RUN mkdir -p /app/data
+# Create directories for persistent config and SSH
+RUN mkdir -p /app/data /root/.ssh
 ENV RUNNER_DATA_DIR=/app/data
 
 # Expose port

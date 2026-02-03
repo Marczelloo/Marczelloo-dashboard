@@ -51,6 +51,7 @@ export function ContainerActions({ containerId, endpointId, isRunning }: Contain
   async function fetchLogs() {
     setLogsLoading(true);
     setLogsOpen(true);
+    setLogs(""); // Clear previous logs
 
     try {
       const response = await fetch("/api/containers/logs", {
@@ -61,13 +62,20 @@ export function ContainerActions({ containerId, endpointId, isRunning }: Contain
 
       const result = await response.json();
 
+      if (!response.ok) {
+        setLogs(`Error (${response.status}): ${result.error || "Failed to fetch logs"}`);
+        return;
+      }
+
       if (result.logs) {
         setLogs(result.logs);
+      } else if (result.error) {
+        setLogs(`Error: ${result.error}`);
       } else {
-        setLogs(result.error || "Failed to fetch logs");
+        setLogs("No logs available");
       }
-    } catch {
-      setLogs("Failed to fetch logs");
+    } catch (err) {
+      setLogs(`Network error: ${err instanceof Error ? err.message : "Failed to fetch logs"}`);
     } finally {
       setLogsLoading(false);
     }
