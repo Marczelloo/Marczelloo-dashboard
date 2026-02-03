@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   BookOpen,
+  Cpu,
 } from "lucide-react";
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/services", label: "Services", icon: Server },
   { href: "/monitoring", label: "Monitoring", icon: Activity },
   { href: "/containers", label: "Containers", icon: Container },
+  { href: "/pi", label: "Raspberry Pi", icon: Cpu },
   { href: "/terminal", label: "Terminal", icon: Terminal },
   { href: "/audit-log", label: "Audit Log", icon: History },
   { href: "/docs", label: "Documentation", icon: BookOpen },

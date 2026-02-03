@@ -109,13 +109,12 @@ function RecentDeploysUI({ deploys, services }: RecentDeploysProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {deploy.logs_object_key && (
-                    <DeployLogsButton
-                      logFile={deploy.logs_object_key}
-                      deployId={deploy.id}
-                      serviceName={service?.name || "Unknown"}
-                    />
-                  )}
+                  <DeployLogsButton
+                    logFile={deploy.logs_object_key || ""}
+                    deployId={deploy.id}
+                    serviceName={service?.name || "Unknown"}
+                    hasLogFile={!!deploy.logs_object_key}
+                  />
                   <div className="text-right">
                     <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
                     {deploy.commit_sha && (
@@ -139,11 +138,11 @@ export async function RecentDeploysServer() {
     filters: [{ operator: "eq", column: "status", value: "running" }],
   });
 
-  // If there are running deploys older than 30 minutes, they're likely stale
-  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+  // If there are running deploys older than 10 minutes, they're likely stale
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
   for (const deploy of runningDeploys) {
     const startTime = new Date(deploy.started_at).getTime();
-    if (startTime < thirtyMinutesAgo) {
+    if (startTime < tenMinutesAgo) {
       // Mark as completed (assume success if no errors in log)
       await deploysRepo.completeDeploy(deploy.id, true, {
         error_message: "Build timed out or completed without status update",

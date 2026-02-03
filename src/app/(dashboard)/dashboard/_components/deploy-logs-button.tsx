@@ -10,15 +10,22 @@ interface DeployLogsButtonProps {
   logFile: string;
   deployId: string;
   serviceName: string;
+  hasLogFile?: boolean;
 }
 
-export function DeployLogsButton({ logFile, deployId, serviceName }: DeployLogsButtonProps) {
+export function DeployLogsButton({ logFile, deployId, serviceName, hasLogFile = true }: DeployLogsButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   async function handleOpen() {
+    if (!hasLogFile) {
+      setOpen(true);
+      setError("No log file available for this deployment");
+      return;
+    }
+
     setOpen(true);
     setLoading(true);
     setError(null);
