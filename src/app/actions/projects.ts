@@ -341,8 +341,53 @@ export async function deployProjectAction(
     output += `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
     console.log(`[Deploy] Git pull result: ${pullResult.stdout?.substring(0, 200)}`);
 
-    // Step 2: Docker Compose Build and Up
+    // Step 2: Check what services and profiles exist in compose file
+    console.log(`[Deploy] Checking compose services and profiles...`);
+    let profileFlags = "";
+    
+    const profilesCheckResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `cd "${repoPath}" && docker compose config --profiles 2>&1`,
+      }),
+    });
+
+    if (profilesCheckResponse.ok) {
+      const profilesResult = await profilesCheckResponse.json();
+      const profiles = (profilesResult.stdout || "").trim().split("\n").filter(Boolean);
+      if (profiles.length > 0) {
+        profileFlags = profiles.map((p: string) => `--profile ${p.trim()}`).join(" ");
+        output += `=== Profiles ===\n${profiles.join(", ")}\n\n`;
+        console.log(`[Deploy] Profiles found: ${profiles.join(", ")}`);
+      }
+    }
+
+    const servicesCheckResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `cd "${repoPath}" && docker compose ${profileFlags} config --services 2>&1`,
+      }),
+    });
+
+    if (servicesCheckResponse.ok) {
+      const servicesResult = await servicesCheckResponse.json();
+      output += `=== Available Services ===\n${servicesResult.stdout || servicesResult.stderr || "No services found"}\n\n`;
+      console.log(`[Deploy] Services: ${servicesResult.stdout?.trim()}`);
+    }
+
+    // Step 3: Docker Compose Build and Up
     console.log(`[Deploy] Running docker compose...`);
+    const composeCmd = `cd "${repoPath}" && docker compose ${profileFlags} up -d --build 2>&1`;
+    console.log(`[Deploy] Command: ${composeCmd}`);
+    
     const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -350,7 +395,7 @@ export async function deployProjectAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && docker compose up -d --build 2>&1`,
+        command: composeCmd,
       }),
     });
 
