@@ -160,15 +160,77 @@ export async function getContainer(endpointId: number, containerId: string): Pro
 
 export async function getContainerLogs(endpointId: number, containerId: string, tail = 1000): Promise<ContainerLogs> {
   try {
-    // Note: timestamps=false to get cleaner output
-    const response = await portainerRequest<string>(
-      `/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=false`,
-      {},
-      false // Don't parse as JSON - logs are raw text
-    );
+    const config = await getConfig();
+    const url = `${config.url}/api/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=false`;
+
+    // Fetch raw binary data - Docker multiplexed streams are binary
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const error = await response.text().catch(() => response.statusText);
+      throw new PortainerError(`Portainer API error: ${response.status} - ${error}`, response.status);
+    }
+
+    // Get as ArrayBuffer to properly handle binary multiplexed stream
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Parse Docker multiplexed stream format
+    // Each frame: [stream_type: 1 byte][0][0][0][size: 4 bytes big-endian][payload: size bytes]
+    // stream_type: 0=stdin, 1=stdout, 2=stderr
+    const textDecoder = new TextDecoder("utf-8", { fatal: false });
+    const chunks: string[] = [];
+
+    // Check if this is multiplexed format
+    const isMultiplexed =
+      uint8Array.length > 8 &&
+      (uint8Array[0] === 1 || uint8Array[0] === 2) &&
+      uint8Array[1] === 0 &&
+      uint8Array[2] === 0 &&
+      uint8Array[3] === 0;
+
+    if (isMultiplexed) {
+      let offset = 0;
+
+      while (offset + 8 <= uint8Array.length) {
+        // Read 4-byte size (big-endian) at offset+4
+        const size =
+          (uint8Array[offset + 4] << 24) |
+          (uint8Array[offset + 5] << 16) |
+          (uint8Array[offset + 6] << 8) |
+          uint8Array[offset + 7];
+
+        offset += 8;
+
+        // Sanity check
+        if (size <= 0 || size > 10000000 || offset + size > uint8Array.length) {
+          break;
+        }
+
+        // Extract payload and decode as UTF-8
+        const payload = uint8Array.slice(offset, offset + size);
+        chunks.push(textDecoder.decode(payload));
+        offset += size;
+      }
+
+      console.log(`[Portainer] Parsed ${chunks.length} multiplexed frames from ${uint8Array.length} bytes`);
+    } else {
+      // Plain text - decode the whole buffer
+      chunks.push(textDecoder.decode(uint8Array));
+    }
+
+    let logs = chunks.join("");
+
+    // Clean up control characters but keep newlines, tabs
+    logs = logs.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim();
 
     return {
-      logs: typeof response === "string" ? response : JSON.stringify(response),
+      logs,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {

@@ -181,8 +181,11 @@ export async function deployProjectAction(
     const user = await requirePinVerification();
 
     if (!RUNNER_TOKEN) {
-      return { success: false, error: "Runner not configured" };
+      return { success: false, error: "Runner not configured (missing RUNNER_TOKEN)" };
     }
+
+    console.log(`[Deploy] Starting deployment for project ${id}, customPath: ${customRepoPath || "(none)"}`);
+    console.log(`[Deploy] Runner URL: ${RUNNER_URL}`);
 
     // Get project and its services
     const project = await projects.getProjectById(id);
@@ -190,19 +193,19 @@ export async function deployProjectAction(
       return { success: false, error: "Project not found" };
     }
 
-    const projectServices = await services.getServicesByProjectId(id);
-
-    // Use custom path if provided, otherwise try to detect
-    let repoPath: string | null = customRepoPath || null;
+    // Use custom path if provided
+    let repoPath: string | null = customRepoPath?.trim() || null;
     let detectedPath: string | undefined;
 
     if (!repoPath) {
+      const projectServices = await services.getServicesByProjectId(id);
+
       // Try to find repo path from services
       for (const service of projectServices) {
         if (service.repo_path) {
           repoPath = service.repo_path;
           detectedPath = repoPath;
-          console.log(`[Deploy Project] Found repo_path from service: ${repoPath}`);
+          console.log(`[Deploy] Found repo_path from service: ${repoPath}`);
           break;
         }
       }
@@ -217,7 +220,7 @@ export async function deployProjectAction(
         `${projectsDir}/${project.name.replace(/\s+/g, "-")}`,
       ];
 
-      console.log(`[Deploy Project] No service repo_path found, trying paths:`, possiblePaths);
+      console.log(`[Deploy] No service repo_path, trying paths:`, possiblePaths);
 
       // Check which path exists
       for (const path of possiblePaths) {
@@ -235,15 +238,17 @@ export async function deployProjectAction(
 
           if (checkResponse.ok) {
             const result = await checkResponse.json();
-            console.log(`[Deploy Project] Check ${path}: ${result.stdout}`);
+            console.log(`[Deploy] Check ${path}: ${result.stdout?.trim()}`);
             if (result.stdout?.includes("EXISTS")) {
               repoPath = path;
               detectedPath = path;
               break;
             }
+          } else {
+            console.log(`[Deploy] Check ${path} failed: ${checkResponse.status}`);
           }
         } catch (e) {
-          console.error(`[Deploy Project] Error checking path ${path}:`, e);
+          console.error(`[Deploy] Error checking path ${path}:`, e);
         }
       }
     }
@@ -251,14 +256,37 @@ export async function deployProjectAction(
     if (!repoPath) {
       return {
         success: false,
-        error: "Could not find project directory. Please enter the repo path manually or set repo_path on a service.",
-        data: { output: "", detectedPath: undefined },
+        error: "Could not find project directory. Please enter the repo path manually.",
       };
     }
 
-    console.log(`[Deploy Project] Deploying ${project.name} from ${repoPath}`);
+    console.log(`[Deploy] Using path: ${repoPath}`);
+    let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\n\n`;
 
     // Step 0: Check for docker-compose.yml
+    console.log(`[Deploy] Checking for docker-compose.yml...`);
+    try {
+      const checkComposeResponse = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          command: `ls -la "${repoPath}" 2>&1 | head -20`,
+        }),
+      });
+
+      if (checkComposeResponse.ok) {
+        const lsResult = await checkComposeResponse.json();
+        output += `=== Directory Contents ===\n${lsResult.stdout || lsResult.stderr || "No output"}\n\n`;
+        console.log(`[Deploy] Directory listing: ${lsResult.stdout?.substring(0, 200)}`);
+      }
+    } catch (e) {
+      console.error(`[Deploy] Error listing directory:`, e);
+    }
+
+    // Check for compose file
     const checkComposeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -272,12 +300,26 @@ export async function deployProjectAction(
 
     if (checkComposeResponse.ok) {
       const checkResult = await checkComposeResponse.json();
+      console.log(`[Deploy] Compose file check: ${checkResult.stdout?.trim()}`);
       if (checkResult.stdout?.includes("NOT_FOUND")) {
-        return { success: false, error: `No docker-compose.yml found in ${repoPath}` };
+        return {
+          success: false,
+          error: `No docker-compose.yml found in ${repoPath}`,
+          data: { output, detectedPath },
+        };
       }
+    } else {
+      const errorText = await checkComposeResponse.text();
+      console.error(`[Deploy] Compose check failed: ${checkComposeResponse.status} - ${errorText}`);
+      return {
+        success: false,
+        error: `Runner error checking compose file: ${checkComposeResponse.status}`,
+        data: { output, detectedPath },
+      };
     }
 
     // Step 1: Git Pull
+    console.log(`[Deploy] Running git pull...`);
     const pullResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -285,19 +327,22 @@ export async function deployProjectAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && git pull`,
+        command: `cd "${repoPath}" && git pull 2>&1`,
       }),
     });
 
     if (!pullResponse.ok) {
       const error = await pullResponse.text();
+      console.error(`[Deploy] Git pull failed: ${error}`);
       return { success: false, error: `Git pull failed: ${error}` };
     }
 
     const pullResult = await pullResponse.json();
-    let output = `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
+    output += `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
+    console.log(`[Deploy] Git pull result: ${pullResult.stdout?.substring(0, 200)}`);
 
-    // Step 2: Docker Compose Build and Up (use -f to specify file explicitly)
+    // Step 2: Docker Compose Build and Up
+    console.log(`[Deploy] Running docker compose...`);
     const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -311,12 +356,14 @@ export async function deployProjectAction(
 
     if (!composeResponse.ok) {
       const error = await composeResponse.text();
+      console.error(`[Deploy] Docker compose failed: ${error}`);
       output += `=== Docker Compose ===\nFailed: ${error}`;
       return { success: false, error: output };
     }
 
     const composeResult = await composeResponse.json();
     output += `=== Docker Compose ===\n${composeResult.stdout || composeResult.stderr || "No output"}`;
+    console.log(`[Deploy] Docker compose result: success=${composeResult.success}`);
 
     // Log the deployment
     await auditLogs.logAction(user.email, "deploy", "project", id, {
