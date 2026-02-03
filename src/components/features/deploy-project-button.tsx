@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Rocket, Loader2, FolderOpen } from "lucide-react";
+import { Rocket, Loader2, FolderOpen, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { deployProjectAction } from "@/app/actions/projects";
+import { deployProjectAction, checkDeployLogAction } from "@/app/actions/projects";
 
 interface DeployProjectButtonProps {
   projectId: string;
@@ -27,11 +27,16 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
   const [customPath, setCustomPath] = useState("");
   const [output, setOutput] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [logFile, setLogFile] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [buildComplete, setBuildComplete] = useState(false);
 
   function handleClick() {
     // Show config dialog first
     setError(null);
     setOutput("");
+    setLogFile(null);
+    setBuildComplete(false);
     setShowConfigDialog(true);
   }
 
@@ -39,6 +44,8 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
     setIsDeploying(true);
     setError(null);
     setOutput("");
+    setLogFile(null);
+    setBuildComplete(false);
     setShowConfigDialog(false);
     setShowOutputDialog(true);
 
@@ -50,10 +57,17 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
       const result = await deployProjectAction(projectId, pathToUse);
 
       if (result.success && result.data) {
-        setOutput(result.data.output);
+        let outputText = result.data.output;
         // If detected path was returned, show it
         if (result.data.detectedPath && !customPath) {
-          setOutput((prev) => `Detected path: ${result.data!.detectedPath}\n\n${prev}`);
+          outputText = `Detected path: ${result.data.detectedPath}\n\n${outputText}`;
+        }
+        setOutput(outputText);
+        
+        // Extract log file path from output
+        const logMatch = outputText.match(/Log file: (\/tmp\/deploy-[^\s]+\.log)/);
+        if (logMatch) {
+          setLogFile(logMatch[1]);
         }
       } else {
         setError(result.error || "Deployment failed");
@@ -63,6 +77,30 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
       setError(err instanceof Error ? err.message : "Deployment failed");
     } finally {
       setIsDeploying(false);
+    }
+  }
+
+  async function handleCheckStatus() {
+    if (!logFile) return;
+    
+    setIsChecking(true);
+    try {
+      const result = await checkDeployLogAction(logFile);
+      if (result.success && result.data) {
+        setOutput(prev => {
+          // Keep the header info, replace log content
+          const headerEnd = prev.indexOf("=== Docker Compose ===");
+          const header = headerEnd > 0 ? prev.substring(0, headerEnd) : "";
+          return `${header}=== Docker Compose Build Log ===\n${result.data!.log}\n\n${result.data!.isComplete ? "✅ Build process completed" : "⏳ Build still running..."}`;
+        });
+        setBuildComplete(result.data.isComplete);
+      } else {
+        setError(result.error || "Failed to check status");
+      }
+    } catch (err) {
+      console.error("[Deploy] Check status error:", err);
+    } finally {
+      setIsChecking(false);
     }
   }
 
@@ -123,16 +161,33 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
       <Dialog open={showOutputDialog} onOpenChange={setShowOutputDialog}>
         <DialogContent className="max-w-4xl h-[70vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Deploy: {projectName}</DialogTitle>
-            <DialogDescription>
-              {isDeploying ? "Deploying..." : error ? "Deployment failed" : "Deployment complete"}
+            <DialogTitle className="flex items-center gap-2">
+              Deploy: {projectName}
+              {buildComplete && <CheckCircle2 className="h-5 w-5 text-success" />}
+              {logFile && !buildComplete && <Clock className="h-5 w-5 text-warning" />}
+            </DialogTitle>
+            <DialogDescription className="flex items-center justify-between">
+              <span>
+                {isDeploying ? "Starting deployment..." : error ? "Deployment failed" : logFile ? "Build running in background" : "Deployment started"}
+              </span>
+              {logFile && !isDeploying && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheckStatus}
+                  disabled={isChecking}
+                >
+                  {isChecking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Check Status
+                </Button>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-auto bg-secondary/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
             {isDeploying ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Running git pull and docker compose...</span>
+                <span className="ml-2 text-muted-foreground">Starting deployment...</span>
               </div>
             ) : error ? (
               <div className="text-danger">{error}</div>

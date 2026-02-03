@@ -434,3 +434,68 @@ export async function deployProjectAction(
     return { success: false, error: error instanceof Error ? error.message : "Deployment failed" };
   }
 }
+
+/**
+ * Check the status of a background deployment by reading the log file
+ */
+export async function checkDeployLogAction(
+  logFile: string
+): Promise<ActionResult<{ log: string; isComplete: boolean }>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    if (!RUNNER_TOKEN) {
+      return { success: false, error: "Runner not configured" };
+    }
+
+    // Validate log file path (must be in /tmp and match our pattern)
+    if (!logFile.startsWith("/tmp/deploy-") || !logFile.endsWith(".log")) {
+      return { success: false, error: "Invalid log file path" };
+    }
+
+    // Check if process is still running
+    const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `pgrep -f "docker compose.*up.*build" > /dev/null && echo "RUNNING" || echo "COMPLETE"`,
+      }),
+    });
+
+    let isComplete = true;
+    if (checkResponse.ok) {
+      const checkResult = await checkResponse.json();
+      isComplete = checkResult.stdout?.includes("COMPLETE") ?? true;
+    }
+
+    // Get the log file contents (last 200 lines)
+    const logResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `tail -200 "${logFile}" 2>&1 || echo "Log file not found or empty"`,
+      }),
+    });
+
+    if (!logResponse.ok) {
+      return { success: false, error: "Failed to read log file" };
+    }
+
+    const logResult = await logResponse.json();
+    const log = logResult.stdout || logResult.stderr || "No log output";
+
+    return { success: true, data: { log, isComplete } };
+  } catch (error) {
+    console.error("checkDeployLogAction error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to check log" };
+  }
+}
