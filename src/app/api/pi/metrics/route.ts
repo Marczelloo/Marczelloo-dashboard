@@ -78,26 +78,70 @@ export async function GET() {
       uptime,
       loadavg,
       cpuInfo,
-      memInfo,
-      diskInfo,
+      memInfoRaw,
+      diskInfoRaw,
       tempInfo,
       dockerRunning,
       dockerStopped,
       dockerImages,
-      ipInfo,
+      ipInfoRaw,
     ] = await Promise.all([
       runCommand("hostname").catch(() => "unknown"),
       runCommand("uptime -p").catch(() => "unknown"),
       runCommand("cat /proc/loadavg").catch(() => "0 0 0 0 0"),
       runCommand("nproc").catch(() => "4"),
-      runCommand("free -m | awk '/Mem:/ {print $2,$3,$4,$7}'").catch(() => "0 0 0 0"),
-      runCommand("df -h / | awk 'NR==2 {print $2,$3,$4,$5}'").catch(() => "0 0 0 0%"),
+      runCommand("free -m").catch(() => ""),
+      runCommand("df -h /").catch(() => ""),
       runCommand("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0").catch(() => "0"),
       runCommand("docker ps -q 2>/dev/null | wc -l").catch(() => "0"),
-      runCommand("docker ps -aq --filter 'status=exited' 2>/dev/null | wc -l").catch(() => "0"),
+      runCommand("docker ps -aq --filter status=exited 2>/dev/null | wc -l").catch(() => "0"),
       runCommand("docker images -q 2>/dev/null | wc -l").catch(() => "0"),
-      runCommand("hostname -I | awk '{print $1}'").catch(() => "unknown"),
+      runCommand("hostname -I").catch(() => "unknown"),
     ]);
+
+    // Parse memory from raw free -m output
+    // Format: "              total        used        free      shared  buff/cache   available\nMem:           7851        2134        3892..."
+    let memTotal = 0,
+      memUsed = 0,
+      memFree = 0,
+      memAvailable = 0;
+    const memLines = memInfoRaw.split("\n");
+    for (const line of memLines) {
+      if (line.startsWith("Mem:")) {
+        const parts = line.split(/\s+/).filter(Boolean);
+        // parts: ["Mem:", total, used, free, shared, buff/cache, available]
+        memTotal = parseInt(parts[1]) || 0;
+        memUsed = parseInt(parts[2]) || 0;
+        memFree = parseInt(parts[3]) || 0;
+        memAvailable = parseInt(parts[6]) || parseInt(parts[3]) || 0;
+        break;
+      }
+    }
+
+    // Parse disk from raw df -h output
+    // Format: "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        50G   20G   28G  42% /"
+    let diskTotal = "0G",
+      diskUsed = "0G",
+      diskAvailable = "0G",
+      diskUsagePercent = 0;
+    const diskLines = diskInfoRaw.split("\n");
+    for (let i = 1; i < diskLines.length; i++) {
+      const line = diskLines[i];
+      if (line.trim()) {
+        const parts = line.split(/\s+/).filter(Boolean);
+        // parts: [filesystem, size, used, avail, use%, mounted]
+        if (parts.length >= 5) {
+          diskTotal = parts[1] || "0G";
+          diskUsed = parts[2] || "0G";
+          diskAvailable = parts[3] || "0G";
+          diskUsagePercent = parseInt(parts[4]?.replace("%", "")) || 0;
+          break;
+        }
+      }
+    }
+
+    // Parse IP
+    const ipInfo = ipInfoRaw.split(/\s+/)[0] || "unknown";
 
     // Parse load average
     const loadParts = loadavg.split(" ");
@@ -109,17 +153,8 @@ export async function GET() {
     const cores = parseInt(cpuInfo) || 4;
     const cpuUsage = Math.min(100, Math.round((load1 / cores) * 100));
 
-    // Parse memory info: total used free available
-    const memParts = memInfo.split(" ");
-    const memTotal = parseInt(memParts[0]) || 0;
-    const memUsed = parseInt(memParts[1]) || 0;
-    const memFree = parseInt(memParts[2]) || 0;
-    const memAvailable = parseInt(memParts[3]) || 0;
+    // Calculate memory usage percent
     const memUsagePercent = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0;
-
-    // Parse disk info: total used available percent
-    const diskParts = diskInfo.split(" ");
-    const diskUsagePercent = parseInt(diskParts[3]?.replace("%", "")) || 0;
 
     // Parse temperature (Pi returns millidegrees)
     const tempRaw = parseInt(tempInfo) || 0;
@@ -143,9 +178,9 @@ export async function GET() {
         usagePercent: memUsagePercent,
       },
       disk: {
-        total: diskParts[0] || "0G",
-        used: diskParts[1] || "0G",
-        available: diskParts[2] || "0G",
+        total: diskTotal,
+        used: diskUsed,
+        available: diskAvailable,
         usagePercent: diskUsagePercent,
         mount: "/",
       },
