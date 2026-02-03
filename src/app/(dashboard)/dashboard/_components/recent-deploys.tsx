@@ -1,10 +1,9 @@
-"use client";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Rocket, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Deploy, Service } from "@/types";
+import { deploys as deploysRepo, services as servicesRepo } from "@/server/atlashub";
 
 interface RecentDeploysProps {
   deploys: Deploy[];
@@ -61,7 +60,7 @@ function getDuration(deploy: Deploy): string {
   return `${Math.round(durationMs / 3600000)}h`;
 }
 
-export function RecentDeploys({ deploys, services }: RecentDeploysProps) {
+function RecentDeploysUI({ deploys, services }: RecentDeploysProps) {
   const serviceMap = new Map(services.map((s) => [s.id, s]));
 
   if (deploys.length === 0) {
@@ -123,14 +122,12 @@ export function RecentDeploys({ deploys, services }: RecentDeploysProps) {
   );
 }
 
-// Server component wrapper to fetch data
-import { deploys as deploysRepo, services as servicesRepo } from "@/server/atlashub";
-
+// Server component that fetches data
 export async function RecentDeploysServer() {
   const [recentDeploys, allServices] = await Promise.all([
     deploysRepo.getRecentDeploys(10),
     servicesRepo.getServices(),
   ]);
 
-  return <RecentDeploys deploys={recentDeploys} services={allServices} />;
+  return <RecentDeploysUI deploys={recentDeploys} services={allServices} />;
 }
