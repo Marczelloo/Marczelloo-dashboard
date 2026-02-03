@@ -58,8 +58,8 @@ function loadAllowlist(): Allowlist {
 
   // Default allowlist
   return {
-    repo_paths: ["/home/Marczelloo_pi/projects/atlas-hub", "/home/Marczelloo_pi/projects/marczelloo-dashboard"],
-    compose_projects: ["atlas-hub", "marczelloo-dashboard"],
+    repo_paths: ["/home/Marczelloo_pi/projects/atlas-hub", "/home/Marczelloo_pi/projects/Marczelloo-dashboard"],
+    compose_projects: ["atlas-hub", "Marczelloo-dashboard"],
     container_names: ["atlashub-postgres", "atlashub-minio", "portainer"],
   };
 }

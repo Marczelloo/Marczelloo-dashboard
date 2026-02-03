@@ -54,6 +54,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [newIsSecret, setNewIsSecret] = useState(true);
+  const [saveToFile, setSaveToFile] = useState(false);
   const [adding, setAdding] = useState(false);
 
   // Edit state
@@ -107,6 +108,36 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     setAdding(true);
 
     try {
+      // If saving to file, use the save-file endpoint
+      if (saveToFile && repoPath) {
+        const fileResponse = await fetch("/api/env-vars/save-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repoPath,
+            filename: ".env",
+            action: "append",
+            vars: [{ key: newKey.trim(), value: newValue }],
+          }),
+        });
+        const fileResult = await fileResponse.json();
+        
+        if (!fileResult.success) {
+          setError(fileResult.error || "Failed to save to file");
+          return;
+        }
+        
+        // Show success
+        setNewKey("");
+        setNewValue("");
+        setShowAddForm(false);
+        setError(null);
+        // Show a success message briefly
+        alert(`Added ${newKey} to .env file`);
+        return;
+      }
+
+      // Otherwise save to database (encrypted)
       const response = await fetch("/api/env-vars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -564,23 +595,39 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 />
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={newIsSecret}
-                  onChange={(e) => setNewIsSecret(e.target.checked)}
-                  className="rounded"
-                />
-                Secret (encrypted)
-              </label>
+            <div className="flex items-center gap-4 flex-wrap">
+              {repoPath ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={saveToFile}
+                    onChange={(e) => {
+                      setSaveToFile(e.target.checked);
+                      if (e.target.checked) setNewIsSecret(false);
+                    }}
+                    className="rounded"
+                  />
+                  Save to .env file
+                </label>
+              ) : null}
+              {!saveToFile && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={newIsSecret}
+                    onChange={(e) => setNewIsSecret(e.target.checked)}
+                    className="rounded"
+                  />
+                  Secret (encrypted in DB)
+                </label>
+              )}
               <div className="flex-1" />
               <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>
                 Cancel
               </Button>
               <Button size="sm" onClick={handleAdd} disabled={adding || !newKey.trim()}>
                 {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add
+                {saveToFile ? "Add to .env" : "Add to DB"}
               </Button>
             </div>
           </div>
