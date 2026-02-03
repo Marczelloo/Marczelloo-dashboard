@@ -158,10 +158,11 @@ export async function getContainer(endpointId: number, containerId: string): Pro
   return container;
 }
 
-export async function getContainerLogs(endpointId: number, containerId: string, tail = 100): Promise<ContainerLogs> {
+export async function getContainerLogs(endpointId: number, containerId: string, tail = 1000): Promise<ContainerLogs> {
   try {
+    // Note: timestamps=false to get cleaner output
     const response = await portainerRequest<string>(
-      `/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=true`,
+      `/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=false`,
       {},
       false // Don't parse as JSON - logs are raw text
     );

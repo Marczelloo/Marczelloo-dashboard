@@ -238,6 +238,25 @@ export async function deployProjectAction(id: string): Promise<ActionResult<{ ou
 
     console.log(`[Deploy Project] Deploying ${project.name} from ${repoPath}`);
 
+    // Step 0: Check for docker-compose.yml
+    const checkComposeResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `test -f "${repoPath}/docker-compose.yml" && echo "FOUND" || (test -f "${repoPath}/docker-compose.yaml" && echo "FOUND" || echo "NOT_FOUND")`,
+      }),
+    });
+
+    if (checkComposeResponse.ok) {
+      const checkResult = await checkComposeResponse.json();
+      if (checkResult.stdout?.includes("NOT_FOUND")) {
+        return { success: false, error: `No docker-compose.yml found in ${repoPath}` };
+      }
+    }
+
     // Step 1: Git Pull
     const pullResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
@@ -258,7 +277,7 @@ export async function deployProjectAction(id: string): Promise<ActionResult<{ ou
     const pullResult = await pullResponse.json();
     let output = `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
 
-    // Step 2: Docker Compose Build and Up
+    // Step 2: Docker Compose Build and Up (use -f to specify file explicitly)
     const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -266,7 +285,7 @@ export async function deployProjectAction(id: string): Promise<ActionResult<{ ou
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && docker compose up -d --build`,
+        command: `cd "${repoPath}" && docker compose up -d --build 2>&1`,
       }),
     });
 

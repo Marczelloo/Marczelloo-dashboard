@@ -56,30 +56,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ logs: "No logs available", timestamp: result.timestamp });
     }
 
-    // Try to detect if it's multiplexed (first byte is 0, 1, or 2)
+    // Docker logs can be multiplexed (first byte indicates stream type: 0=stdin, 1=stdout, 2=stderr)
+    // Or they can be plain text if container runs with tty
     const firstByte = buffer.charCodeAt(0);
-    if (firstByte <= 2 && buffer.length > 8) {
+    
+    if ((firstByte === 0 || firstByte === 1 || firstByte === 2) && buffer.length > 8) {
       // Multiplexed stream - parse frame by frame
+      // Format: [STREAM_TYPE(1 byte), 0, 0, 0, SIZE(4 bytes big-endian), PAYLOAD]
       let offset = 0;
+      const lines: string[] = [];
+      
       while (offset < buffer.length) {
         if (offset + 8 > buffer.length) break;
+        
+        // Read 4-byte size (big-endian) at offset+4
         const size =
-          (buffer.charCodeAt(offset + 4) << 24) +
-          (buffer.charCodeAt(offset + 5) << 16) +
-          (buffer.charCodeAt(offset + 6) << 8) +
-          buffer.charCodeAt(offset + 7);
+          ((buffer.charCodeAt(offset + 4) & 0xff) << 24) +
+          ((buffer.charCodeAt(offset + 5) & 0xff) << 16) +
+          ((buffer.charCodeAt(offset + 6) & 0xff) << 8) +
+          (buffer.charCodeAt(offset + 7) & 0xff);
+        
         offset += 8;
-        if (size > 0 && offset + size <= buffer.length) {
-          cleanLogs += buffer.slice(offset, offset + size);
+        
+        if (size > 0 && size < 1000000 && offset + size <= buffer.length) {
+          const payload = buffer.slice(offset, offset + size);
+          lines.push(payload);
         }
         offset += size;
       }
+      
+      cleanLogs = lines.join("");
     } else {
-      cleanLogs = buffer.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim();
+      // Plain text logs - just clean up control characters
+      cleanLogs = buffer;
     }
-
-    cleanLogs = cleanLogs.trim();
-    console.log(`[Logs API] Returning ${cleanLogs.length} chars of logs`);
+    
+    // Remove control characters but keep newlines and tabs
+    cleanLogs = cleanLogs.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim();
+    
+    console.log(`[Logs API] Returning ${cleanLogs.length} chars of logs (${cleanLogs.split('\n').length} lines)`);
 
     return NextResponse.json({ logs: cleanLogs || "No logs available", timestamp: result.timestamp });
   } catch (error) {
