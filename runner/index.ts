@@ -365,13 +365,21 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const { command, cwd } = JSON.parse(body);
+      const { command, cwd, timeout: requestTimeout } = JSON.parse(body);
 
       if (!command || typeof command !== "string") {
         res.writeHead(400);
         res.end(JSON.stringify({ error: "command is required" }));
         return;
       }
+
+      // Allow caller to specify timeout (max 15 minutes, default 60s)
+      const maxTimeout = 15 * 60 * 1000; // 15 minutes
+      const defaultTimeout = 60 * 1000; // 60 seconds
+      const cmdTimeout = Math.min(
+        typeof requestTimeout === "number" && requestTimeout > 0 ? requestTimeout : defaultTimeout,
+        maxTimeout
+      );
 
       // Security: Block dangerous commands
       const blockedPatterns = [
@@ -407,17 +415,17 @@ const server = http.createServer(async (req, res) => {
 
         shellCommand = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i ${SSH_KEY_PATH} ${SSH_USER}@${SSH_HOST} ${JSON.stringify(remoteCommand)}`;
         execOptions = {
-          timeout: 60000,
-          maxBuffer: 5 * 1024 * 1024,
+          timeout: cmdTimeout,
+          maxBuffer: 10 * 1024 * 1024, // 10MB for build logs
         };
-        console.log(`[${new Date().toISOString()}] SSH to ${SSH_USER}@${SSH_HOST}: "${command}"`);
+        console.log(`[${new Date().toISOString()}] SSH to ${SSH_USER}@${SSH_HOST}: "${command}" (timeout: ${cmdTimeout / 1000}s)`);
       } else {
         // Fallback to local execution (for development or when SSH not configured)
         console.log(`[${new Date().toISOString()}] Local shell (SSH not configured): "${command}"`);
         shellCommand = `/bin/sh -c ${JSON.stringify(command)}`;
         execOptions = {
-          timeout: 60000,
-          maxBuffer: 5 * 1024 * 1024,
+          timeout: cmdTimeout,
+          maxBuffer: 10 * 1024 * 1024, // 10MB for build logs
           env: { ...process.env, TERM: "xterm-256color", HOME: process.env.HOME || "/home/pi" },
         };
       }

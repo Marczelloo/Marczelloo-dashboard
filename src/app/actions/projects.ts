@@ -261,7 +261,7 @@ export async function deployProjectAction(
     }
 
     console.log(`[Deploy] Using path: ${repoPath}`);
-    let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\n\n`;
+    let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\nBuild timeout: 10 minutes\n\n`;
 
     // Step 0: Check for docker-compose.yml
     console.log(`[Deploy] Checking for docker-compose.yml...`);
@@ -383,8 +383,8 @@ export async function deployProjectAction(
       console.log(`[Deploy] Services: ${servicesResult.stdout?.trim()}`);
     }
 
-    // Step 3: Docker Compose Build and Up
-    console.log(`[Deploy] Running docker compose...`);
+    // Step 3: Docker Compose Build and Up (with long timeout for builds)
+    console.log(`[Deploy] Running docker compose (10 minute timeout)...`);
     const composeCmd = `cd "${repoPath}" && docker compose ${profileFlags} up -d --build 2>&1`;
     console.log(`[Deploy] Command: ${composeCmd}`);
     
@@ -396,6 +396,7 @@ export async function deployProjectAction(
       },
       body: JSON.stringify({
         command: composeCmd,
+        timeout: 10 * 60 * 1000, // 10 minutes for Docker builds
       }),
     });
 
