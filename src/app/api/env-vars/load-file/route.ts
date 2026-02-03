@@ -21,6 +21,29 @@ export async function POST(request: Request) {
     // List available .env files
     async function listEnvFiles(): Promise<string[]> {
       console.log(`[Env Load] Listing files in ${repoPath}`);
+      
+      // First check if directory exists
+      const checkDirResponse = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          command: `test -d "${repoPath}" && echo "EXISTS" || echo "NOT_FOUND"`,
+        }),
+      });
+      
+      if (checkDirResponse.ok) {
+        const checkResult = await checkDirResponse.json();
+        console.log(`[Env Load] Dir check:`, checkResult.stdout?.trim());
+        if (checkResult.stdout?.includes("NOT_FOUND")) {
+          console.log(`[Env Load] Directory does not exist: ${repoPath}`);
+          return [];
+        }
+      }
+      
+      // Simple command: list all .env* files
       const listResponse = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
         headers: {
@@ -28,7 +51,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${RUNNER_TOKEN}`,
         },
         body: JSON.stringify({
-          command: `ls -la "${repoPath}" 2>/dev/null | grep -E "^\-.*\.env" | awk '{print $NF}' | sort 2>/dev/null || find "${repoPath}" -maxdepth 1 -name ".env*" -type f -exec basename {} \\; 2>/dev/null | sort`,
+          command: `cd "${repoPath}" && ls -1a .env* 2>/dev/null || echo ""`,
         }),
       });
 
