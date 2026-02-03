@@ -21,6 +21,18 @@ export function NotificationsDropdown() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Load notifications on mount and poll every 30 seconds
+  useEffect(() => {
+    loadNotifications();
+    
+    const pollInterval = setInterval(() => {
+      loadNotifications();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(pollInterval);
+  }, []);
+
+  // Also refresh when dropdown opens
   useEffect(() => {
     if (open) {
       loadNotifications();
@@ -51,17 +63,6 @@ export function NotificationsDropdown() {
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const getIcon = (type: Notification["type"]) => {
-    switch (type) {
-      case "deploy":
-        return <CheckCircle className="h-4 w-4 text-success" />;
-      case "alert":
-        return <AlertTriangle className="h-4 w-4 text-warning" />;
-      default:
-        return <Bell className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
 
   return (
     <div className="relative">

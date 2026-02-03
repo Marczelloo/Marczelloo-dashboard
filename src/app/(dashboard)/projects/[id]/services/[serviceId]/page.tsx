@@ -328,7 +328,7 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
         </form>
 
         {/* Environment Variables */}
-        <EnvManager serviceId={serviceId} serviceName={formData.name} />
+        <EnvManager serviceId={serviceId} serviceName={formData.name} repoPath={formData.repo_path} />
       </div>
     </>
   );

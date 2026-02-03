@@ -105,12 +105,21 @@ export function Terminal({ className }: TerminalProps) {
     }
   }, [history, inputValue]);
 
-  // Keep focus on input
+  // Keep focus on input only after command execution, not during text selection
   useEffect(() => {
-    if (isPinVerified && inputRef.current) {
-      inputRef.current.focus();
+    // Only auto-focus after PIN verification or after command completes
+    if (isPinVerified && inputRef.current && !isLoading) {
+      // Delay focus to allow text selection
+      const timer = setTimeout(() => {
+        // Check if user is selecting text (has selection)
+        const selection = window.getSelection();
+        if (!selection || selection.toString().length === 0) {
+          inputRef.current?.focus();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isPinVerified, isLoading, history]);
+  }, [isPinVerified, isLoading]);
 
   const verifyPin = useCallback(async () => {
     if (!pin) {
@@ -409,11 +418,12 @@ export function Terminal({ className }: TerminalProps) {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
-                className="w-full bg-transparent text-zinc-100 outline-none caret-zinc-100 font-mono"
+                className="w-full bg-transparent text-zinc-100 outline-none border-none ring-0 focus:outline-none focus:ring-0 focus:border-none caret-zinc-100 font-mono"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck={false}
+                style={{ outline: 'none', boxShadow: 'none' }}
               />
               {isLoading && <span className="absolute left-0 top-0 text-zinc-500 animate-pulse">Running...</span>}
             </div>

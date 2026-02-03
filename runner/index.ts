@@ -381,12 +381,12 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Execute with timeout using bash for proper shell handling
+      // Execute with timeout using sh (Alpine compatible) for proper shell handling
       const start = Date.now();
       const workingDir = cwd || process.env.HOME || "/home/pi";
 
-      // Use bash -c for proper shell interpretation
-      const shellCommand = `/bin/bash -c ${JSON.stringify(command)}`;
+      // Use /bin/sh -c for Alpine compatibility (bash not always available)
+      const shellCommand = `/bin/sh -c ${JSON.stringify(command)}`;
 
       const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
         exec(
