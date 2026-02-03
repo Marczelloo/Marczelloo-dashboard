@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Rocket, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Rocket, Loader2, FolderOpen } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { deployProjectAction } from "@/app/actions/projects";
 
 interface DeployProjectButtonProps {
@@ -13,25 +22,44 @@ interface DeployProjectButtonProps {
 
 export function DeployProjectButton({ projectId, projectName }: DeployProjectButtonProps) {
   const [isDeploying, setIsDeploying] = useState(false);
-  const [showDialog, setShowDialog] = useState(false);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [showOutputDialog, setShowOutputDialog] = useState(false);
+  const [customPath, setCustomPath] = useState("");
   const [output, setOutput] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+
+  function handleClick() {
+    // Show config dialog first
+    setError(null);
+    setOutput("");
+    setShowConfigDialog(true);
+  }
 
   async function handleDeploy() {
     setIsDeploying(true);
     setError(null);
     setOutput("");
-    setShowDialog(true);
+    setShowConfigDialog(false);
+    setShowOutputDialog(true);
 
     try {
-      const result = await deployProjectAction(projectId);
+      // Pass custom path if provided
+      const pathToUse = customPath.trim() || undefined;
+      console.log("[Deploy] Starting deploy with path:", pathToUse || "(auto-detect)");
+
+      const result = await deployProjectAction(projectId, pathToUse);
 
       if (result.success && result.data) {
         setOutput(result.data.output);
+        // If detected path was returned, show it
+        if (result.data.detectedPath && !customPath) {
+          setOutput((prev) => `Detected path: ${result.data!.detectedPath}\n\n${prev}`);
+        }
       } else {
         setError(result.error || "Deployment failed");
       }
     } catch (err) {
+      console.error("[Deploy] Error:", err);
       setError(err instanceof Error ? err.message : "Deployment failed");
     } finally {
       setIsDeploying(false);
@@ -40,22 +68,59 @@ export function DeployProjectButton({ projectId, projectName }: DeployProjectBut
 
   return (
     <>
-      <Button 
-        variant="default" 
-        size="sm" 
-        onClick={handleDeploy}
+      <Button
+        variant="default"
+        size="sm"
+        onClick={handleClick}
         disabled={isDeploying}
         className="bg-primary hover:bg-primary/90"
       >
-        {isDeploying ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Rocket className="h-4 w-4" />
-        )}
+        {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
         Deploy Project
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      {/* Config Dialog */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Deploy: {projectName}</DialogTitle>
+            <DialogDescription>
+              Configure deployment settings. Leave path empty to auto-detect from service repo_path.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="repoPath" className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Repository Path
+              </Label>
+              <Input
+                id="repoPath"
+                placeholder="/home/Marczelloo_pi/projects/my-project"
+                value={customPath}
+                onChange={(e) => setCustomPath(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                The path to the project directory on the Raspberry Pi. Must contain docker-compose.yml.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleDeploy} className="bg-primary hover:bg-primary/90">
+              <Rocket className="h-4 w-4 mr-2" />
+              Deploy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Output Dialog */}
+      <Dialog open={showOutputDialog} onOpenChange={setShowOutputDialog}>
         <DialogContent className="max-w-4xl h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Deploy: {projectName}</DialogTitle>

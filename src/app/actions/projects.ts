@@ -173,7 +173,10 @@ export async function getProjectByIdAction(id: string) {
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 
-export async function deployProjectAction(id: string): Promise<ActionResult<{ output: string }>> {
+export async function deployProjectAction(
+  id: string,
+  customRepoPath?: string
+): Promise<ActionResult<{ output: string; detectedPath?: string }>> {
   try {
     const user = await requirePinVerification();
 
@@ -188,52 +191,69 @@ export async function deployProjectAction(id: string): Promise<ActionResult<{ ou
     }
 
     const projectServices = await services.getServicesByProjectId(id);
-    
-    // Try to find repo path from services
-    let repoPath: string | null = null;
-    for (const service of projectServices) {
-      if (service.repo_path) {
-        // Get parent directory (project root) from service repo path
-        repoPath = service.repo_path;
-        break;
+
+    // Use custom path if provided, otherwise try to detect
+    let repoPath: string | null = customRepoPath || null;
+    let detectedPath: string | undefined;
+
+    if (!repoPath) {
+      // Try to find repo path from services
+      for (const service of projectServices) {
+        if (service.repo_path) {
+          repoPath = service.repo_path;
+          detectedPath = repoPath;
+          console.log(`[Deploy Project] Found repo_path from service: ${repoPath}`);
+          break;
+        }
       }
     }
 
     // If no repo path from services, try to infer from project name
     if (!repoPath) {
-      // Try common paths based on project slug/name
       const projectsDir = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/projects";
       const possiblePaths = [
         `${projectsDir}/${project.slug}`,
         `${projectsDir}/${project.name}`,
         `${projectsDir}/${project.name.replace(/\s+/g, "-")}`,
       ];
-      
+
+      console.log(`[Deploy Project] No service repo_path found, trying paths:`, possiblePaths);
+
       // Check which path exists
       for (const path of possiblePaths) {
-        const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RUNNER_TOKEN}`,
-          },
-          body: JSON.stringify({
-            command: `test -d "${path}" && echo "EXISTS" || echo "NOT_FOUND"`,
-          }),
-        });
-        
-        if (checkResponse.ok) {
-          const result = await checkResponse.json();
-          if (result.stdout?.includes("EXISTS")) {
-            repoPath = path;
-            break;
+        try {
+          const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${RUNNER_TOKEN}`,
+            },
+            body: JSON.stringify({
+              command: `test -d "${path}" && echo "EXISTS" || echo "NOT_FOUND"`,
+            }),
+          });
+
+          if (checkResponse.ok) {
+            const result = await checkResponse.json();
+            console.log(`[Deploy Project] Check ${path}: ${result.stdout}`);
+            if (result.stdout?.includes("EXISTS")) {
+              repoPath = path;
+              detectedPath = path;
+              break;
+            }
           }
+        } catch (e) {
+          console.error(`[Deploy Project] Error checking path ${path}:`, e);
         }
       }
     }
 
     if (!repoPath) {
-      return { success: false, error: "Could not find project directory. Set repo_path on a service." };
+      return {
+        success: false,
+        error: "Could not find project directory. Please enter the repo path manually or set repo_path on a service.",
+        data: { output: "", detectedPath: undefined },
+      };
     }
 
     console.log(`[Deploy Project] Deploying ${project.name} from ${repoPath}`);
@@ -299,16 +319,16 @@ export async function deployProjectAction(id: string): Promise<ActionResult<{ ou
     output += `=== Docker Compose ===\n${composeResult.stdout || composeResult.stderr || "No output"}`;
 
     // Log the deployment
-    await auditLogs.logAction(user.email, "deploy", "project", id, { 
-      project: project.name, 
+    await auditLogs.logAction(user.email, "deploy", "project", id, {
+      project: project.name,
       repo_path: repoPath,
-      success: composeResult.success 
+      success: composeResult.success,
     });
 
     revalidatePath(`/projects/${id}`);
     revalidatePath("/dashboard");
 
-    return { success: true, data: { output } };
+    return { success: true, data: { output, detectedPath } };
   } catch (error) {
     console.error("deployProjectAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Deployment failed" };
