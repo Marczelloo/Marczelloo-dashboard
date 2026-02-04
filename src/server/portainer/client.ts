@@ -391,6 +391,153 @@ export async function recreateContainer(endpointId: number, containerId: string)
   return performContainerAction(endpointId, containerId, "recreate");
 }
 
+export async function killContainer(endpointId: number, containerId: string): Promise<PortainerActionResult> {
+  return performContainerAction(endpointId, containerId, "kill");
+}
+
+export async function removeContainer(
+  endpointId: number,
+  containerId: string,
+  force = false
+): Promise<PortainerActionResult> {
+  try {
+    await portainerRequest(`/endpoints/${endpointId}/docker/containers/${containerId}?force=${force}`, {
+      method: "DELETE",
+    });
+    return { success: true, message: "Container removed successfully" };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export interface ContainerStats {
+  cpu_percent: number;
+  memory_usage: number;
+  memory_limit: number;
+  memory_percent: number;
+  network_rx: number;
+  network_tx: number;
+  block_read: number;
+  block_write: number;
+}
+
+export async function getContainerStats(endpointId: number, containerId: string): Promise<ContainerStats | null> {
+  try {
+    const stats = await portainerRequest<{
+      cpu_stats: { cpu_usage: { total_usage: number }; system_cpu_usage: number; online_cpus: number };
+      precpu_stats: { cpu_usage: { total_usage: number }; system_cpu_usage: number };
+      memory_stats: { usage: number; limit: number };
+      networks?: Record<string, { rx_bytes: number; tx_bytes: number }>;
+      blkio_stats?: { io_service_bytes_recursive?: Array<{ op: string; value: number }> };
+    }>(`/endpoints/${endpointId}/docker/containers/${containerId}/stats?stream=false`);
+
+    // Calculate CPU percentage
+    const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+    const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+    const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * stats.cpu_stats.online_cpus * 100 : 0;
+
+    // Calculate memory
+    const memoryUsage = stats.memory_stats.usage || 0;
+    const memoryLimit = stats.memory_stats.limit || 1;
+    const memoryPercent = (memoryUsage / memoryLimit) * 100;
+
+    // Network I/O
+    let networkRx = 0;
+    let networkTx = 0;
+    if (stats.networks) {
+      for (const net of Object.values(stats.networks)) {
+        networkRx += net.rx_bytes || 0;
+        networkTx += net.tx_bytes || 0;
+      }
+    }
+
+    // Block I/O
+    let blockRead = 0;
+    let blockWrite = 0;
+    if (stats.blkio_stats?.io_service_bytes_recursive) {
+      for (const io of stats.blkio_stats.io_service_bytes_recursive) {
+        if (io.op === "read" || io.op === "Read") blockRead += io.value;
+        if (io.op === "write" || io.op === "Write") blockWrite += io.value;
+      }
+    }
+
+    return {
+      cpu_percent: Math.round(cpuPercent * 100) / 100,
+      memory_usage: memoryUsage,
+      memory_limit: memoryLimit,
+      memory_percent: Math.round(memoryPercent * 100) / 100,
+      network_rx: networkRx,
+      network_tx: networkTx,
+      block_read: blockRead,
+      block_write: blockWrite,
+    };
+  } catch (error) {
+    console.error(`[Portainer] Failed to get stats for container ${containerId}:`, error);
+    return null;
+  }
+}
+
+export interface ContainerInspect {
+  Id: string;
+  Created: string;
+  Path: string;
+  Args: string[];
+  State: {
+    Status: string;
+    Running: boolean;
+    Paused: boolean;
+    Restarting: boolean;
+    OOMKilled: boolean;
+    Dead: boolean;
+    Pid: number;
+    ExitCode: number;
+    Error: string;
+    StartedAt: string;
+    FinishedAt: string;
+  };
+  Image: string;
+  Name: string;
+  RestartCount: number;
+  Driver: string;
+  Platform: string;
+  Mounts: Array<{
+    Type: string;
+    Source: string;
+    Destination: string;
+    Mode: string;
+    RW: boolean;
+  }>;
+  Config: {
+    Hostname: string;
+    Env: string[];
+    Cmd: string[];
+    Image: string;
+    WorkingDir: string;
+    Labels: Record<string, string>;
+  };
+  NetworkSettings: {
+    IPAddress: string;
+    Ports: Record<string, Array<{ HostIp: string; HostPort: string }> | null>;
+  };
+  HostConfig: {
+    Memory: number;
+    CpuShares: number;
+    RestartPolicy: { Name: string; MaximumRetryCount: number };
+  };
+}
+
+export async function inspectContainer(endpointId: number, containerId: string): Promise<ContainerInspect | null> {
+  try {
+    return await portainerRequest<ContainerInspect>(`/endpoints/${endpointId}/docker/containers/${containerId}/json`);
+  } catch (error) {
+    console.error(`[Portainer] Failed to inspect container ${containerId}:`, error);
+    return null;
+  }
+}
+
 // ========================================
 // Stacks
 // ========================================

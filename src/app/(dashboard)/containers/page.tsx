@@ -144,6 +144,11 @@ function ContainerCard({ container, endpointId }: { container: PortainerContaine
                 <Badge variant="secondary" className="font-mono text-xs">
                   {container.Id.slice(0, 12)}
                 </Badge>
+                {status === "unhealthy" && (
+                  <Badge variant="warning" className="text-xs">
+                    Unhealthy
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">{container.Image}</p>
             </div>
@@ -155,7 +160,7 @@ function ContainerCard({ container, endpointId }: { container: PortainerContaine
               {ports && <p className="text-xs text-muted-foreground font-mono">{ports}</p>}
             </div>
 
-            <ContainerActions containerId={container.Id} endpointId={endpointId} isRunning={status === "running"} />
+            <ContainerActions containerId={container.Id} endpointId={endpointId} status={status} />
           </div>
         </div>
       </CardContent>

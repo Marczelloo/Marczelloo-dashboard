@@ -15,15 +15,19 @@ import {
   LogOut,
   BookOpen,
   Cpu,
+  CheckSquare,
+  Newspaper,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/services", label: "Services", icon: Server },
+  { href: "/todos", label: "Todos", icon: CheckSquare },
   { href: "/monitoring", label: "Monitoring", icon: Activity },
   { href: "/containers", label: "Containers", icon: Container },
   { href: "/pi", label: "Raspberry Pi", icon: Cpu },
+  { href: "/news", label: "Tech News", icon: Newspaper },
   { href: "/terminal", label: "Terminal", icon: Terminal },
   { href: "/audit-log", label: "Audit Log", icon: History },
   { href: "/docs", label: "Documentation", icon: BookOpen },

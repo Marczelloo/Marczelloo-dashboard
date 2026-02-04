@@ -11,17 +11,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing required parameters" }, { status: 400 });
     }
 
-    if (!["start", "stop", "restart", "recreate"].includes(action)) {
+    if (!["start", "stop", "restart", "recreate", "kill", "remove"].includes(action)) {
       return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
 
-    const result = await portainer.performContainerAction(endpointId, containerId, action);
+    let result;
+    if (action === "remove") {
+      result = await portainer.removeContainer(endpointId, containerId, true);
+    } else {
+      result = await portainer.performContainerAction(endpointId, containerId, action);
+    }
 
     // Log the action (container IDs aren't UUIDs, so store in meta instead)
     const userEmail = process.env.DEV_USER_EMAIL || "unknown";
     await auditLogs.logAction(
       userEmail,
-      action as "start" | "stop" | "restart",
+      action as "start" | "stop" | "restart" | "delete",
       "container",
       undefined, // entity_id expects UUID, container IDs aren't valid UUIDs
       { endpointId, containerId, action, success: result.success }
