@@ -5,9 +5,32 @@ import { Header } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Skeleton } from "@/components/ui";
 import { DeployAllButton } from "@/components/features/deploy-all-button";
 import { DeployProjectButton } from "@/components/features/deploy-project-button";
+import { GitHubInfo } from "./_components/github-info";
+import { GitHubTabs } from "./_components/github-tabs";
+import { ReadmeViewer } from "./_components/readme-viewer";
+import { FileBrowser } from "./_components/file-browser";
+import { BranchStatus } from "./_components/branch-status";
+import { SecurityDashboard } from "./_components/security-dashboard";
+import { DependenciesViewer } from "./_components/dependencies-viewer";
+import { ChangelogViewer } from "./_components/changelog-viewer";
+import { ReleaseCreator } from "./_components/release-creator";
 import { projects, services, workItems, deploys } from "@/server/atlashub";
 import { formatRelativeTime, formatDateTime } from "@/lib/utils";
-import { Github, ExternalLink, Globe, Settings, Plus, Server, CheckSquare, ArrowLeft, Code2 } from "lucide-react";
+import {
+  Github,
+  ExternalLink,
+  Globe,
+  Settings,
+  Plus,
+  Server,
+  CheckSquare,
+  ArrowLeft,
+  Code2,
+  Rocket,
+  FileText,
+  Shield,
+  FolderTree,
+} from "lucide-react";
 import type { Service, Deploy } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -102,7 +125,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               Back
             </Button>
           </Link>
-          <DeployProjectButton projectId={id} projectName={project.name} />
+          <DeployProjectButton projectId={id} projectName={project.name} githubUrl={project.github_url} />
           <Link href={`/projects/${id}/edit`}>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4" />
@@ -167,7 +190,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Services */}
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             <Suspense fallback={<SectionSkeleton title="Services" />}>
               <ServicesSection projectId={id} />
@@ -176,79 +199,131 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             <Suspense fallback={<SectionSkeleton title="Recent Deploys" />}>
               <DeploysSection projectId={id} />
             </Suspense>
+
+            {/* GitHub Activity Tabs */}
+            {project.github_url && <GitHubTabs githubUrl={project.github_url} />}
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Organized into logical sections */}
           <div className="space-y-6">
+            {/* Work Items */}
             <Suspense fallback={<SectionSkeleton title="Work Items" />}>
               <WorkItemsSection projectId={id} />
             </Suspense>
 
-            {/* Technologies */}
-            {parseArray(project.technologies).length > 0 && (
+            {/* GitHub Actions Section */}
+            {project.github_url && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <Rocket className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">GitHub Actions</span>
+                </div>
+                <GitHubInfo githubUrl={project.github_url} />
+                <ReleaseCreator githubUrl={project.github_url} />
+                <ChangelogViewer githubUrl={project.github_url} />
+              </div>
+            )}
+
+            {/* Repository Section */}
+            {project.github_url && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <FolderTree className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Repository</span>
+                </div>
+                <ReadmeViewer githubUrl={project.github_url} />
+                <FileBrowser githubUrl={project.github_url} />
+                <BranchStatus githubUrl={project.github_url} />
+              </div>
+            )}
+
+            {/* Code Quality Section */}
+            {project.github_url && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Code Quality</span>
+                </div>
+                <SecurityDashboard githubUrl={project.github_url} />
+                <DependenciesViewer githubUrl={project.github_url} />
+              </div>
+            )}
+
+            {/* Project Info Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Project Info</span>
+              </div>
+
+              {/* Technologies */}
+              {parseArray(project.technologies).length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Code2 className="h-3.5 w-3.5" />
+                      Technologies
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      {parseArray(project.technologies).map((tech) => {
+                        const key = tech.toLowerCase().replace(/[\s.]/g, "");
+                        const info = TECH_INFO[key] || TECH_INFO[tech.toLowerCase()];
+                        return (
+                          <a
+                            key={tech}
+                            href={
+                              info?.doc || `https://google.com/search?q=${encodeURIComponent(tech + " documentation")}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded border border-border/50 bg-secondary/30 px-2 py-0.5 text-xs hover:bg-secondary transition-colors"
+                            title={`${info?.label || tech} Documentation`}
+                          >
+                            <span>{info?.emoji || "📦"}</span>
+                            <span>{info?.label || tech}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Notes */}
+              {project.notes && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{project.notes}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Details */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Code2 className="h-4 w-4" />
-                    Technologies
-                  </CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Details</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {parseArray(project.technologies).map((tech) => {
-                      const key = tech.toLowerCase().replace(/[\s.]/g, "");
-                      const info = TECH_INFO[key] || TECH_INFO[tech.toLowerCase()];
-                      return (
-                        <a
-                          key={tech}
-                          href={
-                            info?.doc || `https://google.com/search?q=${encodeURIComponent(tech + " documentation")}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1 text-sm hover:bg-secondary transition-colors"
-                          title={`${info?.label || tech} Documentation`}
-                        >
-                          <span>{info?.emoji || "📦"}</span>
-                          <span>{info?.label || tech}</span>
-                        </a>
-                      );
-                    })}
+                <CardContent className="pt-0 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Created</span>
+                    <span>{formatDateTime(project.created_at)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Updated</span>
+                    <span>{formatRelativeTime(project.updated_at)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID</span>
+                    <span className="font-mono">{project.id.slice(0, 8)}</span>
                   </div>
                 </CardContent>
               </Card>
-            )}
-
-            {project.notes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{project.notes}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Created</span>
-                  <span>{formatDateTime(project.created_at)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Updated</span>
-                  <span>{formatRelativeTime(project.updated_at)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ID</span>
-                  <span className="font-mono text-xs">{project.id.slice(0, 8)}</span>
-                </div>
-              </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
       </div>

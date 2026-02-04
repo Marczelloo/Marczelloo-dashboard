@@ -49,6 +49,8 @@ export interface WorkItem {
   status: WorkItemStatus;
   priority: WorkItemPriority;
   labels: string[];
+  github_issue_number: number | null;
+  github_pr_number: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -114,9 +116,29 @@ export type AuditAction =
   | "pin_verify"
   | "docker_exec"
   | "docker_exec_blocked"
-  | "clear_deploys";
+  | "clear_deploys"
+  | "github_sync"
+  | "github_webhook_trigger"
+  | "github_deploy"
+  | "link"
+  | "unlink"
+  | "sync"
+  | "import";
 
-export type EntityType = "project" | "service" | "work_item" | "env_var" | "deploy" | "container" | "auth";
+export type EntityType =
+  | "project"
+  | "service"
+  | "work_item"
+  | "env_var"
+  | "deploy"
+  | "container"
+  | "auth"
+  | "github_repo"
+  | "release"
+  | "github_issue"
+  | "work_item_pr"
+  | "work_item_github"
+  | "github_repos";
 
 // ========================================
 // Create/Update DTOs
@@ -192,6 +214,8 @@ export interface UpdateWorkItemInput {
   status?: WorkItemStatus;
   priority?: WorkItemPriority;
   labels?: string[];
+  github_issue_number?: number | null;
+  github_pr_number?: number | null;
 }
 
 export interface CreateEnvVarInput {

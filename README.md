@@ -1,188 +1,205 @@
 # Marczelloo Dashboard
 
-A private, self-hosted project manager panel for managing projects, Docker containers, and website monitoring on a Raspberry Pi.
+<div align="center">
+
+**A self-hosted project manager for Docker, GitHub, and website monitoring**
+
+![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38bdf8?style=flat-square&logo=tailwindcss)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)
+
+</div>
+
+---
+
+## Overview
+
+A private, self-hosted project manager panel for managing projects, Docker containers, and website monitoring. Designed for Raspberry Pi infrastructure with Docker, Portainer, and Cloudflare Tunnel.
+
+**Key highlights:**
+
+- 🚀 **One-click deploys** via git pull + Docker rebuild
+- 📊 **GitHub integration** with commits, PRs, releases, and changelogs
+- 📡 **Uptime monitoring** with Discord/email alerts
+- 🔒 **Secure** with Cloudflare Access + PIN protection
+- 🖥️ **Terminal access** to your Pi through the dashboard
+
+---
 
 ## Features
 
-- **Project Management**: CRUD for projects with metadata, status, tags, technologies, and links
-- **Service Management**: Track Docker containers, Vercel deployments, and external services
-- **Work Items**: Track TODOs, bugs, features, and changes per project
-- **Website Monitoring**: Automatic uptime checks with configurable intervals and Discord alerts
-- **Container Management**: Start/stop/restart containers via Portainer API
-- **Deployments**: Git pull + Docker rebuild/restart automation via Runner service
-- **Deploy All**: Batch deploy all services in a project with selectable strategy
-- **Terminal**: Full SSH-like terminal access to Pi through the dashboard
-- **Environment Variables**: Encrypted storage with ability to load from .env files
-- **Settings Dashboard**: Configure monitoring intervals, port tracker, runner allowlists
-- **Notifications**: Discord webhooks for downtime alerts
-- **Audit Log**: Complete activity history
-- **Cloudflare Zero Trust**: Protected by Cloudflare Access with email allowlist
+### 📁 Project Management
+
+- CRUD for projects with metadata, status, tags, technologies, and links
+- **Import from GitHub** - Create projects directly from your GitHub repositories
+- Technology badges with documentation links
+- Project notes and detailed tracking
+
+### 🐳 Container Management
+
+- Start/stop/restart containers via Portainer API
+- View container logs (tail) in real-time
+- Container stats and health monitoring
+- Docker Compose stack management
+
+### 🔧 Service Management
+
+- Track **Docker containers**, **Vercel deployments**, and **external services**
+- Environment variables with encrypted storage
+- Deploy strategies: `pull_restart`, `pull_rebuild`, `compose_up`
+- **Deploy All** - Batch deploy all services in a project
+
+### 📋 Work Items
+
+- Track TODOs, bugs, features, and changes per project
+- Priority levels: Low, Medium, High, Critical
+- Status workflow: Open → In Progress → Done / Blocked
+- Labels for categorization and filtering
+
+### 📡 Website Monitoring
+
+- Automatic uptime checks (configurable interval 1-60 min)
+- HTTP status, latency, and SSL certificate expiry tracking
+- Health check endpoints support
+- Historical data with charts
+
+### 🔔 Notifications
+
+- **Discord webhooks** for downtime alerts, deploy results
+- SSL expiry warnings (30/14/7 days)
+- Optional SMTP email notifications
+
+### 🖥️ Terminal
+
+- Full SSH-like terminal access to Raspberry Pi
+- Project directory shortcuts
+- Session persistence
+
+### ⚙️ Settings Dashboard
+
+- Monitoring interval configuration
+- Port tracker (scan used ports)
+- Runner allowlist management
+- Connection tests (Portainer, Runner, Discord)
+
+### 📝 Audit Log
+
+- Complete activity history
+- Track all sensitive operations
+- User and timestamp tracking
+
+### 🔒 Security
+
+- **Cloudflare Zero Trust** protection with email allowlist
+- **PIN protection** for sensitive operations
+- Encrypted environment variables (AES-256-GCM)
+
+---
+
+## GitHub Integration
+
+Deep integration through a GitHub App for comprehensive repository management:
+
+| Feature                 | Description                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| **Activity Dashboard**  | View commits, pull requests, and releases in tabbed interface |
+| **Branch Deploys**      | Deploy from any branch with branch selector                   |
+| **README Viewer**       | Render repository README with full markdown support           |
+| **File Browser**        | Navigate repository files/directories directly                |
+| **Release Creator**     | Create releases with auto-generated semantic versions         |
+| **Changelog Generator** | Generate changelogs between any two releases                  |
+| **Work Item → Issue**   | Create GitHub issues from work items with auto-labels         |
+| **Repository Sync**     | Import GitHub repositories as dashboard projects              |
+| **Security Dashboard**  | View code scanning alerts and vulnerabilities                 |
+| **Dependencies Viewer** | Analyze project dependencies from package.json                |
+| **Branch Status**       | Compare branches, view ahead/behind counts                    |
+| **Contributors**        | View repository contributors                                  |
+
+### GitHub App Setup
+
+1. Create a GitHub App in your GitHub settings
+2. Configure permissions: Contents, Issues, PRs, Releases, Metadata
+3. Generate and download a private key (.pem file)
+4. Install the app on your repositories
+5. Set environment variables:
+
+```bash
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY=base64_encoded_private_key
+GITHUB_APP_INSTALLATION_ID=12345678
+```
+
+---
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript
-- **Styling**: Tailwind CSS, shadcn/ui components, Framer Motion
-- **Data**: AtlasHub REST API (self-hosted)
-- **Container Management**: Portainer CE
-- **Infrastructure**: Raspberry Pi, Docker, Cloudflare Tunnel
+| Layer              | Technologies                                  |
+| ------------------ | --------------------------------------------- |
+| **Frontend**       | Next.js 15 (App Router), React 19, TypeScript |
+| **Styling**        | Tailwind CSS, shadcn/ui, Framer Motion        |
+| **Data**           | AtlasHub REST API (self-hosted)               |
+| **Containers**     | Portainer CE, Docker Compose                  |
+| **Infrastructure** | Raspberry Pi, Cloudflare Tunnel               |
 
-## Quick Start with Docker
+---
 
-### 1. Clone and Configure
+## Quick Start
+
+### Docker Deployment (Recommended)
 
 ```bash
+# Clone and configure
 git clone https://github.com/yourusername/marczelloo-dashboard.git
 cd marczelloo-dashboard
 cp .env.example .env
-```
 
-### 2. Edit Environment Variables
+# Edit .env with your values (see Environment Variables section)
 
-```bash
-# Required
-ATLASHUB_API_URL=https://api-atlashub.marczelloo.dev
-ATLASHUB_SECRET_KEY=sk_your_secret_key
-RUNNER_TOKEN=your_random_token  # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Optional
-DEV_USER_EMAIL=admin@example.com
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-MONITORING_INTERVAL_MS=300000  # 5 minutes
-```
-
-### 3. Start All Services
-
-```bash
+# Start all services
 docker-compose up -d --build
 ```
 
 This starts:
 
 - **Dashboard** on port `3100`
-- **Runner** on port `8787`
+- **Runner** on port `8787` (internal)
 - **Portainer** on port `9200`
 
-### 4. Initial Setup
+### Initial Setup
 
 1. Open Portainer at `http://localhost:9200` and create admin account
-2. Get JWT token: POST to `/api/auth` with username/password
-3. Add `PORTAINER_TOKEN` to your `.env` file
-4. Restart dashboard: `docker-compose restart dashboard`
+2. Get JWT token from Portainer API
+3. Add `PORTAINER_TOKEN` to `.env`
+4. Restart: `docker-compose restart dashboard`
+5. Open dashboard at `http://localhost:3100`
 
-## Services
+---
 
-### Dashboard (port 3100)
+## Architecture
 
-Main web interface for managing projects, services, and monitoring.
-
-**Key Features:**
-
-- Project/service CRUD
-- Uptime monitoring with configurable intervals
-- Container management via Portainer
-- Audit logging
-
-### Runner (port 8787)
-
-Local service for executing git and Docker operations securely.
-
-**Endpoints:**
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/health` | GET | No | Health check |
-| `/status` | GET | No | Service status |
-| `/allowlist` | GET | Yes | Get allowlist |
-| `/allowlist` | PUT | Yes | Update allowlist |
-| `/execute` | POST | Yes | Run operations |
-
-**Allowlist Configuration:**
-
-The runner only executes operations for items in its allowlist. Configure via:
-
-1. **Dashboard**: Settings → Runner Allowlist
-2. **File**: `runner/data/allowlist.json`
-
-```json
-{
-  "repo_paths": ["/home/pi/projects/my-app"],
-  "compose_projects": ["my-app"],
-  "container_names": ["my-container"]
-}
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Cloudflare Access                        │
+│                   (Authentication Layer)                    │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │    Dashboard      │
+                    │   (Next.js App)   │
+                    │   Port: 3100      │
+                    └─────────┬─────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+┌───────▼───────┐    ┌────────▼────────┐   ┌───────▼───────┐
+│   AtlasHub    │    │     Runner      │   │   Portainer   │
+│  (Database)   │    │ (Git/Docker Ops)│   │ (Containers)  │
+│   External    │    │   Port: 8787    │   │  Port: 9200   │
+└───────────────┘    └─────────────────┘   └───────────────┘
 ```
 
-### Portainer (port 9200)
-
-Docker management UI. Dashboard uses Portainer API for container operations.
-
-## Terminal SSH Setup
-
-The dashboard terminal feature requires SSH access from the runner container to the Pi host.
-
-### 1. Generate SSH Key (on Pi)
-
-```bash
-# Generate a dedicated SSH key for the dashboard
-ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
-
-# Add to authorized_keys
-cat ~/.ssh/dashboard_runner.pub >> ~/.ssh/authorized_keys
-
-# Ensure correct permissions
-chmod 600 ~/.ssh/authorized_keys
-```
-
-### 2. Configure Environment
-
-Add to your `.env` file:
-
-```bash
-SSH_USER=pi                          # Your Pi username
-SSH_KEY_PATH=~/.ssh/dashboard_runner # Path to private key
-DEFAULT_CWD=/home/pi                 # Default terminal directory
-PROJECTS_DIR=/home/pi/projects       # Projects directory
-```
-
-### 3. Restart Services
-
-```bash
-docker-compose down
-docker-compose up -d --build
-```
-
-### 4. Verify SSH Connection
-
-Check runner status at `http://localhost:8787/status` - you should see:
-
-```json
-{
-  "ssh": {
-    "enabled": true,
-    "configured": true,
-    "host": "host.docker.internal",
-    "user": "pi"
-  }
-}
-```
-
-**Note:** If `configured: false`, the SSH key mount failed. Check the key path exists.
-
-## Settings Page Features
-
-### Monitoring Interval
-
-Configure how often uptime checks run (1-60 minutes). Changes take effect on server restart.
-
-### Port Tracker
-
-Scan which ports are in use on the host machine. Useful for avoiding conflicts when self-hosting multiple apps.
-
-### Runner Allowlist
-
-Manage which repositories, compose projects, and containers the runner can access. All changes are persisted.
-
-### Connection Tests
-
-Test connectivity to Portainer, Runner, and Discord webhook.
+---
 
 ## Directory Structure
 
@@ -194,39 +211,113 @@ Test connectivity to Portainer, Runner, and Discord webhook.
 │   ├── index.ts           # Runner service
 │   └── data/              # Persistent allowlist
 ├── src/
-│   ├── app/               # Next.js pages & API
+│   ├── app/               # Next.js pages & API routes
+│   │   ├── (dashboard)/   # Dashboard pages
+│   │   └── api/           # API endpoints
 │   ├── components/        # UI components
 │   ├── server/            # Server-only modules
 │   └── types/             # TypeScript types
 └── docs/                  # Documentation
 ```
 
+---
+
 ## Environment Variables
 
-| Variable                 | Required | Default                  | Description                   |
-| ------------------------ | -------- | ------------------------ | ----------------------------- |
-| `ATLASHUB_API_URL`       | Yes      | -                        | AtlasHub API endpoint         |
-| `ATLASHUB_SECRET_KEY`    | Yes      | -                        | AtlasHub API key              |
-| `PORTAINER_URL`          | No       | `http://portainer:9000`  | Portainer URL                 |
-| `PORTAINER_TOKEN`        | No       | -                        | Portainer JWT token           |
-| `RUNNER_URL`             | No       | `http://runner:8787`     | Runner service URL            |
-| `RUNNER_TOKEN`           | Yes      | -                        | Shared secret for runner auth |
-| `DEV_USER_EMAIL`         | No       | `admin@marczelloo.local` | User for audit logs           |
-| `MONITORING_INTERVAL_MS` | No       | `300000`                 | Check interval (ms)           |
-| `DISCORD_WEBHOOK_URL`    | No       | -                        | Discord alerts                |
+### Required
+
+| Variable              | Description                   |
+| --------------------- | ----------------------------- |
+| `ATLASHUB_API_URL`    | AtlasHub API endpoint         |
+| `ATLASHUB_SECRET_KEY` | AtlasHub API key              |
+| `RUNNER_TOKEN`        | Shared secret for runner auth |
+
+### GitHub Integration
+
+| Variable                     | Description                |
+| ---------------------------- | -------------------------- |
+| `GITHUB_APP_ID`              | GitHub App ID              |
+| `GITHUB_APP_PRIVATE_KEY`     | Base64-encoded private key |
+| `GITHUB_APP_INSTALLATION_ID` | Installation ID            |
+
+### Optional
+
+| Variable                 | Default                  | Description              |
+| ------------------------ | ------------------------ | ------------------------ |
+| `PORTAINER_URL`          | `http://portainer:9000`  | Portainer URL            |
+| `PORTAINER_TOKEN`        | -                        | Portainer JWT token      |
+| `RUNNER_URL`             | `http://runner:8787`     | Runner service URL       |
+| `DEV_USER_EMAIL`         | `admin@marczelloo.local` | Dev mode user email      |
+| `MONITORING_INTERVAL_MS` | `300000`                 | Monitoring interval (ms) |
+| `DISCORD_WEBHOOK_URL`    | -                        | Discord alerts           |
+| `ENCRYPTION_KEY`         | -                        | Env vars encryption key  |
+
+---
+
+## Services
+
+### Dashboard (port 3100)
+
+Main web interface. Features:
+
+- Project/service management
+- GitHub integration
+- Uptime monitoring
+- Container controls
+
+### Runner (port 8787)
+
+Secure deploy service. Operations:
+
+- `git pull` in allowed repo paths
+- `docker compose up -d --build`
+- `docker restart`
+- Log fetching
+
+**Security:** Only executes operations for items in the allowlist. Configure via Settings → Runner Allowlist.
+
+### Portainer (port 9200)
+
+Docker management UI. Dashboard uses Portainer API for:
+
+- Container list and status
+- Start/stop/restart
+- Logs and stats
+
+---
+
+## Terminal SSH Setup
+
+```bash
+# Generate SSH key on Pi
+ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
+cat ~/.ssh/dashboard_runner.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# Add to .env
+SSH_USER=pi
+SSH_KEY_PATH=~/.ssh/dashboard_runner
+DEFAULT_CWD=/home/pi
+PROJECTS_DIR=/home/pi/projects
+```
+
+---
 
 ## Database Tables
 
 All data stored in AtlasHub:
 
-- `projects` - Project metadata
-- `services` - Docker/Vercel/external services
-- `work_items` - TODOs, bugs, changes
-- `uptime_checks` - Monitoring history
-- `deploys` - Deployment records
-- `audit_logs` - Activity history
+| Table           | Description                     |
+| --------------- | ------------------------------- |
+| `projects`      | Project metadata                |
+| `services`      | Docker/Vercel/external services |
+| `work_items`    | Tasks, bugs, features           |
+| `env_vars`      | Encrypted environment variables |
+| `deploys`       | Deployment history              |
+| `uptime_checks` | Monitoring history              |
+| `audit_logs`    | Activity history                |
 
-Run `npm run db:setup` to create tables.
+---
 
 ## Development
 
@@ -242,109 +333,35 @@ cd runner && npx tsx index.ts
 
 # Type check
 npx tsc --noEmit
+
+# Build
+npm run build
 ```
-
-## License
-
-Private - All rights reserved.
 
 ---
 
 ## Cloudflare Zero Trust Setup
 
-This dashboard is designed to be protected by Cloudflare Access for secure remote access.
+1. Install cloudflared on Pi
+2. Create tunnel: `cloudflared tunnel create marczelloo-dashboard`
+3. Configure `~/.cloudflared/config.yml`
+4. Create Cloudflare Access application with email allowlist
+5. Start tunnel as service: `sudo cloudflared service install`
 
-### Prerequisites
-
-- Cloudflare account with Zero Trust enabled
-- Domain managed by Cloudflare
-- Cloudflare Tunnel (cloudflared) installed on Pi
-
-### 1. Create Cloudflare Tunnel
-
-```bash
-# Install cloudflared on Pi
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared
-chmod +x /usr/local/bin/cloudflared
-
-# Login and create tunnel
-cloudflared tunnel login
-cloudflared tunnel create marczelloo-dashboard
-
-# Note the tunnel ID from output
-```
-
-### 2. Configure Tunnel
-
-Create `/home/pi/.cloudflared/config.yml`:
-
-```yaml
-tunnel: <TUNNEL_ID>
-credentials-file: /home/pi/.cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: dashboard.marczelloo.dev
-    service: http://localhost:3100
-  - hostname: portainer.marczelloo.dev
-    service: http://localhost:9201
-  - service: http_status:404
-```
-
-### 3. Create DNS Records
-
-```bash
-cloudflared tunnel route dns marczelloo-dashboard dashboard.marczelloo.dev
-cloudflared tunnel route dns marczelloo-dashboard portainer.marczelloo.dev
-```
-
-### 4. Create Cloudflare Access Application
-
-1. Go to Cloudflare Zero Trust Dashboard → Access → Applications
-2. Click "Add an application" → Self-hosted
-3. Configure:
-   - **Application name**: Marczelloo Dashboard
-   - **Session duration**: 24 hours (or preferred)
-   - **Application domain**: `dashboard.marczelloo.dev`
-   - **Path**: Leave empty (protects entire app)
-
-### 5. Create Access Policy
-
-1. In the application, add a policy:
-   - **Policy name**: Owner Access
-   - **Action**: Allow
-   - **Include**: Emails - your email address
-2. (Optional) Add additional rules:
-   - Require specific country
-   - Require device posture
-   - Add one-time PIN as second factor
-
-### 6. Start Tunnel as Service
-
-```bash
-# Install as systemd service
-sudo cloudflared service install
-sudo systemctl enable cloudflared
-sudo systemctl start cloudflared
-
-# Check status
-sudo systemctl status cloudflared
-```
-
-### 7. Verify Setup
-
-1. Access `https://dashboard.marczelloo.dev`
-2. You should see Cloudflare Access login
-3. Enter your email and verify with the link/code sent
-4. After authentication, you're in the dashboard
-
-### Reading Cloudflare Identity Headers
-
-The dashboard can read authenticated user info from Cloudflare headers:
-
-```typescript
-// In API routes/server components
-const userEmail = request.headers.get("cf-access-authenticated-user-email");
-const userJwt = request.headers.get("cf-access-jwt-assertion");
-```
+See full guide in `/docs` page.
 
 ---
+
+## API Rate Limits
+
+Using GitHub App installation tokens, you get:
+
+- **5,000 requests/hour** per installation
+- **30 requests/minute** for Search API
+- **Completely free** - no charges for API calls
+
+---
+
+## License
+
+Private - All rights reserved.

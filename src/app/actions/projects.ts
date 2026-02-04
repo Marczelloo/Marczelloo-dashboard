@@ -3,6 +3,13 @@
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
 import { notifyDeploySuccess, notifyDeployFailed } from "@/server/notifications";
+import {
+  createRelease,
+  generateReleaseNotes,
+  isGitHubConfigured,
+  getLatestRelease,
+  listRepositories,
+} from "@/server/github";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
@@ -226,8 +233,9 @@ function detectDeploymentError(log: string): { hasError: boolean; errorMessage: 
 
 export async function deployProjectAction(
   id: string,
-  customRepoPath?: string
-): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string }>> {
+  customRepoPath?: string,
+  branch?: string
+): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; branch?: string }>> {
   try {
     const user = await requirePinVerification();
 
@@ -235,7 +243,9 @@ export async function deployProjectAction(
       return { success: false, error: "Runner not configured (missing RUNNER_TOKEN)" };
     }
 
-    console.log(`[Deploy] Starting deployment for project ${id}, customPath: ${customRepoPath || "(none)"}`);
+    console.log(
+      `[Deploy] Starting deployment for project ${id}, customPath: ${customRepoPath || "(none)"}, branch: ${branch || "(default)"}`
+    );
     console.log(`[Deploy] Runner URL: ${RUNNER_URL}`);
 
     // Get project and its services
@@ -371,7 +381,51 @@ export async function deployProjectAction(
       };
     }
 
-    // Step 1: Git Pull
+    // Step 1a: Git Fetch (always fetch to get latest branches)
+    console.log(`[Deploy] Running git fetch...`);
+    const fetchResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `cd "${repoPath}" && git fetch --all 2>&1`,
+      }),
+    });
+
+    if (fetchResponse.ok) {
+      const fetchResult = await fetchResponse.json();
+      output += `=== Git Fetch ===\n${fetchResult.stdout || fetchResult.stderr || "No output"}\n\n`;
+      console.log(`[Deploy] Git fetch result: ${fetchResult.stdout?.substring(0, 200)}`);
+    }
+
+    // Step 1b: Git Checkout (if branch specified)
+    if (branch) {
+      console.log(`[Deploy] Checking out branch: ${branch}`);
+      const checkoutResponse = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          command: `cd "${repoPath}" && git checkout ${branch} 2>&1`,
+        }),
+      });
+
+      if (!checkoutResponse.ok) {
+        const error = await checkoutResponse.text();
+        console.error(`[Deploy] Git checkout failed: ${error}`);
+        return { success: false, error: `Git checkout failed: ${error}` };
+      }
+
+      const checkoutResult = await checkoutResponse.json();
+      output += `=== Git Checkout (${branch}) ===\n${checkoutResult.stdout || checkoutResult.stderr || "No output"}\n\n`;
+      console.log(`[Deploy] Git checkout result: ${checkoutResult.stdout?.substring(0, 200)}`);
+    }
+
+    // Step 1c: Git Pull
     console.log(`[Deploy] Running git pull...`);
     const pullResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
@@ -505,6 +559,7 @@ export async function deployProjectAction(
     await auditLogs.logAction(user.email, "deploy", "project", id, {
       project: project.name,
       repo_path: repoPath,
+      branch: branch || "default",
       log_file: logFile,
       background: true,
       deploy_id: deployRecord?.id,
@@ -519,6 +574,7 @@ export async function deployProjectAction(
         output,
         detectedPath,
         deployId: deployRecord?.id,
+        branch,
       },
     };
   } catch (error) {
@@ -739,5 +795,474 @@ export async function refreshRunningDeploysAction(): Promise<ActionResult<{ upda
   } catch (error) {
     console.error("refreshRunningDeploysAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to refresh deploys" };
+  }
+}
+
+// ========================================
+// GitHub Release Operations
+// ========================================
+
+/**
+ * Parse GitHub URL to extract owner and repo
+ */
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  const patterns = [/github\.com\/([^\/]+)\/([^\/\?#]+)/, /github\.com:([^\/]+)\/([^\/\?#\.]+)/];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) {
+      return {
+        owner: match[1],
+        repo: match[2].replace(/\.git$/, ""),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Generate a semantic version tag for the next release
+ */
+async function generateNextVersionTag(
+  owner: string,
+  repo: string,
+  type: "patch" | "minor" | "major" = "patch"
+): Promise<string> {
+  try {
+    const latest = await getLatestRelease(owner, repo);
+    if (latest?.tag_name) {
+      // Parse existing version (v1.2.3 or 1.2.3)
+      const match = latest.tag_name.match(/v?(\d+)\.(\d+)\.(\d+)/);
+      if (match) {
+        let [, major, minor, patch] = match.map(Number);
+        switch (type) {
+          case "major":
+            major++;
+            minor = 0;
+            patch = 0;
+            break;
+          case "minor":
+            minor++;
+            patch = 0;
+            break;
+          case "patch":
+          default:
+            patch++;
+        }
+        return `v${major}.${minor}.${patch}`;
+      }
+    }
+  } catch {
+    // No existing releases or error - start at v1.0.0
+  }
+  return "v1.0.0";
+}
+
+/**
+ * Create a GitHub release for a project
+ */
+export async function createReleaseAction(
+  projectId: string,
+  options: {
+    tagName?: string;
+    name?: string;
+    description?: string;
+    autoGenerateNotes?: boolean;
+    versionType?: "patch" | "minor" | "major";
+    draft?: boolean;
+    prerelease?: boolean;
+  } = {}
+): Promise<ActionResult<{ tagName: string; htmlUrl: string }>> {
+  try {
+    const user = await requirePinVerification();
+
+    if (!isGitHubConfigured()) {
+      return { success: false, error: "GitHub App not configured" };
+    }
+
+    // Get project
+    const project = await projects.getProjectById(projectId);
+    if (!project) {
+      return { success: false, error: "Project not found" };
+    }
+
+    if (!project.github_url) {
+      return { success: false, error: "Project has no GitHub URL" };
+    }
+
+    const parsed = parseGitHubUrl(project.github_url);
+    if (!parsed) {
+      return { success: false, error: "Invalid GitHub URL" };
+    }
+
+    const { owner, repo } = parsed;
+
+    // Generate or use provided tag name
+    let tagName = options.tagName;
+    if (!tagName) {
+      tagName = await generateNextVersionTag(owner, repo, options.versionType || "patch");
+    }
+
+    // Generate release notes if requested
+    let body = options.description || "";
+    if (options.autoGenerateNotes && !body) {
+      try {
+        const latest = await getLatestRelease(owner, repo);
+        const notes = await generateReleaseNotes(owner, repo, tagName, latest?.tag_name);
+        body = notes.body;
+      } catch (e) {
+        console.warn("[Release] Failed to generate notes:", e);
+        body = `Release ${tagName}`;
+      }
+    }
+
+    // Create the release
+    const release = await createRelease(owner, repo, tagName, {
+      name: options.name || tagName,
+      body,
+      draft: options.draft || false,
+      prerelease: options.prerelease || false,
+    });
+
+    // Log the action
+    await auditLogs.logAction(user.email, "create", "release", projectId, {
+      project: project.name,
+      tag: tagName,
+      draft: options.draft,
+      prerelease: options.prerelease,
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+
+    return {
+      success: true,
+      data: {
+        tagName: release.tag_name,
+        htmlUrl: release.html_url,
+      },
+    };
+  } catch (error) {
+    console.error("createReleaseAction error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create release",
+    };
+  }
+}
+
+/**
+ * Create a release after a successful deploy
+ * This can be called after confirming deploy succeeded
+ */
+export async function createDeployReleaseAction(
+  projectId: string,
+  deployId: string
+): Promise<ActionResult<{ tagName: string; htmlUrl: string }>> {
+  try {
+    const user = await requirePinVerification();
+
+    // Verify deploy succeeded
+    const deploy = await deploys.getDeployById(deployId);
+    if (!deploy) {
+      return { success: false, error: "Deploy not found" };
+    }
+
+    if (deploy.status !== "success") {
+      return { success: false, error: "Can only create release for successful deploys" };
+    }
+
+    // Get project
+    const project = await projects.getProjectById(projectId);
+    if (!project) {
+      return { success: false, error: "Project not found" };
+    }
+
+    if (!project.github_url) {
+      return { success: false, error: "Project has no GitHub URL" };
+    }
+
+    const parsed = parseGitHubUrl(project.github_url);
+    if (!parsed) {
+      return { success: false, error: "Invalid GitHub URL" };
+    }
+
+    const { owner, repo } = parsed;
+
+    // Generate next patch version
+    const tagName = await generateNextVersionTag(owner, repo, "patch");
+
+    // Generate release notes based on commits since last release
+    let body = "";
+    try {
+      const latest = await getLatestRelease(owner, repo);
+      const notes = await generateReleaseNotes(owner, repo, tagName, latest?.tag_name);
+      body = notes.body;
+    } catch (e) {
+      console.warn("[Release] Failed to generate notes:", e);
+      body = `Deployed on ${new Date().toISOString().split("T")[0]}\n\nDeployed by ${user.email}`;
+    }
+
+    // Create the release
+    const release = await createRelease(owner, repo, tagName, {
+      name: tagName,
+      body,
+      draft: false,
+      prerelease: false,
+    });
+
+    // Log the action
+    await auditLogs.logAction(user.email, "create", "release", projectId, {
+      project: project.name,
+      tag: tagName,
+      deployId,
+      autoCreated: true,
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+
+    return {
+      success: true,
+      data: {
+        tagName: release.tag_name,
+        htmlUrl: release.html_url,
+      },
+    };
+  } catch (error) {
+    console.error("createDeployReleaseAction error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create release",
+    };
+  }
+}
+
+// ========================================
+// GitHub Repository Sync
+// ========================================
+
+/**
+ * Sync GitHub repositories with dashboard projects
+ * Creates new projects for repos that don't exist yet
+ * Updates existing projects with latest repo info
+ */
+export async function syncGitHubReposAction(): Promise<
+  ActionResult<{
+    created: number;
+    updated: number;
+    skipped: number;
+    details: string[];
+  }>
+> {
+  try {
+    const user = await requirePinVerification();
+
+    if (!isGitHubConfigured()) {
+      return { success: false, error: "GitHub App not configured" };
+    }
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const details: string[] = [];
+
+    // Fetch all accessible repositories (paginated)
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const result = await listRepositories(page, 50);
+      const repos = result.data;
+
+      if (repos.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const repo of repos) {
+        try {
+          // Check if project already exists with this GitHub URL
+          const existingProjects = await projects.getProjects();
+          const existingProject = existingProjects.find((p) => p.github_url === repo.html_url);
+
+          if (existingProject) {
+            // Update existing project with latest repo info if needed
+            const needsUpdate = existingProject.description !== repo.description || existingProject.name !== repo.name;
+
+            if (needsUpdate) {
+              await projects.updateProject(existingProject.id, {
+                description: repo.description || undefined,
+              });
+              updated++;
+              details.push(`Updated: ${repo.full_name}`);
+            } else {
+              skipped++;
+            }
+          } else {
+            // Create new project for this repo
+            const slug = repo.name
+              .toLowerCase()
+              .replace(/[^a-z0-9-]/g, "-")
+              .replace(/-+/g, "-")
+              .replace(/^-|-$/g, "");
+
+            // Check if slug already exists
+            const existingBySlug = await projects.getProjectBySlug(slug);
+            if (existingBySlug) {
+              skipped++;
+              details.push(`Skipped (slug exists): ${repo.full_name}`);
+              continue;
+            }
+
+            // Determine technologies from repo topics/language
+            const technologies: string[] = [];
+            if (repo.language) {
+              technologies.push(repo.language);
+            }
+            if (repo.topics && repo.topics.length > 0) {
+              technologies.push(...repo.topics.slice(0, 5));
+            }
+
+            await projects.createProject({
+              name: repo.name,
+              slug,
+              description: repo.description || undefined,
+              status: repo.archived ? "archived" : "active",
+              github_url: repo.html_url,
+              tags: repo.topics || [],
+              technologies,
+            });
+
+            created++;
+            details.push(`Created: ${repo.full_name}`);
+          }
+        } catch (repoError) {
+          console.error(`Failed to sync repo ${repo.full_name}:`, repoError);
+          details.push(
+            `Error: ${repo.full_name} - ${repoError instanceof Error ? repoError.message : "Unknown error"}`
+          );
+        }
+      }
+
+      // Check if there are more pages
+      hasMore = result.pagination?.nextPage !== undefined;
+      page++;
+    }
+
+    // Log the sync action
+    await auditLogs.logAction(user.email, "sync", "github_repos", "all", {
+      created,
+      updated,
+      skipped,
+    });
+
+    revalidatePath("/projects");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: {
+        created,
+        updated,
+        skipped,
+        details,
+      },
+    };
+  } catch (error) {
+    console.error("syncGitHubReposAction error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to sync GitHub repositories",
+    };
+  }
+}
+
+/**
+ * Import a single GitHub repository as a project
+ */
+export async function importGitHubRepoAction(
+  owner: string,
+  repo: string
+): Promise<ActionResult<{ projectId: string }>> {
+  try {
+    const user = await requirePinVerification();
+
+    if (!isGitHubConfigured()) {
+      return { success: false, error: "GitHub App not configured" };
+    }
+
+    const githubUrl = `https://github.com/${owner}/${repo}`;
+
+    // Check if already exists
+    const existingProjects = await projects.getProjects();
+    const existingProject = existingProjects.find((p) => p.github_url === githubUrl);
+
+    if (existingProject) {
+      return {
+        success: false,
+        error: `Project already exists: ${existingProject.name}`,
+      };
+    }
+
+    // Generate slug
+    const slug = repo
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    // Check if slug already exists
+    const existingBySlug = await projects.getProjectBySlug(slug);
+    if (existingBySlug) {
+      return {
+        success: false,
+        error: `A project with slug "${slug}" already exists`,
+      };
+    }
+
+    // Fetch repo info from GitHub
+    const response = await fetch(`/api/github/repos/${owner}/${repo}`);
+    let repoData: {
+      description?: string;
+      language?: string;
+      topics?: string[];
+      archived?: boolean;
+    } = {};
+
+    if (response.ok) {
+      const result = await response.json();
+      repoData = result.data || {};
+    }
+
+    // Create the project
+    const project = await projects.createProject({
+      name: repo,
+      slug,
+      description: repoData.description || undefined,
+      status: repoData.archived ? "archived" : "active",
+      github_url: githubUrl,
+      tags: repoData.topics || [],
+      technologies: repoData.language ? [repoData.language] : [],
+    });
+
+    // Log the action
+    await auditLogs.logAction(user.email, "import", "github_repo", project.id, {
+      owner,
+      repo,
+      github_url: githubUrl,
+    });
+
+    revalidatePath("/projects");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: { projectId: project.id },
+    };
+  } catch (error) {
+    console.error("importGitHubRepoAction error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to import repository",
+    };
   }
 }

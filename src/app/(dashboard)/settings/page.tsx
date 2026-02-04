@@ -13,7 +13,21 @@ import {
   Label,
   Badge,
 } from "@/components/ui";
-import { Save, RefreshCw, TestTube, Check, X, Loader2, Info, Plus, Network, Clock, Shield, Key } from "lucide-react";
+import {
+  Save,
+  RefreshCw,
+  TestTube,
+  Check,
+  X,
+  Loader2,
+  Info,
+  Plus,
+  Network,
+  Clock,
+  Shield,
+  Key,
+  Github,
+} from "lucide-react";
 
 interface ConnectionStatus {
   status: "unknown" | "loading" | "success" | "error";
@@ -42,6 +56,7 @@ export default function SettingsPage() {
 
       <div className="p-6 space-y-6 max-w-4xl">
         <EnvironmentInfo />
+        <GitHubSettings />
         <MonitoringIntervalSettings />
         <PortainerSettings />
         <RunnerSettings />
@@ -109,6 +124,162 @@ function EnvironmentInfo() {
           </a>{" "}
           for details.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GitHubSettings() {
+  const [status, setStatus] = useState<ConnectionStatus>({ status: "unknown" });
+  const [loading, setLoading] = useState(true);
+  const [githubStatus, setGithubStatus] = useState<{
+    configured: boolean;
+    connected?: boolean;
+    repoCount?: number;
+    rateLimit?: { remaining: number; limit: number; resetsAt: string };
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  async function loadStatus() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/github/status");
+      const result = await response.json();
+      setGithubStatus(result);
+    } catch {
+      setGithubStatus(null);
+    }
+    setLoading(false);
+  }
+
+  async function testConnection() {
+    setStatus({ status: "loading" });
+    try {
+      const response = await fetch("/api/github/status");
+      const result = await response.json();
+
+      if (result.connected) {
+        setStatus({ status: "success", message: `Connected: ${result.repoCount} repos accessible` });
+        setGithubStatus(result);
+      } else if (result.configured) {
+        setStatus({ status: "error", message: result.error || "Failed to connect" });
+      } else {
+        setStatus({ status: "error", message: "GitHub App not configured" });
+      }
+    } catch {
+      setStatus({ status: "error", message: "Failed to test connection" });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Github className="h-5 w-5" />
+          GitHub Integration
+        </CardTitle>
+        <CardDescription>Repository monitoring, auto-deploy webhooks, and release tracking</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Checking GitHub configuration...
+          </div>
+        ) : !githubStatus ? (
+          <p className="text-muted-foreground">Failed to check GitHub status</p>
+        ) : !githubStatus.configured ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50">
+              <X className="h-4 w-4 text-danger" />
+              <span className="text-sm">GitHub App not configured</span>
+            </div>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>To enable GitHub integration, set these environment variables:</p>
+              <ul className="list-disc list-inside ml-2 font-mono text-xs">
+                <li>GITHUB_APP_ID</li>
+                <li>GITHUB_PRIVATE_KEY_BASE64</li>
+                <li>GITHUB_INSTALLATION_ID</li>
+                <li>GITHUB_WEBHOOK_SECRET (optional)</li>
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Connection Status */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                <span className="text-sm">Status</span>
+                <Badge variant={githubStatus.connected ? "success" : "danger"}>
+                  {githubStatus.connected ? "Connected" : "Error"}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                <span className="text-sm">Repositories</span>
+                <Badge variant="secondary">{githubStatus.repoCount ?? 0}</Badge>
+              </div>
+            </div>
+
+            {/* Rate Limit Info */}
+            {githubStatus.rateLimit && (
+              <div className="p-3 rounded-lg bg-secondary/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">API Rate Limit</span>
+                  <span className="text-sm font-mono">
+                    {githubStatus.rateLimit.remaining} / {githubStatus.rateLimit.limit}
+                  </span>
+                </div>
+                <div className="mt-2 w-full bg-secondary rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{
+                      width: `${(githubStatus.rateLimit.remaining / githubStatus.rateLimit.limit) * 100}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Resets at {new Date(githubStatus.rateLimit.resetsAt).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {githubStatus.error && (
+              <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-sm text-danger">
+                {githubStatus.error}
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" onClick={testConnection} disabled={status.status === "loading"}>
+                {status.status === "loading" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <TestTube className="h-4 w-4" />
+                )}
+                Test Connection
+              </Button>
+              <Button variant="outline" size="sm" onClick={loadStatus} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              <StatusIndicator status={status} />
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              <p>
+                Webhook URL: <code className="bg-secondary px-1 rounded">/api/github/webhook</code>
+              </p>
+              <p className="mt-1">
+                Configure this URL in your GitHub App settings to receive push, release, and security alert events.
+              </p>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

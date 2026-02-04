@@ -20,6 +20,7 @@ import {
   Clock,
   Network,
   List,
+  Github,
 } from "lucide-react";
 
 function Section({
@@ -470,6 +471,129 @@ Body: { "name": "My Project", "status": "active" }`}
           <CodeBlock title="Filter by column">
             {`GET /v1/db/services?filters=[{"operator":"eq","column":"type","value":"docker"}]`}
           </CodeBlock>
+        </Section>
+
+        {/* GitHub Integration */}
+        <Section title="GitHub App Integration" icon={Github}>
+          <p className="text-muted-foreground mb-4">
+            Deep integration with GitHub through a GitHub App for repository management, releases, and issue tracking.
+          </p>
+
+          <h4 className="font-semibold mt-4 mb-2">Features</h4>
+          <div className="space-y-3 text-sm">
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Activity Dashboard</div>
+              <p className="text-muted-foreground">
+                View recent commits, pull requests, and releases in a tabbed interface directly from the project page.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Branch Deploys</div>
+              <p className="text-muted-foreground">
+                Deploy from any branch using the branch selector dropdown. Fetches branches directly from GitHub.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">README Viewer</div>
+              <p className="text-muted-foreground">
+                Render repository README with full markdown support including code blocks, tables, and images.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">File Browser</div>
+              <p className="text-muted-foreground">
+                Navigate repository files and directories directly from the dashboard with file icons and sizes.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Release Management</div>
+              <p className="text-muted-foreground">
+                Create releases with auto-generated semantic versions (v1.0.0 → v1.0.1) and GitHub-generated release
+                notes.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Changelog Generator</div>
+              <p className="text-muted-foreground">
+                Generate changelogs between any two releases. Copy or download as markdown.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Work Item → GitHub Issue</div>
+              <p className="text-muted-foreground">
+                Create GitHub issues directly from work items with auto-applied labels based on type and priority.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">PR Linking</div>
+              <p className="text-muted-foreground">
+                Link work items to pull requests for tracking development progress.
+              </p>
+            </div>
+            <div className="border border-border rounded-lg p-3">
+              <div className="font-medium text-foreground">Repository Sync</div>
+              <p className="text-muted-foreground">
+                Auto-import all accessible GitHub repositories as dashboard projects, or import individual repos.
+              </p>
+            </div>
+          </div>
+
+          <h4 className="font-semibold mt-4 mb-2">Setup</h4>
+          <ol className="text-muted-foreground space-y-2 text-sm list-decimal list-inside">
+            <li>Create a GitHub App in your GitHub account/organization settings</li>
+            <li>
+              Configure permissions: Contents (read), Issues (read/write), PRs (read), Releases (read/write), Metadata
+              (read)
+            </li>
+            <li>Generate and download a private key (.pem file)</li>
+            <li>Install the app on your repositories</li>
+            <li>Note your App ID and Installation ID</li>
+          </ol>
+
+          <h4 className="font-semibold mt-4 mb-2">Environment Variables</h4>
+          <CodeBlock>
+            {`# GitHub App Configuration
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY=base64_encoded_private_key
+GITHUB_APP_INSTALLATION_ID=12345678`}
+          </CodeBlock>
+
+          <h4 className="font-semibold mt-4 mb-2">Encoding the Private Key</h4>
+          <p className="text-muted-foreground text-sm mb-2">
+            Convert your .pem file to base64 for use in environment variables:
+          </p>
+          <CodeBlock title="Linux/macOS">{`cat private-key.pem | base64 -w 0`}</CodeBlock>
+          <CodeBlock title="PowerShell (Windows)">
+            {`[Convert]::ToBase64String([IO.File]::ReadAllBytes("private-key.pem"))`}
+          </CodeBlock>
+
+          <h4 className="font-semibold mt-4 mb-2">Actions Available</h4>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">createReleaseAction</code>
+              <span>— Create a release with auto version or custom tag</span>
+            </div>
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">createDeployReleaseAction</code>
+              <span>— Create release after successful deploy</span>
+            </div>
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">syncGitHubReposAction</code>
+              <span>— Sync all repos to projects</span>
+            </div>
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">importGitHubRepoAction</code>
+              <span>— Import single repo as project</span>
+            </div>
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">createGitHubIssueFromWorkItemAction</code>
+              <span>— Create issue from work item</span>
+            </div>
+            <div className="flex gap-2">
+              <code className="bg-secondary px-2 py-0.5 rounded shrink-0">linkWorkItemToPRAction</code>
+              <span>— Link work item to PR</span>
+            </div>
+          </div>
         </Section>
 
         {/* Portainer Setup */}

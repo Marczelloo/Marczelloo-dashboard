@@ -86,6 +86,13 @@ async function AuditLogList() {
     docker_exec: "warning",
     docker_exec_blocked: "danger",
     clear_deploys: "secondary",
+    github_sync: "secondary",
+    github_webhook_trigger: "success",
+    github_deploy: "success",
+    link: "success",
+    unlink: "secondary",
+    sync: "secondary",
+    import: "success",
   };
 
   const entityLinks: Record<string, (id: string) => string> = {

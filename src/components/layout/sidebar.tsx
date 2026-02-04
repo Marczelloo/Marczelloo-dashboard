@@ -17,6 +17,7 @@ import {
   Cpu,
   CheckSquare,
   Newspaper,
+  Sparkles,
 } from "lucide-react";
 
 const navItems = [
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/news", label: "Tech News", icon: Newspaper },
   { href: "/terminal", label: "Terminal", icon: Terminal },
   { href: "/audit-log", label: "Audit Log", icon: History },
+  { href: "/features", label: "Features", icon: Sparkles },
   { href: "/docs", label: "Documentation", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
