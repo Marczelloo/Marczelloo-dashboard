@@ -140,26 +140,27 @@ export default function TechNewsPage() {
       }
 
       const data = await response.json();
-      return (
-        data.vulnerabilities
-          ?.slice(0, 20)
-          .map(
-            (v: {
-              cve: {
-                id: string;
-                descriptions: { value: string }[];
-                published: string;
-                metrics?: { cvssMetricV31?: { cvssData: { baseScore: number; baseSeverity: string } }[] };
-              };
-            }) => ({
-              id: v.cve.id,
-              summary: v.cve.descriptions?.[0]?.value || "No description",
-              published: v.cve.published,
-              cvss: v.cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore,
-              severity: v.cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseSeverity,
-            })
-          ) || []
-      );
+      const cves =
+        data.vulnerabilities?.map(
+          (v: {
+            cve: {
+              id: string;
+              descriptions: { value: string }[];
+              published: string;
+              metrics?: { cvssMetricV31?: { cvssData: { baseScore: number; baseSeverity: string } }[] };
+            };
+          }) => ({
+            id: v.cve.id,
+            summary: v.cve.descriptions?.[0]?.value || "No description",
+            published: v.cve.published,
+            cvss: v.cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore,
+            severity: v.cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseSeverity,
+          })
+        ) || [];
+      // Sort by published date (newest first) and take top 20
+      return cves
+        .sort((a: CveItem, b: CveItem) => new Date(b.published).getTime() - new Date(a.published).getTime())
+        .slice(0, 20);
     } catch {
       console.error("Failed to fetch CVEs, using mock data");
       return [

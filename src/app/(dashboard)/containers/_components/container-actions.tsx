@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Play, Square, RotateCcw, FileText, Loader2, RefreshCw, Trash2, MoreHorizontal, Info } from "lucide-react";
@@ -39,6 +39,14 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
   const [logsOpen, setLogsOpen] = useState(false);
   const [logs, setLogs] = useState<string>("");
   const [logsLoading, setLogsLoading] = useState(false);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when logs update
+  useEffect(() => {
+    if (logs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs]);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -160,10 +168,6 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
                 Inspect
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={fetchLogs}>
-              <FileText className="h-4 w-4 mr-2" />
-              View Logs
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isRunning && (
               <DropdownMenuItem onClick={() => performAction("kill")} className="text-warning">
@@ -225,7 +229,10 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              logs || "No logs available"
+              <>
+                {logs || "No logs available"}
+                <div ref={logsEndRef} />
+              </>
             )}
           </div>
         </DialogContent>

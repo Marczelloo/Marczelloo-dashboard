@@ -2,6 +2,7 @@
 
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
+import { notifyDeploySuccess, notifyDeployFailed } from "@/server/notifications";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
@@ -172,6 +173,56 @@ export async function getProjectByIdAction(id: string) {
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
+
+// Helper function to detect deployment errors in logs
+function detectDeploymentError(log: string): { hasError: boolean; errorMessage: string | null } {
+  const normalizedLog = log.toLowerCase();
+
+  // Docker/build error patterns
+  const errorPatterns = [
+    { pattern: /error[:\s]+.*build.*failed/i, message: "Build failed" },
+    { pattern: /exited with code [1-9]\d*/i, message: "Container exited with error" },
+    { pattern: /failed to (build|pull|create|start)/i, message: "Docker operation failed" },
+    { pattern: /error during connect/i, message: "Docker connection error" },
+    { pattern: /cannot connect to the docker daemon/i, message: "Docker daemon unreachable" },
+    { pattern: /no space left on device/i, message: "Disk full" },
+    { pattern: /error:\s*enoent/i, message: "File not found" },
+    { pattern: /npm err!/i, message: "NPM error" },
+    { pattern: /yarn error/i, message: "Yarn error" },
+    { pattern: /fatal:/i, message: "Fatal error" },
+    { pattern: /error: failed to solve/i, message: "Docker build failed" },
+    { pattern: /exec \/.*: no such file or directory/i, message: "Entrypoint not found" },
+  ];
+
+  // Success patterns that override errors (e.g., "0 errors" or build success messages)
+  const successPatterns = [
+    /successfully built/i,
+    /successfully tagged/i,
+    /container .+ started/i,
+    /Creating .+ \.\.\. done/i,
+    /0 error/i,
+  ];
+
+  for (const { pattern, message } of errorPatterns) {
+    if (pattern.test(log)) {
+      // Check if it's overridden by success patterns
+      const hasSuccessAfterError = successPatterns.some((sp) => sp.test(log));
+      if (!hasSuccessAfterError) {
+        return { hasError: true, errorMessage: message };
+      }
+    }
+  }
+
+  // Generic error check - but only if no success patterns found
+  if (normalizedLog.includes("error") && !normalizedLog.includes("0 error")) {
+    const hasSuccess = successPatterns.some((sp) => sp.test(log));
+    if (!hasSuccess) {
+      return { hasError: true, errorMessage: "Build completed with errors (check logs)" };
+    }
+  }
+
+  return { hasError: false, errorMessage: null };
+}
 
 export async function deployProjectAction(
   id: string,
@@ -533,15 +584,32 @@ export async function checkDeployLogAction(
     const logResult = await logResponse.json();
     const log = logResult.stdout || logResult.stderr || "No log output";
 
-    // If complete and we have a deploy ID, update the deploy status
+    // If complete and we have a deploy ID, update the deploy status and send notifications
     if (isComplete && deployId) {
       try {
-        // Check if there was an error in the output
-        const hasError = log.toLowerCase().includes("error") && !log.includes("0 errors");
-        await deploys.completeDeploy(deployId, !hasError, {
-          error_message: hasError ? "Build completed with errors (check logs)" : undefined,
-        });
-        revalidatePath("/dashboard");
+        // Use improved error detection
+        const { hasError, errorMessage } = detectDeploymentError(log);
+
+        // Get the deploy record to check if we've already updated it
+        const existingDeploy = await deploys.getDeployById(deployId);
+        if (existingDeploy && existingDeploy.status === "running") {
+          await deploys.completeDeploy(deployId, !hasError, {
+            error_message: errorMessage || undefined,
+          });
+
+          // Get service name for notification
+          const service = existingDeploy.service_id ? await services.getServiceById(existingDeploy.service_id) : null;
+          const serviceName = service?.name || "Unknown Service";
+
+          // Send notification
+          if (hasError) {
+            await notifyDeployFailed(serviceName, errorMessage || "Unknown error");
+          } else {
+            await notifyDeploySuccess(serviceName);
+          }
+
+          revalidatePath("/dashboard");
+        }
       } catch (e) {
         console.error("[Deploy] Failed to update deploy status:", e);
       }
