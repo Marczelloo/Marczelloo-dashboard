@@ -7,18 +7,7 @@ import { DeployAllButton } from "@/components/features/deploy-all-button";
 import { DeployProjectButton } from "@/components/features/deploy-project-button";
 import { projects, services, workItems, deploys } from "@/server/atlashub";
 import { formatRelativeTime, formatDateTime } from "@/lib/utils";
-import {
-  Github,
-  ExternalLink,
-  Globe,
-  Settings,
-  Plus,
-  Server,
-  CheckSquare,
-  Rocket,
-  ArrowLeft,
-  Code2,
-} from "lucide-react";
+import { Github, ExternalLink, Globe, Settings, Plus, Server, CheckSquare, ArrowLeft, Code2 } from "lucide-react";
 import type { Service, Deploy } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -404,6 +393,8 @@ async function WorkItemsSection({ projectId }: { projectId: string }) {
 }
 
 async function DeploysSection({ projectId }: { projectId: string }) {
+  const { ProjectDeploysClient } = await import("./_components/project-deploys");
+
   const projectServices = await services.getServicesByProjectId(projectId);
   const serviceIds = projectServices.map((s) => s.id);
 
@@ -419,44 +410,7 @@ async function DeploysSection({ projectId }: { projectId: string }) {
     .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
     .slice(0, 5);
 
-  const statusColors: Record<string, "secondary" | "warning" | "success" | "danger"> = {
-    pending: "secondary",
-    running: "warning",
-    success: "success",
-    failed: "danger",
-    cancelled: "secondary",
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Rocket className="h-4 w-4" />
-          Recent Deploys
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {recentDeploys.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No deploys yet</p>
-        ) : (
-          <div className="space-y-3">
-            {recentDeploys.map((deploy) => (
-              <div key={deploy.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div className="flex items-center gap-3">
-                  <Badge variant={statusColors[deploy.status]}>{deploy.status}</Badge>
-                  <div>
-                    {deploy.commit_sha && <p className="font-mono text-xs">{deploy.commit_sha.slice(0, 7)}</p>}
-                    <p className="text-xs text-muted-foreground">{formatRelativeTime(deploy.started_at)}</p>
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground">{deploy.triggered_by}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return <ProjectDeploysClient deploys={recentDeploys} services={projectServices} />;
 }
 
 function SectionSkeleton({ title: _title }: { title: string }) {

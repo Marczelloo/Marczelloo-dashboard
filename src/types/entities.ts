@@ -111,7 +111,10 @@ export type AuditAction =
   | "start"
   | "reveal_secret"
   | "login"
-  | "pin_verify";
+  | "pin_verify"
+  | "docker_exec"
+  | "docker_exec_blocked"
+  | "clear_deploys";
 
 export type EntityType = "project" | "service" | "work_item" | "env_var" | "deploy" | "container" | "auth";
 

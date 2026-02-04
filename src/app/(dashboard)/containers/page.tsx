@@ -160,7 +160,7 @@ function ContainerCard({ container, endpointId }: { container: PortainerContaine
               {ports && <p className="text-xs text-muted-foreground font-mono">{ports}</p>}
             </div>
 
-            <ContainerActions containerId={container.Id} endpointId={endpointId} status={status} />
+            <ContainerActions containerId={container.Id} containerName={name} endpointId={endpointId} status={status} />
           </div>
         </div>
       </CardContent>

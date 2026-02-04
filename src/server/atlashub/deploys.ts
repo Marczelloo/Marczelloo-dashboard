@@ -96,3 +96,28 @@ export async function getDeployStats(): Promise<{
     running: deploys.filter((d) => d.status === "running").length,
   };
 }
+
+export async function deleteDeployById(id: string): Promise<boolean> {
+  const result = await db.deleteById(TABLE, id);
+  return result.deletedCount > 0;
+}
+
+/**
+ * Delete completed deploys (not running or pending)
+ * Returns count of deleted deploys
+ */
+export async function clearCompletedDeploys(): Promise<number> {
+  // Get all completed deploys
+  const allDeploys = await getDeploys();
+  const completedDeploys = allDeploys.filter(
+    (d) => d.status === "success" || d.status === "failed" || d.status === "cancelled"
+  );
+
+  let deleted = 0;
+  for (const deploy of completedDeploys) {
+    const result = await db.deleteById(TABLE, deploy.id);
+    if (result.deletedCount > 0) deleted++;
+  }
+
+  return deleted;
+}

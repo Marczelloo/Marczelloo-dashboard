@@ -158,14 +158,14 @@ export async function ServiceStatus() {
   const servicesList = await getServiceStatuses();
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between flex-shrink-0">
         <CardTitle>Service Status</CardTitle>
         <Link href="/monitoring" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           View all →
         </Link>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 overflow-y-auto">
         {servicesList.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No services yet. Create a project and add services to monitor.

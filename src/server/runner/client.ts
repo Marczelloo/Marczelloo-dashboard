@@ -135,6 +135,62 @@ export async function dockerStatus(containerName: string): Promise<RunnerRespons
   });
 }
 
+/**
+ * Execute a command inside a Docker container
+ * Uses the shell endpoint to run docker exec
+ */
+export async function dockerExec(
+  containerName: string,
+  command: string
+): Promise<{ success: boolean; stdout: string; stderr: string; error?: string }> {
+  const config = getConfig();
+
+  // Sanitize container name and command to prevent injection
+  // Only allow alphanumeric, dashes, underscores, and dots in container name
+  if (!/^[a-zA-Z0-9_.-]+$/.test(containerName)) {
+    throw new RunnerError("Invalid container name format", 400);
+  }
+
+  try {
+    const response = await fetch(`${config.url}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.token}`,
+      },
+      body: JSON.stringify({
+        command: `docker exec ${containerName} ${command}`,
+      }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const error = await response.text().catch(() => response.statusText);
+      return {
+        success: false,
+        stdout: "",
+        stderr: "",
+        error: `Runner error: ${response.status} - ${error}`,
+      };
+    }
+
+    const result = await response.json();
+    return {
+      success: result.exit_code === 0 || (!result.exit_code && !result.stderr),
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      error: result.exit_code !== 0 ? `Exit code: ${result.exit_code}` : undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: "",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 // ========================================
 // Deployment Workflows
 // ========================================

@@ -22,9 +22,9 @@ export default function DashboardPage() {
 
         {/* Main Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Service Status - 2 columns */}
-          <div className="lg:col-span-2">
-            <Suspense fallback={<CardSkeleton className="h-96" />}>
+          {/* Service Status - 2 columns, scrollable with max height matching Quick Actions */}
+          <div className="lg:col-span-2 max-h-[400px] overflow-hidden flex flex-col">
+            <Suspense fallback={<CardSkeleton className="h-full" />}>
               <ServiceStatus />
             </Suspense>
           </div>
@@ -35,15 +35,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Deploys */}
-        <Suspense fallback={<CardSkeleton className="h-64" />}>
-          <RecentDeploysServer />
-        </Suspense>
+        {/* Recent Deploys + Recent Activity - 2 columns side by side */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Suspense fallback={<CardSkeleton className="h-80" />}>
+            <RecentDeploysServer />
+          </Suspense>
 
-        {/* Recent Activity */}
-        <Suspense fallback={<CardSkeleton className="h-80" />}>
-          <RecentActivity />
-        </Suspense>
+          <Suspense fallback={<CardSkeleton className="h-80" />}>
+            <RecentActivity />
+          </Suspense>
+        </div>
       </div>
     </>
   );

@@ -83,6 +83,9 @@ async function AuditLogList() {
     reveal_secret: "warning",
     login: "secondary",
     pin_verify: "secondary",
+    docker_exec: "warning",
+    docker_exec_blocked: "danger",
+    clear_deploys: "secondary",
   };
 
   const entityLinks: Record<string, (id: string) => string> = {

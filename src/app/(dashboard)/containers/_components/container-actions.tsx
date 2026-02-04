@@ -3,7 +3,20 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Play, Square, RotateCcw, FileText, Loader2, RefreshCw, Trash2, MoreHorizontal, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Play,
+  Square,
+  RotateCcw,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  MoreHorizontal,
+  Info,
+  Terminal,
+  Send,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -26,13 +39,20 @@ import Link from "next/link";
 
 interface ContainerActionsProps {
   containerId: string;
+  containerName: string;
   endpointId: number;
   status: "running" | "stopped" | "unhealthy" | "unknown";
 }
 
+interface TerminalEntry {
+  type: "command" | "stdout" | "stderr" | "error";
+  content: string;
+  timestamp: Date;
+}
+
 const LOG_TAIL_SIZE = 1000; // Fetch last 1000 lines
 
-export function ContainerActions({ containerId, endpointId, status }: ContainerActionsProps) {
+export function ContainerActions({ containerId, containerName, endpointId, status }: ContainerActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
@@ -41,12 +61,35 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
   const [logsLoading, setLogsLoading] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
+  // Terminal state
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHistory, setTerminalHistory] = useState<TerminalEntry[]>([]);
+  const [terminalCommand, setTerminalCommand] = useState("");
+  const [terminalLoading, setTerminalLoading] = useState(false);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalInputRef = useRef<HTMLInputElement>(null);
+
   // Auto-scroll to bottom when logs update
   useEffect(() => {
     if (logs && logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs]);
+
+  // Auto-scroll terminal to bottom
+  useEffect(() => {
+    if (terminalHistory.length > 0 && terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [terminalHistory]);
+
+  // Focus terminal input when dialog opens
+  useEffect(() => {
+    if (terminalOpen && terminalInputRef.current) {
+      setTimeout(() => terminalInputRef.current?.focus(), 100);
+    }
+  }, [terminalOpen]);
+
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -113,6 +156,51 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
     }
   }
 
+  async function executeCommand() {
+    if (!terminalCommand.trim() || terminalLoading) return;
+
+    const command = terminalCommand.trim();
+    setTerminalCommand("");
+    setTerminalLoading(true);
+
+    // Add command to history
+    setTerminalHistory((prev) => [...prev, { type: "command", content: command, timestamp: new Date() }]);
+
+    try {
+      const response = await fetch("/api/containers/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ containerName, command }),
+      });
+
+      const result = await response.json();
+
+      if (result.stdout) {
+        setTerminalHistory((prev) => [...prev, { type: "stdout", content: result.stdout, timestamp: new Date() }]);
+      }
+
+      if (result.stderr) {
+        setTerminalHistory((prev) => [...prev, { type: "stderr", content: result.stderr, timestamp: new Date() }]);
+      }
+
+      if (result.error && !result.stdout && !result.stderr) {
+        setTerminalHistory((prev) => [...prev, { type: "error", content: result.error, timestamp: new Date() }]);
+      }
+    } catch (err) {
+      setTerminalHistory((prev) => [
+        ...prev,
+        {
+          type: "error",
+          content: err instanceof Error ? err.message : "Failed to execute command",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setTerminalLoading(false);
+      terminalInputRef.current?.focus();
+    }
+  }
+
   const isLoading = isPending || actionInProgress !== null;
 
   return (
@@ -168,6 +256,12 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
                 Inspect
               </Link>
             </DropdownMenuItem>
+            {isRunning && (
+              <DropdownMenuItem onClick={() => setTerminalOpen(true)}>
+                <Terminal className="h-4 w-4 mr-2" />
+                Terminal (Exec)
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             {isRunning && (
               <DropdownMenuItem onClick={() => performAction("kill")} className="text-warning">
@@ -234,6 +328,73 @@ export function ContainerActions({ containerId, endpointId, status }: ContainerA
                 <div ref={logsEndRef} />
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terminal Dialog */}
+      <Dialog open={terminalOpen} onOpenChange={setTerminalOpen}>
+        <DialogContent className="max-w-4xl h-[70vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Terminal className="h-5 w-5" />
+              Terminal - {containerName}
+            </DialogTitle>
+            <DialogDescription>
+              Execute commands inside the container. Use caution with destructive commands.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Terminal output area */}
+          <div className="flex-1 min-h-0 overflow-auto bg-zinc-950 rounded-lg p-4 font-mono text-sm">
+            {terminalHistory.length === 0 ? (
+              <div className="text-zinc-500">
+                Type a command below and press Enter to execute.
+                <br />
+                Example: ls -la, cat /etc/os-release, env
+              </div>
+            ) : (
+              terminalHistory.map((entry, index) => (
+                <div key={index} className="mb-2">
+                  {entry.type === "command" ? (
+                    <div className="text-primary">
+                      <span className="text-zinc-500">$ </span>
+                      {entry.content}
+                    </div>
+                  ) : entry.type === "stdout" ? (
+                    <pre className="text-zinc-300 whitespace-pre-wrap">{entry.content}</pre>
+                  ) : entry.type === "stderr" ? (
+                    <pre className="text-yellow-500 whitespace-pre-wrap">{entry.content}</pre>
+                  ) : (
+                    <div className="text-red-500">{entry.content}</div>
+                  )}
+                </div>
+              ))
+            )}
+            <div ref={terminalEndRef} />
+          </div>
+
+          {/* Command input */}
+          <div className="flex gap-2 mt-4">
+            <div className="flex-1 flex items-center gap-2 bg-zinc-950 rounded-lg px-3 border border-border">
+              <span className="text-zinc-500 font-mono text-sm">$</span>
+              <Input
+                ref={terminalInputRef}
+                value={terminalCommand}
+                onChange={(e) => setTerminalCommand(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    executeCommand();
+                  }
+                }}
+                placeholder="Enter command..."
+                className="border-0 bg-transparent font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                disabled={terminalLoading || !isRunning}
+              />
+            </div>
+            <Button onClick={executeCommand} disabled={terminalLoading || !terminalCommand.trim() || !isRunning}>
+              {terminalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
