@@ -6,7 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Rocket, RefreshCw, FileText, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Rocket, RefreshCw, FileText, Loader2, Trash2 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { checkDeployLogAction } from "@/app/actions/projects";
 import { toast } from "sonner";
@@ -28,6 +39,7 @@ const statusColors: Record<string, "secondary" | "warning" | "success" | "danger
 export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isClearing, setIsClearing] = useState(false);
   const [logDialog, setLogDialog] = useState<{
     open: boolean;
     log: string;
@@ -41,6 +53,25 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
   });
 
   const serviceMap = new Map(services.map((s) => [s.id, s]));
+
+  async function handleClearAll() {
+    setIsClearing(true);
+    try {
+      const response = await fetch("/api/deploys/clear", { method: "POST" });
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`Cleared ${result.deleted} deployment(s)`);
+        router.refresh();
+      } else {
+        toast.error("Failed to clear deployments", { description: result.error });
+      }
+    } catch {
+      toast.error("Failed to clear deployments");
+    } finally {
+      setIsClearing(false);
+    }
+  }
 
   async function handleCheckStatus(deploy: Deploy) {
     if (!deploy.logs_object_key) {
@@ -120,11 +151,42 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Rocket className="h-4 w-4" />
             Recent Deploys
           </CardTitle>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive"
+                title="Clear old deployments"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear Deployment History?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all completed deployments. Running deployments will not be affected.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearAll}
+                  disabled={isClearing}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isClearing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Clear History
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">

@@ -446,8 +446,10 @@ export async function deployProjectAction(
     // Step 3: Docker Compose Build and Up (run in background to avoid Cloudflare timeout)
     console.log(`[Deploy] Running docker compose in background...`);
     // Use nohup to run in background, redirect output to a log file
+    // The command writes a completion marker at the end so we can detect when it's done
     const logFile = `/tmp/deploy-${project.slug}-${Date.now()}.log`;
-    const composeCmd = `cd "${repoPath}" && nohup docker compose ${profileFlags} up -d --build > "${logFile}" 2>&1 &`;
+    // Use a subshell that runs docker compose and then writes a completion marker
+    const composeCmd = `cd "${repoPath}" && nohup bash -c 'docker compose ${profileFlags} up -d --build 2>&1; EXIT_CODE=$?; echo ""; echo "===[DEPLOY_COMPLETE]===" ; if [ $EXIT_CODE -eq 0 ]; then echo "STATUS: SUCCESS"; else echo "STATUS: FAILED (exit code: $EXIT_CODE)"; fi; echo "TIMESTAMP: $(date -Iseconds)"' > "${logFile}" 2>&1 &`;
     console.log(`[Deploy] Command: ${composeCmd}`);
     console.log(`[Deploy] Log file: ${logFile}`);
 
@@ -547,25 +549,7 @@ export async function checkDeployLogAction(
       return { success: false, error: "Invalid log file path" };
     }
 
-    // Check if process is still running
-    const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        command: `pgrep -f "docker compose.*up.*build" > /dev/null && echo "RUNNING" || echo "COMPLETE"`,
-      }),
-    });
-
-    let isComplete = true;
-    if (checkResponse.ok) {
-      const checkResult = await checkResponse.json();
-      isComplete = checkResult.stdout?.includes("COMPLETE") ?? true;
-    }
-
-    // Get the log file contents (last 200 lines)
+    // Get the log file contents (last 300 lines to ensure we capture the completion marker)
     const logResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -573,7 +557,7 @@ export async function checkDeployLogAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `tail -200 "${logFile}" 2>&1 || echo "Log file not found or empty"`,
+        command: `tail -300 "${logFile}" 2>&1 || echo "Log file not found or empty"`,
       }),
     });
 
@@ -584,17 +568,64 @@ export async function checkDeployLogAction(
     const logResult = await logResponse.json();
     const log = logResult.stdout || logResult.stderr || "No log output";
 
+    // Check for our completion marker in the log
+    // The deploy command writes "===[DEPLOY_COMPLETE]===" when docker compose finishes
+    const hasCompletionMarker = log.includes("===[DEPLOY_COMPLETE]===");
+
+    // Also check for docker compose success patterns as fallback for older deploys
+    const hasDockerSuccess =
+      /Container .+ Started/i.test(log) ||
+      /Container .+ Running/i.test(log) ||
+      /Creating .+ \.\.\. done/i.test(log) ||
+      /Started$/m.test(log);
+
+    // Deploy is complete if we have the marker OR if we see docker success patterns
+    // and no more output is being written (check if file was modified recently)
+    let isComplete = hasCompletionMarker;
+
+    // If no completion marker but has success patterns, check if file stopped updating
+    if (!isComplete && hasDockerSuccess) {
+      const checkStaleResponse = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          // Check if file was modified in the last 30 seconds
+          command: `find "${logFile}" -mmin -0.5 2>/dev/null | grep -q . && echo "RECENT" || echo "STALE"`,
+        }),
+      });
+
+      if (checkStaleResponse.ok) {
+        const staleResult = await checkStaleResponse.json();
+        // If file is stale (not modified in 30s) and has success patterns, consider complete
+        if (staleResult.stdout?.includes("STALE")) {
+          isComplete = true;
+        }
+      }
+    }
+
+    // Check for explicit status in the completion marker
+    let markerIndicatesSuccess = true;
+    if (hasCompletionMarker) {
+      markerIndicatesSuccess = log.includes("STATUS: SUCCESS");
+    }
+
     // If complete and we have a deploy ID, update the deploy status and send notifications
     if (isComplete && deployId) {
       try {
-        // Use improved error detection
+        // Use improved error detection combined with marker status
         const { hasError, errorMessage } = detectDeploymentError(log);
+        // If marker explicitly says FAILED, that overrides error detection
+        const deployFailed = !markerIndicatesSuccess || hasError;
+        const finalErrorMessage = !markerIndicatesSuccess ? "Docker compose exited with non-zero code" : errorMessage;
 
         // Get the deploy record to check if we've already updated it
         const existingDeploy = await deploys.getDeployById(deployId);
         if (existingDeploy && existingDeploy.status === "running") {
-          await deploys.completeDeploy(deployId, !hasError, {
-            error_message: errorMessage || undefined,
+          await deploys.completeDeploy(deployId, !deployFailed, {
+            error_message: finalErrorMessage || undefined,
           });
 
           // Get service name for notification
@@ -602,8 +633,8 @@ export async function checkDeployLogAction(
           const serviceName = service?.name || "Unknown Service";
 
           // Send notification
-          if (hasError) {
-            await notifyDeployFailed(serviceName, errorMessage || "Unknown error");
+          if (deployFailed) {
+            await notifyDeployFailed(serviceName, finalErrorMessage || "Unknown error");
           } else {
             await notifyDeploySuccess(serviceName);
           }
