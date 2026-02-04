@@ -354,13 +354,20 @@ export async function deployProjectAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && docker compose config --profiles 2>&1`,
+        // Don't use 2>&1 here - we only want stdout (profile names), not stderr (warnings)
+        command: `cd "${repoPath}" && docker compose config --profiles 2>/dev/null`,
       }),
     });
 
     if (profilesCheckResponse.ok) {
       const profilesResult = await profilesCheckResponse.json();
-      const profiles = (profilesResult.stdout || "").trim().split("\n").filter(Boolean);
+      // Filter out any lines that don't look like valid profile names
+      // Valid profile names are simple strings: lowercase letters, numbers, hyphens, underscores
+      const validProfilePattern = /^[a-z0-9][a-z0-9_-]*$/i;
+      const profiles = (profilesResult.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((line: string) => line.trim() && validProfilePattern.test(line.trim()));
       if (profiles.length > 0) {
         profileFlags = profiles.map((p: string) => `--profile ${p.trim()}`).join(" ");
         output += `=== Profiles ===\n${profiles.join(", ")}\n\n`;
@@ -375,7 +382,7 @@ export async function deployProjectAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && docker compose ${profileFlags} config --services 2>&1`,
+        command: `cd "${repoPath}" && docker compose ${profileFlags} config --services 2>/dev/null`,
       }),
     });
 
