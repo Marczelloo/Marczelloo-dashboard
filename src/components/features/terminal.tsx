@@ -513,10 +513,6 @@ export function Terminal({ className }: TerminalProps) {
     }
   };
 
-  const focusInput = () => {
-    inputRef.current?.focus();
-  };
-
   const getPrompt = (cwd?: string) => {
     const dir = cwd || currentCwd;
     return (
