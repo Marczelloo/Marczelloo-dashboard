@@ -523,9 +523,8 @@ export async function internalDeployProject(
   // Use nohup to run in background, redirect output to a log file
   // The command writes a completion marker at the end so we can detect when it's done
   const logFile = `/tmp/deploy-${project.slug}-${Date.now()}.log`;
-  // Use a subshell that runs docker compose and then writes a completion marker
-  // Note: Using quoted variables and string comparison for bash compatibility
-  const composeCmd = `cd "${repoPath}" && nohup bash -c 'docker compose ${profileFlags} up -d --build 2>&1; DEPLOY_EXIT="$?"; echo ""; echo "===[DEPLOY_COMPLETE]==="; if [ "$DEPLOY_EXIT" = "0" ]; then echo "STATUS: SUCCESS"; else echo "STATUS: FAILED (exit code: $DEPLOY_EXIT)"; fi; echo "TIMESTAMP: $(date -Iseconds)"' > "${logFile}" 2>&1 &`;
+  // Use simpler bash syntax with && and || to avoid variable capture issues
+  const composeCmd = `cd "${repoPath}" && nohup bash -c 'docker compose ${profileFlags} up -d --build 2>&1 && (echo ""; echo "===[DEPLOY_COMPLETE]==="; echo "STATUS: SUCCESS"; echo "TIMESTAMP: $(date -Iseconds)") || (echo ""; echo "===[DEPLOY_COMPLETE]==="; echo "STATUS: FAILED"; echo "TIMESTAMP: $(date -Iseconds)")' > "${logFile}" 2>&1 &`;
   console.log(`[Deploy] Command: ${composeCmd}`);
   console.log(`[Deploy] Log file: ${logFile}`);
 

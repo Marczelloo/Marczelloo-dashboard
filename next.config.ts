@@ -9,10 +9,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
-  // Ignore ESLint warnings during build (only fail on errors)
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
   // Ignore TypeScript type errors during build for faster iteration
   typescript: {
     ignoreBuildErrors: false,

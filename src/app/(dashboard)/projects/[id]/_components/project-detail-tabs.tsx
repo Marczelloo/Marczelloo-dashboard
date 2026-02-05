@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui";
 import { DeployAllButton } from "@/components/features/deploy-all-button";
 import { DeployLogsButton } from "@/app/(dashboard)/dashboard/_components/deploy-logs-button";
+import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 import { checkDeployLogAction } from "@/app/actions/projects";
 import { GitHubTabs } from "./github-tabs";
 import { GitHubInfo } from "./github-info";
@@ -379,70 +380,78 @@ function OverviewTab({
                 {deploys.slice(0, 5).map((deploy) => {
                   const service = services.find((s) => s.id === deploy.service_id);
                   const isRefreshing = refreshingDeployId === deploy.id;
+                  const isRunning = deploy.status === "running";
                   return (
-                    <div
-                      key={deploy.id}
-                      className="flex items-center justify-between rounded-lg border border-border/50 p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            "h-2 w-2 rounded-full",
-                            deploy.status === "success"
-                              ? "bg-success"
-                              : deploy.status === "failed"
-                                ? "bg-destructive"
-                                : deploy.status === "running"
-                                  ? "bg-warning animate-pulse"
-                                  : "bg-warning"
+                    <div key={deploy.id} className="space-y-0">
+                      <div className="flex items-center justify-between rounded-lg border border-border/50 p-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              "h-2 w-2 rounded-full",
+                              deploy.status === "success"
+                                ? "bg-success"
+                                : deploy.status === "failed"
+                                  ? "bg-destructive"
+                                  : isRunning
+                                    ? "bg-warning animate-pulse"
+                                    : "bg-warning"
+                            )}
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{service?.name || "Unknown Service"}</p>
+                            <p className="text-xs text-muted-foreground">{formatRelativeTime(deploy.started_at)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Refresh button for running deploys */}
+                          {isRunning && deploy.logs_object_key && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                onRefreshDeploy(deploy);
+                              }}
+                              disabled={isRefreshing}
+                              title="Check status"
+                            >
+                              {isRefreshing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
                           )}
-                        />
-                        <div>
-                          <p className="text-sm font-medium">{service?.name || "Unknown Service"}</p>
-                          <p className="text-xs text-muted-foreground">{formatRelativeTime(deploy.started_at)}</p>
+                          {/* Logs button */}
+                          <DeployLogsButton
+                            logFile={deploy.logs_object_key || ""}
+                            deployId={deploy.id}
+                            serviceName={service?.name || "Unknown"}
+                            hasLogFile={!!deploy.logs_object_key}
+                          />
+                          {/* Duration */}
+                          <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">
+                            {getDuration(deploy)}
+                          </span>
+                          {/* Status badge */}
+                          <Badge
+                            variant={
+                              deploy.status === "success"
+                                ? "success"
+                                : deploy.status === "failed"
+                                  ? "danger"
+                                  : "warning"
+                            }
+                          >
+                            {deploy.status}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {/* Refresh button for running deploys */}
-                        {deploy.status === "running" && deploy.logs_object_key && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              onRefreshDeploy(deploy);
-                            }}
-                            disabled={isRefreshing}
-                            title="Check status"
-                          >
-                            {isRefreshing ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        )}
-                        {/* Logs button */}
-                        <DeployLogsButton
-                          logFile={deploy.logs_object_key || ""}
-                          deployId={deploy.id}
-                          serviceName={service?.name || "Unknown"}
-                          hasLogFile={!!deploy.logs_object_key}
-                        />
-                        {/* Duration */}
-                        <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">
-                          {getDuration(deploy)}
-                        </span>
-                        {/* Status badge */}
-                        <Badge
-                          variant={
-                            deploy.status === "success" ? "success" : deploy.status === "failed" ? "danger" : "warning"
-                          }
-                        >
-                          {deploy.status}
-                        </Badge>
-                      </div>
+                      {/* Live logs for running deploys */}
+                      {isRunning && deploy.logs_object_key && (
+                        <LiveDeployLogs logFile={deploy.logs_object_key} isRunning={isRunning} defaultExpanded={true} />
+                      )}
                     </div>
                   );
                 })}

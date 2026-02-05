@@ -10,6 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import type { Deploy, Service } from "@/types";
 import { refreshRunningDeploysAction, checkDeployLogAction } from "@/app/actions/projects";
 import { DeployLogsButton } from "./deploy-logs-button";
+import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -222,56 +223,61 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
         <div className="space-y-3">
           {deploys.map((deploy) => {
             const service = serviceMap.get(deploy.service_id);
+            const isRunning = deploy.status === "running";
             return (
-              <div
-                key={deploy.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(deploy.status)}
-                  <div>
-                    <p className="font-medium text-sm">{service?.name || "Unknown Service"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      by {deploy.triggered_by} • {formatDistanceToNow(new Date(deploy.started_at), { addSuffix: true })}
-                    </p>
+              <div key={deploy.id} className="space-y-0">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {getStatusBadge(deploy.status)}
+                    <div>
+                      <p className="font-medium text-sm">{service?.name || "Unknown Service"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        by {deploy.triggered_by} •{" "}
+                        {formatDistanceToNow(new Date(deploy.started_at), { addSuffix: true })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {/* Check Status button for running deploys */}
-                  {deploy.status === "running" && deploy.logs_object_key && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={async () => {
-                        const result = await checkDeployLogAction(deploy.logs_object_key!, deploy.id);
-                        if (result.success) {
-                          if (result.data?.isComplete) {
-                            toast.success("Build completed!");
-                            router.refresh();
-                          } else {
-                            toast.info("Build still in progress...");
+                  <div className="flex items-center gap-3">
+                    {/* Check Status button for running deploys */}
+                    {isRunning && deploy.logs_object_key && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          const result = await checkDeployLogAction(deploy.logs_object_key!, deploy.id);
+                          if (result.success) {
+                            if (result.data?.isComplete) {
+                              toast.success("Build completed!");
+                              router.refresh();
+                            } else {
+                              toast.info("Build still in progress...");
+                            }
                           }
-                        }
-                      }}
-                      title="Check status"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-
-                  <DeployLogsButton
-                    logFile={deploy.logs_object_key || ""}
-                    deployId={deploy.id}
-                    serviceName={service?.name || "Unknown"}
-                    hasLogFile={!!deploy.logs_object_key}
-                  />
-                  <div className="text-right">
-                    <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
-                    {deploy.commit_sha && (
-                      <p className="text-xs font-mono text-muted-foreground">{deploy.commit_sha.substring(0, 7)}</p>
+                        }}
+                        title="Check status"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
                     )}
+
+                    <DeployLogsButton
+                      logFile={deploy.logs_object_key || ""}
+                      deployId={deploy.id}
+                      serviceName={service?.name || "Unknown"}
+                      hasLogFile={!!deploy.logs_object_key}
+                    />
+                    <div className="text-right">
+                      <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
+                      {deploy.commit_sha && (
+                        <p className="text-xs font-mono text-muted-foreground">{deploy.commit_sha.substring(0, 7)}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
+                {/* Live logs for running deploys */}
+                {isRunning && deploy.logs_object_key && (
+                  <LiveDeployLogs logFile={deploy.logs_object_key} isRunning={isRunning} defaultExpanded={true} />
+                )}
               </div>
             );
           })}
