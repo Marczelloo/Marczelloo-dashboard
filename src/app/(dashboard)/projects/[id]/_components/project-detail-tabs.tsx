@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui";
 import { DeployAllButton } from "@/components/features/deploy-all-button";
+import { DeployLogsButton } from "@/app/(dashboard)/dashboard/_components/deploy-logs-button";
+import { checkDeployLogAction } from "@/app/actions/projects";
 import { GitHubTabs } from "./github-tabs";
 import { GitHubInfo } from "./github-info";
 import { BranchStatus } from "./branch-status";
@@ -28,6 +31,8 @@ import {
   Rocket,
   ExternalLink,
   Activity,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import type { Service, WorkItem, Deploy, Project } from "@/types";
 
@@ -190,12 +195,38 @@ function formatDateTime(date: string | Date): string {
   });
 }
 
+function getDuration(deploy: Deploy): string {
+  if (!deploy.started_at) return "-";
+
+  const start = new Date(deploy.started_at).getTime();
+  const end = deploy.finished_at ? new Date(deploy.finished_at).getTime() : Date.now();
+  const durationMs = end - start;
+
+  if (durationMs < 1000) return "<1s";
+  if (durationMs < 60000) return `${Math.round(durationMs / 1000)}s`;
+  if (durationMs < 3600000) return `${Math.round(durationMs / 60000)}m`;
+  return `${Math.round(durationMs / 3600000)}h`;
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export function ProjectDetailTabs({ project, services, workItems, deploys }: ProjectDetailTabsProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [refreshingDeployId, setRefreshingDeployId] = useState<string | null>(null);
+
+  const handleRefreshDeploy = async (deploy: Deploy) => {
+    if (!deploy.logs_object_key) return;
+    setRefreshingDeployId(deploy.id);
+    try {
+      await checkDeployLogAction(deploy.logs_object_key, deploy.id);
+      router.refresh();
+    } finally {
+      setRefreshingDeployId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -237,7 +268,14 @@ export function ProjectDetailTabs({ project, services, workItems, deploys }: Pro
           transition={{ duration: 0.15 }}
         >
           {activeTab === "overview" && (
-            <OverviewTab project={project} services={services} workItems={workItems} deploys={deploys} />
+            <OverviewTab
+              project={project}
+              services={services}
+              workItems={workItems}
+              deploys={deploys}
+              refreshingDeployId={refreshingDeployId}
+              onRefreshDeploy={handleRefreshDeploy}
+            />
           )}
           {activeTab === "github" && <GitHubTab project={project} />}
           {activeTab === "repository" && <RepositoryTab project={project} />}
@@ -258,11 +296,15 @@ function OverviewTab({
   services,
   workItems,
   deploys,
+  refreshingDeployId,
+  onRefreshDeploy,
 }: {
   project: Project;
   services: Service[];
   workItems: WorkItem[];
   deploys: Deploy[];
+  refreshingDeployId: string | null;
+  onRefreshDeploy: (deploy: Deploy) => void;
 }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -336,6 +378,7 @@ function OverviewTab({
               <div className="space-y-2">
                 {deploys.slice(0, 5).map((deploy) => {
                   const service = services.find((s) => s.id === deploy.service_id);
+                  const isRefreshing = refreshingDeployId === deploy.id;
                   return (
                     <div
                       key={deploy.id}
@@ -349,7 +392,9 @@ function OverviewTab({
                               ? "bg-success"
                               : deploy.status === "failed"
                                 ? "bg-destructive"
-                                : "bg-warning"
+                                : deploy.status === "running"
+                                  ? "bg-warning animate-pulse"
+                                  : "bg-warning"
                           )}
                         />
                         <div>
@@ -357,13 +402,47 @@ function OverviewTab({
                           <p className="text-xs text-muted-foreground">{formatRelativeTime(deploy.started_at)}</p>
                         </div>
                       </div>
-                      <Badge
-                        variant={
-                          deploy.status === "success" ? "success" : deploy.status === "failed" ? "danger" : "warning"
-                        }
-                      >
-                        {deploy.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {/* Refresh button for running deploys */}
+                        {deploy.status === "running" && deploy.logs_object_key && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              onRefreshDeploy(deploy);
+                            }}
+                            disabled={isRefreshing}
+                            title="Check status"
+                          >
+                            {isRefreshing ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
+                        {/* Logs button */}
+                        <DeployLogsButton
+                          logFile={deploy.logs_object_key || ""}
+                          deployId={deploy.id}
+                          serviceName={service?.name || "Unknown"}
+                          hasLogFile={!!deploy.logs_object_key}
+                        />
+                        {/* Duration */}
+                        <span className="text-xs font-mono text-muted-foreground min-w-[40px] text-right">
+                          {getDuration(deploy)}
+                        </span>
+                        {/* Status badge */}
+                        <Badge
+                          variant={
+                            deploy.status === "success" ? "success" : deploy.status === "failed" ? "danger" : "warning"
+                          }
+                        >
+                          {deploy.status}
+                        </Badge>
+                      </div>
                     </div>
                   );
                 })}
