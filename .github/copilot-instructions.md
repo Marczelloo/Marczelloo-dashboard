@@ -1,19 +1,54 @@
-# Marczelloo Dashboard (Marczelloo Dashboard) — Agent & Repo Instructions
+# Marczelloo Dashboard — Agent & Repo Instructions
+
+## ⚠️ IMPORTANT — REQUIRED DESIGN SKILL
+
+This project **MANDATES** usage of the **`frontend-design` skill**.
+
+The agent MUST:
+
+- think in terms of **layout systems**
+- design clear **visual hierarchy**
+- treat the dashboard as a **power-user tool**, not a generic admin panel
+- avoid default SaaS dashboard patterns unless explicitly justified
+
+---
 
 ## Product
 
-Private project manager panel to manage and monitor self-hosted projects (Raspberry Pi + Docker + Portainer + Cloudflare Tunnel) and external websites (incl. Vercel-hosted).
+Private project manager panel to manage and monitor:
 
-UI style: **dark mode**, **red accent**, minimalist, modern, subtle animations.
+- self-hosted projects (Raspberry Pi + Docker + Portainer + Cloudflare Tunnel)
+- external websites (including Vercel-hosted services)
+
+This is a **complex internal dashboard**, not a marketing website.
+
+---
+
+## UI Philosophy (UPDATED)
+
+- Dark mode as default
+- Red accent as brand identity
+- Strong hierarchy > flat layouts
+- Clear separation of concerns
+- Navigation must scale with feature growth
+- Pages should be **intent-driven**, not information-stacked
+
+Avoid:
+
+- one-column “everything at once” layouts
+- endless scrolls for complex tools
+- visually merged navigation items
 
 ---
 
 ## Tech Stack
 
 - Next.js App Router + TypeScript
-- TailwindCSS + shadcn/ui + lucide-react
-- Framer Motion (subtle)
-- Server Actions / Route Handlers for server-only work
+- TailwindCSS
+- shadcn/ui
+- lucide-react
+- Framer Motion (subtle, purposeful)
+- Server Actions / Route Handlers
 
 ---
 
@@ -25,37 +60,42 @@ App is protected by Cloudflare Access in front of the tunnel.
 
 Server must:
 
-1. Read Cloudflare Access identity headers (e.g., authenticated user email).
-2. Allowlist only the owner email(s).
-3. Require a second factor: **PIN** inside the app for sensitive actions.
+1. Read Cloudflare Access identity headers (e.g., authenticated user email)
+2. Allowlist only the owner email(s)
+3. Require a second factor: **PIN** inside the app for sensitive actions
 
 ### PIN
 
-- Stored hashed (argon2 or bcrypt).
-- Required for: create/update/delete, deploy actions, env reveal/edit, container actions.
-- For “reveal secret” require re-enter PIN (or recent PIN session TTL).
+- Stored hashed (argon2 or bcrypt)
+- Required for:
+  - create / update / delete
+  - deploy actions
+  - env reveal / edit
+  - container actions
+- Revealing secrets requires re-entering PIN or a valid PIN session TTL
 
 ---
 
 ## AtlasHub (MANDATORY Data Layer)
 
-**Source of truth docs:** `docs/atlashub/USAGE.md`
+**Canonical docs:** `docs/atlashub/USAGE.md`
 
-All app persistence uses AtlasHub REST API:
+All persistence must use the AtlasHub REST API.
 
 - Base URL: `ATLASHUB_API_URL=http://localhost:3001`
 - Auth header: `x-api-key: <server-side secret>`
 
-Use AtlasHub endpoints:
+Endpoints:
 
 - DB CRUD: `${ATLASHUB_API_URL}/v1/db/:table`
-- Storage (optional): `${ATLASHUB_API_URL}/v1/storage/...`
+- Storage: `${ATLASHUB_API_URL}/v1/storage/...`
 
 Rules:
 
-- Treat `docs/atlashub/USAGE.md` as the canonical reference for request/response formats, filters, and examples.
-- NEVER expose the secret key in client bundles. All AtlasHub calls must go through server-only modules.
-- Updates/deletes must include filters (AtlasHub safety behavior).
+- Treat AtlasHub docs as source of truth
+- NEVER expose secret keys to client bundles
+- All AtlasHub calls must go through server-only modules
+- Updates and deletes must include filters
 
 ---
 
@@ -71,130 +111,161 @@ Rules:
 
 Notes:
 
-- A Project can have multiple Services (AtlasHub has multiple containers).
-- Two “Vercel projects” exist: they are Services of type `vercel` and have monitoring only.
+- A Project can have multiple Services
+- External (e.g. Vercel) projects are represented as Services with monitoring only
 
 ---
 
 ## Secrets / Env Vars Handling
 
-User requires ability to view env values for debugging.
-Therefore:
+User must be able to view env values for debugging.
 
-- Store `value_encrypted` (AES-256-GCM) in DB.
-- Encryption key stored only in server env (`ENCRYPTION_KEY`).
-- UI shows masked values by default.
-- Reveal requires PIN re-auth and logs to `audit_logs`.
+Implementation rules:
+
+- Store `value_encrypted` using AES-256-GCM
+- Encryption key stored server-side only (`ENCRYPTION_KEY`)
+- UI masks values by default
+- Reveal requires PIN re-auth
+- Every reveal is logged in `audit_logs`
 
 ---
 
 ## Portainer Integration
 
-- Portainer is local on Pi and manages Docker.
-- Use Portainer API to:
-  - list containers/stacks,
-  - fetch logs (tail),
-  - run actions: start/stop/restart/recreate/pull image/exec.
+Portainer runs locally on Raspberry Pi.
 
-Store Portainer config server-side:
+Use Portainer API to:
+
+- list containers / stacks
+- fetch logs (tail)
+- perform actions:
+  - start / stop / restart
+  - recreate
+  - pull image
+  - exec
+
+Store server-side config only:
 
 - `PORTAINER_URL`
-- auth token/credentials (server only)
+- auth token / credentials
 
-Map Services to:
+Services map to:
 
 - `portainer_endpoint_id`
 - `container_id` and/or `stack_id`
 
 ---
 
-## Runner (Git Pull + Docker Rebuild/Restart)
+## Runner (Git Pull + Docker Rebuild)
 
-Do NOT execute arbitrary shell commands from Next.js request handlers.
+DO NOT execute arbitrary shell commands from Next.js handlers.
 
-Implement a local-only Runner service (localhost) with:
+Use a local Runner service with:
 
 - strict allowlist:
-  - repo paths (exact paths)
+  - repo paths
   - compose project names
-  - allowed ops (pull, rebuild, restart, logs)
-- shared secret token (`RUNNER_TOKEN`)
-- refuse any request not matching allowlist
+  - allowed operations
+- shared secret (`RUNNER_TOKEN`)
 
-Panel triggers:
+Allowed actions:
 
-- `git pull` in allowed repo path
-- `docker compose up -d --build` (or `docker restart`)
-- write deploy record + audit log
+- `git pull`
+- `docker compose up -d --build`
+- `docker restart`
+
+Each action must:
+
+- create a deploy record
+- write an audit log entry
 
 ---
 
 ## Website Monitoring
 
-- Periodic checks from Pi (internal scheduler/cron).
-- Capture: HTTP status, latency, SSL expiry days.
-- Optional `health_url` per service.
-- Store history in `uptime_checks`.
-- UI shows recent status + simple charts.
+- Periodic checks from Raspberry Pi
+- Capture:
+  - HTTP status
+  - latency
+  - SSL expiry days
+- Optional health check URL per service
+- Store history in `uptime_checks`
+- UI displays recent status and simple charts
 
 ---
 
 ## Notifications
 
-- Discord webhook for alerts (downtime, unhealthy, deploy result).
-- Email optional via SMTP (provider-agnostic).
-- All alerts are also recorded in `audit_logs`/`deploys`.
+- Discord webhook for:
+  - downtime
+  - unhealthy status
+  - deploy results
+- Optional email notifications via SMTP
+- All notifications must also be recorded in audit logs
 
 ---
 
-## UI/UX Requirements
+## UI / UX Requirements (UPDATED)
 
-- Dark theme + red accent (unique but minimalist).
-- Animations: subtle (opacity/slide, micro-interactions).
-- Pages:
-  - Dashboard (overview: red/yellow/green)
-  - Projects list
-  - Project detail: services, work items, notes, recent deploys
-  - Service detail: monitoring, logs, actions, env manager
-  - Audit log
-  - Settings (Portainer/Runner/Notifications)
+### Navigation
+
+- Sidebar / navbar must support:
+  - clear categories
+  - subcategories
+  - collapsible groups
+- Navigation must scale to 20+ items
+
+### Page-Specific Rules
+
+- **Project Details**
+  - MUST NOT be a single overloaded view
+  - Split into logical sections or tabs
+- **Terminal**
+  - Requires full redesign
+  - Dedicated tool-like layout
+- **Documentation**
+  - Must be split into categories and subpages
+  - Sidebar navigation required
+- **Raspberry Pi Monitoring**
+  - Must feel visually complete, not empty
 
 ---
 
 ## Coding Conventions
 
 - Strict TypeScript
-- Server-only modules inside `src/server/**`
-- Client components only where needed (forms, live refresh, charts)
+- Server-only logic in `src/server/**`
+- Client components only where needed
 - Centralized API clients:
   - `src/server/atlashub/*`
   - `src/server/portainer/*`
   - `src/server/runner/*`
-- Every sensitive action writes an audit log entry.
+- Every sensitive action must write an audit log entry
 
 ---
 
-## Environment Variables (example)
+## Environment Variables (Example)
 
 - `ATLASHUB_API_URL=http://localhost:3001`
-- `ATLASHUB_SECRET_KEY=sk_...` (server only)
+- `ATLASHUB_SECRET_KEY=sk_...`
 - `OWNER_EMAIL=...`
-- `PIN_HASH=...` (or store in DB)
-- `ENCRYPTION_KEY=...` (32 bytes base64)
+- `PIN_HASH=...`
+- `ENCRYPTION_KEY=...`
 - `PORTAINER_URL=http://localhost:9000`
 - `PORTAINER_TOKEN=...`
 - `RUNNER_URL=http://127.0.0.1:8787`
 - `RUNNER_TOKEN=...`
 - `DISCORD_WEBHOOK_URL=...`
-- `SMTP_HOST=...` `SMTP_USER=...` `SMTP_PASS=...`
+- `SMTP_HOST=...`
+- `SMTP_USER=...`
+- `SMTP_PASS=...`
 
 ---
 
-## Definition of Done (MVP)
+## Definition of Done (Design Scope)
 
-- Cloudflare Access + email allowlist + PIN gate.
-- Projects + Services + Work Items CRUD via AtlasHub.
-- Portainer list + logs + restart.
-- Monitoring (status/latency/SSL) with stored history.
-- “Update” triggers git pull + restart via Runner.
-- Audit log captures all sensitive operations.
+- New navigation structure implemented
+- Clear hierarchy across all pages
+- No page feels overloaded or chaotic
+- Terminal and Documentation fully redesigned
+- UI scales with future features

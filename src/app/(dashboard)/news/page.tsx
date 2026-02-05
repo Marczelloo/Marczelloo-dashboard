@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Header } from "@/components/layout";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
 import {
@@ -206,18 +205,29 @@ export default function TechNewsPage() {
   }, [fetchAll]);
 
   return (
-    <>
-      <Header title="Tech News" description="Latest tech news and security vulnerabilities">
-        <div className="flex items-center gap-2">
-          <PageInfoButton {...PAGE_INFO.news} />
-          <Button variant="outline" size="sm" onClick={fetchAll} disabled={state.loading}>
-            {state.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Refresh
-          </Button>
+    <div className="flex min-h-screen flex-col">
+      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <Newspaper className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">Tech News</h1>
+              <p className="text-sm text-muted-foreground">Latest tech news and security vulnerabilities</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <PageInfoButton {...PAGE_INFO.news} />
+            <Button variant="outline" size="sm" onClick={fetchAll} disabled={state.loading}>
+              {state.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Refresh
+            </Button>
+          </div>
         </div>
-      </Header>
+      </header>
 
-      <div className="p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="hacker-news">
@@ -388,6 +398,6 @@ export default function TechNewsPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

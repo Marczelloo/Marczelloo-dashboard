@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Header } from "@/components/layout";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
 import {
@@ -29,6 +28,7 @@ import {
   Shield,
   Key,
   Github,
+  Settings,
 } from "lucide-react";
 
 interface ConnectionStatus {
@@ -53,12 +53,23 @@ interface Allowlist {
 
 export default function SettingsPage() {
   return (
-    <>
-      <Header title="Settings" description="Configure your dashboard connections">
-        <PageInfoButton {...PAGE_INFO.settings} />
-      </Header>
+    <div className="flex min-h-screen flex-col">
+      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <Settings className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">Settings</h1>
+              <p className="text-sm text-muted-foreground">Configure your dashboard connections</p>
+            </div>
+          </div>
+          <PageInfoButton {...PAGE_INFO.settings} />
+        </div>
+      </header>
 
-      <div className="p-6 space-y-6 max-w-4xl">
+      <div className="flex-1 p-6 space-y-6 max-w-4xl">
         <EnvironmentInfo />
         <GitHubSettings />
         <MonitoringIntervalSettings />
@@ -68,7 +79,7 @@ export default function SettingsPage() {
         <PortTrackerSettings />
         <NotificationSettings />
       </div>
-    </>
+    </div>
   );
 }
 

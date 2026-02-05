@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Header } from "@/components/layout";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
@@ -22,6 +21,7 @@ import {
   ExternalLink,
   ChevronDown,
   Rocket,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -588,12 +588,23 @@ export default function FeaturesPage() {
   );
 
   return (
-    <>
-      <Header title="Features" description="Complete list of all dashboard functionalities">
-        <PageInfoButton {...PAGE_INFO.features} />
-      </Header>
+    <div className="flex min-h-screen flex-col">
+      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">Features</h1>
+              <p className="text-sm text-muted-foreground">Complete list of all dashboard functionalities</p>
+            </div>
+          </div>
+          <PageInfoButton {...PAGE_INFO.features} />
+        </div>
+      </header>
 
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="flex-1 p-6 space-y-6 max-w-5xl">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           <Card className="bg-success/5 border-success/20">
@@ -776,6 +787,6 @@ export default function FeaturesPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

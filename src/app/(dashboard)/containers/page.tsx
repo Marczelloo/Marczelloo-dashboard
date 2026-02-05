@@ -2,12 +2,11 @@ import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
-import { Header } from "@/components/layout";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, Badge, Skeleton, Button } from "@/components/ui";
 import { StatusDot } from "@/components/status-dot";
-import { RefreshCw, AlertTriangle, Server } from "lucide-react";
+import { RefreshCw, AlertTriangle, Server, Container } from "lucide-react";
 import { isDemoMode } from "@/lib/demo-mode";
 import { mockEndpoints, mockContainers } from "@/lib/mock-data";
 import * as portainer from "@/server/portainer/client";
@@ -21,25 +20,36 @@ async function refreshContainers() {
 
 export default function ContainersPage() {
   return (
-    <>
-      <Header title="Containers" description="Docker container management via Portainer">
-        <div className="flex items-center gap-2">
-          <PageInfoButton {...PAGE_INFO.containers} />
-          <form action={refreshContainers}>
-            <Button variant="outline" size="sm" type="submit">
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-          </form>
+    <div className="flex min-h-screen flex-col">
+      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <Container className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">Containers</h1>
+              <p className="text-sm text-muted-foreground">Docker container management via Portainer</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <PageInfoButton {...PAGE_INFO.containers} />
+            <form action={refreshContainers}>
+              <Button variant="outline" size="sm" type="submit">
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+            </form>
+          </div>
         </div>
-      </Header>
+      </header>
 
-      <div className="p-6">
+      <div className="flex-1 p-6">
         <Suspense fallback={<ContainersListSkeleton />}>
           <ContainersList />
         </Suspense>
       </div>
-    </>
+    </div>
   );
 }
 
