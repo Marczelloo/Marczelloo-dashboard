@@ -1,6 +1,10 @@
 /**
  * API Route: /api/github/webhook
  * Handle incoming GitHub webhooks for auto-deploy and notifications
+ *
+ * IMPORTANT: This endpoint must be excluded from Cloudflare Access protection
+ * to allow GitHub to send webhooks. Configure this in Cloudflare dashboard:
+ * Access > Applications > [Your App] > Policies > Add bypass rule for /api/github/webhook
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,13 +18,25 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow 60 seconds for deploy trigger
 
 export async function POST(request: NextRequest) {
+  console.log("[GitHub Webhook] Request received");
+
   try {
     const signature = request.headers.get("x-hub-signature-256") || "";
     const event = request.headers.get("x-github-event") || "";
     const deliveryId = request.headers.get("x-github-delivery") || "";
+    const userAgent = request.headers.get("user-agent") || "";
+
+    console.log(`[GitHub Webhook] Headers - Event: ${event}, Delivery: ${deliveryId}, UA: ${userAgent}`);
+
+    // Verify it's actually from GitHub
+    if (!userAgent.startsWith("GitHub-Hookshot/")) {
+      console.warn("[GitHub Webhook] Request not from GitHub (user-agent check failed)");
+      return NextResponse.json({ error: "Invalid source" }, { status: 403 });
+    }
 
     // Get raw body for signature verification
     const body = await request.text();
+    console.log(`[GitHub Webhook] Body length: ${body.length} bytes`);
 
     // Verify webhook signature
     const isValid = await verifyWebhookSignature(body, signature);
@@ -42,6 +58,7 @@ export async function POST(request: NextRequest) {
       case "dependabot_alert":
         return handleDependabotEvent(payload as GitHubDependabotAlertPayload, deliveryId);
       case "ping":
+        console.log("[GitHub Webhook] Ping received successfully");
         return NextResponse.json({ message: "pong", deliveryId });
       default:
         console.log(`[GitHub Webhook] Unhandled event type: ${event}`);

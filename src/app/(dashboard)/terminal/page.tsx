@@ -141,7 +141,7 @@ export default function TerminalPage() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-[calc(100vh-1px)]">
       {/* Quick Commands Sidebar */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (
@@ -150,7 +150,7 @@ export default function TerminalPage() {
             animate={{ width: 320, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="border-r border-border/50 bg-card/50 overflow-hidden flex flex-col"
+            className="border-r border-border/50 bg-card/50 overflow-hidden flex flex-col h-full"
           >
             <div className="p-4 border-b border-border/50 flex items-center justify-between shrink-0">
               <h2 className="text-sm font-semibold">Quick Commands</h2>
@@ -232,7 +232,7 @@ export default function TerminalPage() {
       </AnimatePresence>
 
       {/* Main Terminal Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Terminal Header */}
         <header className="shrink-0 border-b border-border/50 bg-card/30 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -262,8 +262,8 @@ export default function TerminalPage() {
         </header>
 
         {/* Terminal Content */}
-        <div className="flex-1 p-4 overflow-hidden">
-          <Terminal className="h-full" />
+        <div className="flex-1 p-4 flex flex-col min-h-0">
+          <Terminal className="flex-1 min-h-0" />
         </div>
 
         {/* Security Footer */}

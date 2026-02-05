@@ -40,14 +40,25 @@ export async function GET(request: NextRequest) {
       let lastOffset = 0;
       let isComplete = false;
       let retries = 0;
-      const maxRetries = 120; // 2 minutes at 1 second intervals
+      const maxRetries = 600; // 10 minutes at 1 second intervals (docker builds can take time)
+      let isClosed = false;
 
+      // Track if the stream was cancelled by the client
       const sendEvent = (event: string, data: unknown) => {
-        const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-        controller.enqueue(encoder.encode(message));
+        if (isClosed) return false;
+        try {
+          const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(message));
+          return true;
+        } catch (error) {
+          // Controller was closed externally (client disconnected)
+          console.log("[SSE] Controller closed, stopping stream");
+          isClosed = true;
+          return false;
+        }
       };
 
-      while (!isComplete && retries < maxRetries) {
+      while (!isComplete && retries < maxRetries && !isClosed) {
         try {
           // Check if build process is still running
           const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
@@ -86,16 +97,13 @@ export async function GET(request: NextRequest) {
             const newContent = logResult.stdout || "";
 
             if (newContent.length > 0) {
-              sendEvent("log", { content: newContent });
+              if (!sendEvent("log", { content: newContent })) break;
               lastOffset += newContent.length;
             }
           }
 
           // Send heartbeat and status
-          sendEvent("status", {
-            running: !isComplete,
-            offset: lastOffset,
-          });
+          if (!sendEvent("status", { running: !isComplete, offset: lastOffset })) break;
 
           if (!isComplete) {
             // Wait 1 second before next check
@@ -104,20 +112,26 @@ export async function GET(request: NextRequest) {
           }
         } catch (error) {
           console.error("[SSE] Error:", error);
-          sendEvent("error", { message: "Failed to read logs" });
+          if (!sendEvent("error", { message: "Failed to read logs" })) break;
           retries++;
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
 
-      // Send completion event
-      sendEvent("complete", {
-        success: true,
-        totalBytes: lastOffset,
-        timedOut: retries >= maxRetries,
-      });
+      // Send completion event (if stream still open)
+      if (!isClosed) {
+        sendEvent("complete", {
+          success: true,
+          totalBytes: lastOffset,
+          timedOut: retries >= maxRetries,
+        });
 
-      controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already closed
+        }
+      }
     },
   });
 
