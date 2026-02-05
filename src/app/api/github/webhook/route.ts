@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, parseGitHubUrl } from "@/server/github";
 import { projects, auditLogs } from "@/server/atlashub";
-import { deployProjectAction } from "@/app/actions/projects";
+import { internalDeployProject } from "@/app/actions/projects";
 import { sendDiscordNotification } from "@/server/notifications";
 import type { GitHubPushPayload, GitHubReleasePayload, GitHubDependabotAlertPayload } from "@/types/github";
 
@@ -115,9 +115,9 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
         },
       });
 
-      // Trigger deploy
+      // Trigger deploy using internal function (no PIN required after webhook signature verification)
       console.log(`[GitHub Webhook] Triggering deploy for ${project.name}`);
-      const deployResult = await deployProjectAction(project.id);
+      const deployResult = await internalDeployProject(project.id, "github-webhook", { branch });
 
       // Log the deploy action
       await auditLogs.createAuditLog({
