@@ -1,12 +1,49 @@
 import { NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demo-mode";
 import { auditLogs } from "@/server/atlashub";
 import { getCurrentUser } from "@/server/lib/auth";
+
+// Mock notifications for demo mode
+const DEMO_NOTIFICATIONS = [
+  {
+    id: "demo-1",
+    type: "deploy" as const,
+    title: "Deployed Service",
+    message: "AtlasHub API by demo@marczelloo.dev",
+    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
+    read: false,
+    link: "/services/svc-demo-1",
+  },
+  {
+    id: "demo-2",
+    type: "info" as const,
+    title: "Created Project",
+    message: "Portfolio Website by demo@marczelloo.dev",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+    read: false,
+    link: "/projects/proj-demo-1",
+  },
+  {
+    id: "demo-3",
+    type: "alert" as const,
+    title: "Service Restarted",
+    message: "Redis Cache by demo@marczelloo.dev",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
+    read: true,
+    link: "/services/svc-demo-3",
+  },
+];
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Return mock notifications in demo mode
+    if (isDemoMode()) {
+      return NextResponse.json({ notifications: DEMO_NOTIFICATIONS });
     }
 
     // Get recent audit logs and transform them into notifications

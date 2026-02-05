@@ -2,6 +2,8 @@ import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { DashboardStats } from "./_components/dashboard-stats";
 import { RecentActivity } from "./_components/recent-activity";
 import { ServiceStatus } from "./_components/service-status";
@@ -12,7 +14,9 @@ import { Skeleton } from "@/components/ui";
 export default function DashboardPage() {
   return (
     <>
-      <Header title="Dashboard" description="Overview of your projects and services" />
+      <Header title="Dashboard" description="Overview of your projects and services">
+        <PageInfoButton {...PAGE_INFO.dashboard} />
+      </Header>
 
       <div className="p-6 space-y-6">
         {/* Stats Cards */}

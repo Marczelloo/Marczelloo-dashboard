@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { projects, services, workItems } from "@/server/atlashub";
+import { projects, services, workItems } from "@/server/data";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { formatRelativeTime } from "@/lib/utils";
 import { Github, ExternalLink, Server, CheckSquare } from "lucide-react";

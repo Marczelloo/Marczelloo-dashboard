@@ -2,6 +2,7 @@
 
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
+import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { notifyDeploySuccess, notifyDeployFailed } from "@/server/notifications";
 import {
   createRelease,
@@ -52,6 +53,10 @@ export interface ActionResult<T = void> {
 
 export async function createProjectAction(input: CreateProjectInput): Promise<ActionResult<{ id: string }>> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = createProjectSchema.parse(input);
 
@@ -80,6 +85,10 @@ export async function createProjectAction(input: CreateProjectInput): Promise<Ac
 
 export async function updateProjectAction(id: string, input: UpdateProjectInput): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = updateProjectSchema.parse(input);
 
@@ -115,6 +124,10 @@ export async function updateProjectAction(id: string, input: UpdateProjectInput)
 
 export async function deleteProjectAction(id: string): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     // Delete related services and work items first
@@ -237,6 +250,10 @@ export async function deployProjectAction(
   branch?: string
 ): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; branch?: string }>> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     if (!RUNNER_TOKEN) {
@@ -874,6 +891,10 @@ export async function createReleaseAction(
   } = {}
 ): Promise<ActionResult<{ tagName: string; htmlUrl: string }>> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     if (!isGitHubConfigured()) {
@@ -959,6 +980,10 @@ export async function createDeployReleaseAction(
   deployId: string
 ): Promise<ActionResult<{ tagName: string; htmlUrl: string }>> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     // Verify deploy succeeded
@@ -1054,6 +1079,10 @@ export async function syncGitHubReposAction(): Promise<
   }>
 > {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     if (!isGitHubConfigured()) {
@@ -1184,6 +1213,10 @@ export async function importGitHubRepoAction(
   repo: string
 ): Promise<ActionResult<{ projectId: string }>> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     if (!isGitHubConfigured()) {

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import {
   Card,
   CardContent,
@@ -52,7 +54,9 @@ interface Allowlist {
 export default function SettingsPage() {
   return (
     <>
-      <Header title="Settings" description="Configure your dashboard connections" />
+      <Header title="Settings" description="Configure your dashboard connections">
+        <PageInfoButton {...PAGE_INFO.settings} />
+      </Header>
 
       <div className="p-6 space-y-6 max-w-4xl">
         <EnvironmentInfo />

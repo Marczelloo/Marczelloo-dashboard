@@ -3,16 +3,25 @@ import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton, Button } from "@/components/ui";
 import { StatusDot } from "@/components/status-dot";
 import { RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
-import * as services from "@/server/atlashub/services";
-import * as uptimeChecks from "@/server/atlashub/uptime-checks";
+import { isDemoMode, checkDemoModeBlocked } from "@/lib/demo-mode";
+import { services, uptimeChecks } from "@/server/data";
 import type { Service } from "@/types";
 
 async function runMonitoringChecks() {
   "use server";
+
+  // Skip in demo mode
+  const demoCheck = checkDemoModeBlocked();
+  if (demoCheck.blocked) {
+    revalidatePath("/monitoring");
+    return;
+  }
 
   try {
     // Get monitorable services and check them directly
@@ -63,12 +72,15 @@ export default function MonitoringPage() {
   return (
     <>
       <Header title="Monitoring" description="Website uptime and SSL monitoring">
-        <form action={runMonitoringChecks}>
-          <Button variant="outline" size="sm" type="submit">
-            <RefreshCw className="h-4 w-4" />
-            Run Checks
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          <PageInfoButton {...PAGE_INFO.monitoring} />
+          <form action={runMonitoringChecks}>
+            <Button variant="outline" size="sm" type="submit">
+              <RefreshCw className="h-4 w-4" />
+              Run Checks
+            </Button>
+          </form>
+        </div>
       </Header>
 
       <div className="p-6 space-y-6">

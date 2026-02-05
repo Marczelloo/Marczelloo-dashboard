@@ -1,4 +1,6 @@
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Terminal } from "@/components/features/terminal";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +8,9 @@ export const dynamic = "force-dynamic";
 export default function TerminalPage() {
   return (
     <>
-      <Header title="Terminal" description="Execute commands on the Raspberry Pi" />
+      <Header title="Terminal" description="Execute commands on the Raspberry Pi">
+        <PageInfoButton {...PAGE_INFO.terminal} />
+      </Header>
 
       <div className="p-6">
         <div className="max-w-4xl">

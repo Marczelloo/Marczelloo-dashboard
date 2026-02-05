@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui";
 import { FolderKanban, Server, CheckCircle, AlertTriangle } from "lucide-react";
-import { projects, services, workItems, uptimeChecks } from "@/server/atlashub";
+import { projects, services, workItems, uptimeChecks } from "@/server/data";
 import type { Project, Service, WorkItem } from "@/types";
 
 async function getStats() {

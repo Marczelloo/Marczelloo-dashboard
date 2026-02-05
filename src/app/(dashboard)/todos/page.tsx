@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, Button, Input, Textarea, Badge, Skeleton } from "@/components/ui";
 import {
   Dialog,
@@ -176,6 +178,7 @@ export default function TodosPage() {
     <>
       <Header title="Todos" description="General task list">
         <div className="flex items-center gap-2">
+          <PageInfoButton {...PAGE_INFO.todos} />
           <Button variant="outline" size="sm" onClick={fetchTodos}>
             <RefreshCw className="h-4 w-4" />
           </Button>

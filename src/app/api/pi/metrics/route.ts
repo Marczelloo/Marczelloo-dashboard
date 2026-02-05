@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import { mockPiMetrics } from "@/lib/mock-data";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://localhost:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
@@ -66,6 +68,11 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Return mock data in demo mode
+    if (isDemoMode()) {
+      return NextResponse.json({ success: true, data: mockPiMetrics });
     }
 
     if (!RUNNER_TOKEN) {

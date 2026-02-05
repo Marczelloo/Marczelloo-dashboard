@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -587,7 +589,9 @@ export default function FeaturesPage() {
 
   return (
     <>
-      <Header title="Features" description="Complete list of all dashboard functionalities" />
+      <Header title="Features" description="Complete list of all dashboard functionalities">
+        <PageInfoButton {...PAGE_INFO.features} />
+      </Header>
 
       <div className="p-6 space-y-6 max-w-5xl">
         {/* Stats */}

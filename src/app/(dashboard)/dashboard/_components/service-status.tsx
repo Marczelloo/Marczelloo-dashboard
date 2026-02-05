@@ -2,8 +2,9 @@ import { Card, CardHeader, CardTitle, CardContent, Badge } from "@/components/ui
 import { StatusDot } from "@/components/status-dot";
 import { ExternalLink, Container } from "lucide-react";
 import Link from "next/link";
-import { services, projects, uptimeChecks } from "@/server/atlashub";
+import { services, projects, uptimeChecks } from "@/server/data";
 import { formatRelativeTime } from "@/lib/utils";
+import { isDemoMode } from "@/lib/demo-mode";
 import { getContainers, getContainerStatus } from "@/server/portainer/client";
 import type { Service, Project, PortainerContainer } from "@/types";
 
@@ -48,7 +49,7 @@ async function getServiceStatuses(): Promise<ServiceStatusItem[]> {
     (s: Service) => s.type === "docker" && s.container_id && s.portainer_endpoint_id
   );
 
-  if (dockerServices.length > 0) {
+  if (dockerServices.length > 0 && !isDemoMode()) {
     // Get unique endpoint IDs
     const endpointIds = [...new Set(dockerServices.map((s: Service) => s.portainer_endpoint_id!))];
 

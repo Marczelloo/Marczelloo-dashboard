@@ -68,6 +68,38 @@ services:
     networks:
       - marczelloo
 
+  # ================================
+  # Demo Dashboard (Public showcase with mock data)
+  # ================================
+  # Access via: demo.yourdomain.com (configure in Cloudflare Tunnel)
+  # This instance uses mock data and has all destructive actions disabled.
+  # Safe to expose publicly without Cloudflare Access protection.
+  dashboard-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marczelloo-dashboard-demo
+    restart: unless-stopped
+    ports:
+      - "3101:3101"
+    environment:
+      - PORT=3101
+      - DEMO_MODE=true
+      # Demo mode uses mock data, no real backend needed
+      - ATLASHUB_API_URL=http://localhost:3001
+      - ATLASHUB_SECRET_KEY=demo_not_used
+      - DEV_USER_EMAIL=demo@example.com
+      - DEV_SKIP_PIN=true
+      - NEXT_PUBLIC_APP_URL=${DEMO_APP_URL:-http://localhost:3101}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3101/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - marczelloo
+
   runner:
     build:
       context: ./runner

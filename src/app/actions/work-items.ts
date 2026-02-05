@@ -2,6 +2,7 @@
 
 import { workItems, auditLogs, projects } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
+import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { createIssue, isGitHubConfigured } from "@/server/github";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -29,6 +30,10 @@ const updateWorkItemSchema = createWorkItemSchema.partial().omit({ project_id: t
 
 export async function createWorkItemAction(input: CreateWorkItemInput) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = createWorkItemSchema.parse(input);
 
@@ -51,6 +56,10 @@ export async function createWorkItemAction(input: CreateWorkItemInput) {
 
 export async function updateWorkItemAction(id: string, input: UpdateWorkItemInput) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = updateWorkItemSchema.parse(input);
 
@@ -76,6 +85,10 @@ export async function updateWorkItemAction(id: string, input: UpdateWorkItemInpu
 
 export async function deleteWorkItemAction(id: string) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     const item = await workItems.getWorkItemById(id);
@@ -163,6 +176,10 @@ function getPriorityLabel(priority: string): string | null {
  */
 export async function createGitHubIssueFromWorkItemAction(workItemId: string) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     if (!isGitHubConfigured()) {
@@ -264,6 +281,10 @@ export async function createGitHubIssueFromWorkItemAction(workItemId: string) {
  */
 export async function linkWorkItemToPRAction(workItemId: string, prNumber: number) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     // Get the work item
@@ -300,6 +321,10 @@ export async function linkWorkItemToPRAction(workItemId: string, prNumber: numbe
  */
 export async function unlinkWorkItemAction(workItemId: string, unlinkType: "issue" | "pr" | "both") {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     // Get the work item

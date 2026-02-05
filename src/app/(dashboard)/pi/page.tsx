@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, Button } from "@/components/ui";
 import {
   Cpu,
@@ -160,7 +162,9 @@ export default function PiMetricsPage() {
   if (loading && !metrics) {
     return (
       <>
-        <Header title="Raspberry Pi" description="System metrics and status" />
+        <Header title="Raspberry Pi" description="System metrics and status">
+          <PageInfoButton {...PAGE_INFO.pi} />
+        </Header>
         <div className="p-6 space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
@@ -180,7 +184,9 @@ export default function PiMetricsPage() {
   if (error && !metrics) {
     return (
       <>
-        <Header title="Raspberry Pi" description="System metrics and status" />
+        <Header title="Raspberry Pi" description="System metrics and status">
+          <PageInfoButton {...PAGE_INFO.pi} />
+        </Header>
         <div className="p-6">
           <Card className="border-destructive">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -202,7 +208,9 @@ export default function PiMetricsPage() {
 
   return (
     <>
-      <Header title="Raspberry Pi" description="System metrics and status" />
+      <Header title="Raspberry Pi" description="System metrics and status">
+        <PageInfoButton {...PAGE_INFO.pi} />
+      </Header>
 
       <div className="p-6 space-y-6">
         {/* Refresh bar */}

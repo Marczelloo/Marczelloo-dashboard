@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { generalTodos } from "@/server/atlashub";
+import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import type { TodoPriority, TodoStatus } from "@/server/atlashub/general-todos";
 
 interface ActionResult {
@@ -34,6 +35,10 @@ export async function createTodoAction(input: {
   due_date?: string;
 }): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     await generalTodos.createTodo(input);
     revalidatePath("/todos");
     revalidatePath("/dashboard");
@@ -54,6 +59,10 @@ export async function updateTodoAction(
   }
 ): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     await generalTodos.updateTodo(id, input);
     revalidatePath("/todos");
     revalidatePath("/dashboard");
@@ -65,6 +74,10 @@ export async function updateTodoAction(
 
 export async function toggleTodoAction(id: string): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     await generalTodos.toggleTodoStatus(id);
     revalidatePath("/todos");
     revalidatePath("/dashboard");
@@ -76,6 +89,10 @@ export async function toggleTodoAction(id: string): Promise<ActionResult> {
 
 export async function deleteTodoAction(id: string): Promise<ActionResult> {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     await generalTodos.deleteTodo(id);
     revalidatePath("/todos");
     revalidatePath("/dashboard");

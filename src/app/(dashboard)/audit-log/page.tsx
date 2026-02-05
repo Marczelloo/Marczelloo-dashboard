@@ -2,11 +2,13 @@ import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton, Button } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
 import { History, RefreshCw, AlertTriangle } from "lucide-react";
 import { revalidatePath } from "next/cache";
-import * as auditLogs from "@/server/atlashub/audit-logs";
+import { auditLogs } from "@/server/data";
 import type { AuditLog, AuditAction } from "@/types";
 import Link from "next/link";
 
@@ -19,12 +21,15 @@ export default function AuditLogPage() {
   return (
     <>
       <Header title="Audit Log" description="Activity history and security events">
-        <form action={refreshAuditLog}>
-          <Button variant="outline" size="sm" type="submit">
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          <PageInfoButton {...PAGE_INFO.auditLog} />
+          <form action={refreshAuditLog}>
+            <Button variant="outline" size="sm" type="submit">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </form>
+        </div>
       </Header>
 
       <div className="p-6">

@@ -1,4 +1,4 @@
-import { deploys as deploysRepo, services as servicesRepo } from "@/server/atlashub";
+import { deploys as deploysRepo, services as servicesRepo } from "@/server/data";
 import { RecentDeploysClient } from "./recent-deploys-client";
 
 // Server component that fetches data

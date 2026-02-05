@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import {
   Card,
   CardContent,
@@ -206,10 +208,13 @@ export default function TechNewsPage() {
   return (
     <>
       <Header title="Tech News" description="Latest tech news and security vulnerabilities">
-        <Button variant="outline" size="sm" onClick={fetchAll} disabled={state.loading}>
-          {state.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <PageInfoButton {...PAGE_INFO.news} />
+          <Button variant="outline" size="sm" onClick={fetchAll} disabled={state.loading}>
+            {state.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
+        </div>
       </Header>
 
       <div className="p-6 space-y-6">

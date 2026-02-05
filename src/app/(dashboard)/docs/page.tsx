@@ -1,4 +1,6 @@
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import {
   Database,
@@ -88,7 +90,9 @@ function EnvVar({
 export default function DocsPage() {
   return (
     <>
-      <Header title="Documentation" description="Setup guides and configuration reference for Marczelloo Dashboard" />
+      <Header title="Documentation" description="Setup guides and configuration reference for Marczelloo Dashboard">
+        <PageInfoButton {...PAGE_INFO.docs} />
+      </Header>
 
       <div className="p-6 space-y-6 max-w-4xl">
         {/* Overview */}

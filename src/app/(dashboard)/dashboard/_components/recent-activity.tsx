@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent, Badge } from "@/components/ui";
 import { formatRelativeTime } from "@/lib/utils";
-import { auditLogs } from "@/server/atlashub";
+import { auditLogs } from "@/server/data";
 import type { AuditLog } from "@/types";
 
 interface ActivityItem {

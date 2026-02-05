@@ -5,6 +5,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import bcrypt from "bcryptjs";
+import { isDemoMode, DEMO_USER } from "@/lib/demo-mode";
 
 // Cloudflare Access headers
 const CF_ACCESS_EMAIL_HEADER = "cf-access-authenticated-user-email";
@@ -24,6 +25,15 @@ interface AuthUser {
  * Get the current user from Cloudflare Access headers
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
+  // Demo mode: return demo user immediately
+  if (isDemoMode()) {
+    return {
+      email: DEMO_USER.email,
+      isAuthenticated: true,
+      isPinVerified: true, // Always verified in demo mode
+    };
+  }
+
   const headersList = await headers();
   const email = headersList.get(CF_ACCESS_EMAIL_HEADER);
 
@@ -189,6 +199,15 @@ export async function requireAuth(): Promise<AuthUser> {
  * Throws if PIN session is not valid
  */
 export async function requirePinVerification(): Promise<AuthUser> {
+  // Demo mode: return demo user without PIN check
+  if (isDemoMode()) {
+    return {
+      email: DEMO_USER.email,
+      isAuthenticated: true,
+      isPinVerified: true,
+    };
+  }
+
   const user = await requireAuth();
 
   // Allow bypass with DEV_SKIP_PIN for self-hosted setups

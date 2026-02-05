@@ -10,6 +10,12 @@
 export async function register() {
   // Only run scheduler on the server (not during build or in edge runtime)
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Skip scheduler in demo mode - no real services to monitor
+    if (process.env.DEMO_MODE === "true") {
+      console.log("[Scheduler] Skipped - Demo mode enabled");
+      return;
+    }
+
     const { startMonitoringScheduler } = await import("./server/scheduler");
     startMonitoringScheduler();
   }

@@ -3,9 +3,13 @@ import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 import { Header } from "@/components/layout";
+import { PageInfoButton } from "@/components/layout/page-info-button";
+import { PAGE_INFO } from "@/lib/page-info";
 import { Card, CardContent, Badge, Skeleton, Button } from "@/components/ui";
 import { StatusDot } from "@/components/status-dot";
 import { RefreshCw, AlertTriangle, Server } from "lucide-react";
+import { isDemoMode } from "@/lib/demo-mode";
+import { mockEndpoints, mockContainers } from "@/lib/mock-data";
 import * as portainer from "@/server/portainer/client";
 import type { PortainerContainer, PortainerEndpoint } from "@/types";
 import { ContainerActions } from "./_components/container-actions";
@@ -19,12 +23,15 @@ export default function ContainersPage() {
   return (
     <>
       <Header title="Containers" description="Docker container management via Portainer">
-        <form action={refreshContainers}>
-          <Button variant="outline" size="sm" type="submit">
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          <PageInfoButton {...PAGE_INFO.containers} />
+          <form action={refreshContainers}>
+            <Button variant="outline" size="sm" type="submit">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </form>
+        </div>
       </Header>
 
       <div className="p-6">
@@ -37,6 +44,33 @@ export default function ContainersPage() {
 }
 
 async function ContainersList() {
+  // Use mock data in demo mode
+  if (isDemoMode()) {
+    const results = mockEndpoints.map((endpoint) => ({
+      endpoint: endpoint as unknown as PortainerEndpoint,
+      containers: mockContainers as unknown as PortainerContainer[],
+      error: null,
+    }));
+
+    return (
+      <div className="space-y-8">
+        {results.map(({ endpoint, containers }) => (
+          <div key={endpoint.Id} className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">{endpoint.Name}</h2>
+              <Badge variant="secondary">{containers.length} containers</Badge>
+            </div>
+            <div className="space-y-3">
+              {containers.map((container) => (
+                <ContainerCard key={container.Id} container={container} endpointId={endpoint.Id} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   let endpoints: PortainerEndpoint[] = [];
   let error: string | null = null;
 

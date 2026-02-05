@@ -2,6 +2,7 @@
 
 import { services, auditLogs, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
+import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as runner from "@/server/runner";
@@ -34,6 +35,10 @@ const updateServiceSchema = createServiceSchema.partial().omit({ project_id: tru
 
 export async function createServiceAction(input: CreateServiceInput) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = createServiceSchema.parse(input);
 
@@ -62,6 +67,10 @@ export async function createServiceAction(input: CreateServiceInput) {
 
 export async function updateServiceAction(id: string, input: UpdateServiceInput) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
     const parsed = updateServiceSchema.parse(input);
 
@@ -89,6 +98,10 @@ export async function updateServiceAction(id: string, input: UpdateServiceInput)
 
 export async function deleteServiceAction(id: string) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     const service = await services.getServiceById(id);
@@ -121,6 +134,10 @@ export async function deleteServiceAction(id: string) {
 
 export async function deployServiceAction(serviceId: string) {
   try {
+    // Check demo mode
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
     const user = await requirePinVerification();
 
     const service = await services.getServiceById(serviceId);
