@@ -269,28 +269,33 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     const updatedVars = [...envVars, newVar];
     setEnvVars(updatedVars);
 
-    const success = await saveToFileAndRestart(updatedVars);
-    if (success) {
-      setNewKey("");
-      setNewValue("");
-      setNewIsSecret(true);
-      setShowAddForm(false);
+    try {
+      const success = await saveToFileAndRestart(updatedVars);
+      if (success) {
+        setNewKey("");
+        setNewValue("");
+        setNewIsSecret(true);
+        setShowAddForm(false);
+      }
+    } catch (err) {
+      console.error("[EnvManager] Add error:", err);
+      setError("Failed to add environment variable");
     }
   }
 
-  async function handleUpdate(originalKey: string) {
+  async function handleUpdate(id: string) {
     if (!editKey.trim()) return;
 
     const updatedKey = editKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
 
     // Check for duplicate if key changed
-    if (originalKey !== updatedKey && envVars.some(v => v.key === updatedKey)) {
+    if (id !== updatedKey && envVars.some(v => v.key === updatedKey)) {
       setError(`Variable ${updatedKey} already exists`);
       return;
     }
 
     const updatedVars = envVars.map(v => {
-      if (v.key === originalKey) {
+      if (v.key === id) {
         return {
           key: updatedKey,
           value: editValue !== "" ? editValue : v.value,
@@ -301,42 +306,55 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     });
 
     setEnvVars(updatedVars);
-    setEditingKey(null);
+    setEditingId(null);
 
-    const success = await saveToFileAndRestart(updatedVars);
-    if (success) {
-      setEditKey("");
-      setEditValue("");
+    try {
+      const success = await saveToFileAndRestart(updatedVars);
+      if (success) {
+        setEditKey("");
+        setEditValue("");
+      }
+    } catch (err) {
+      console.error("[EnvManager] Update error:", err);
+      setError("Failed to update environment variable");
     }
   }
 
-  async function handleDelete(key: string) {
-    if (!confirm(`Delete ${key}?`)) return;
+  async function handleDelete(id: string) {
+    const envVar = envVars.find(v => v.key === id);
+    if (!envVar) return;
 
-    const updatedVars = envVars.filter(v => v.key !== key);
+    if (!confirm(`Delete ${envVar.key}?`)) return;
+
+    const updatedVars = envVars.filter(v => v.key !== id);
     setEnvVars(updatedVars);
 
-    await saveToFileAndRestart(updatedVars);
+    try {
+      await saveToFileAndRestart(updatedVars);
+    } catch (err) {
+      console.error("[EnvManager] Delete error:", err);
+      setError("Failed to delete environment variable");
+    }
   }
 
-  async function handleReveal(id: string) {
-    if (revealedValues[id]) {
+  async function handleReveal(key: string) {
+    if (revealedValues[key]) {
       // Hide if already revealed
       setRevealedValues((prev) => {
         const updated = { ...prev };
-        delete updated[id];
+        delete updated[key];
         return updated;
       });
       return;
     }
 
-    setRevealingId(id);
+    setRevealingId(key);
     try {
-      const response = await fetch(`/api/env-vars/${id}`);
+      const response = await fetch(`/api/env-vars/${encodeURIComponent(key)}?serviceId=${serviceId}`);
       const result = await response.json();
 
       if (result.success) {
-        setRevealedValues((prev) => ({ ...prev, [id]: result.value }));
+        setRevealedValues((prev) => ({ ...prev, [key]: result.value }));
       } else if (result.requirePin) {
         setError("PIN verification required. Please verify PIN first.");
       } else {
@@ -349,9 +367,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }
 
-  async function handleCopy(id: string, value: string) {
+  async function handleCopy(key: string, value: string) {
     await navigator.clipboard.writeText(value);
-    setCopiedId(id);
+    setCopiedId(key);
     setTimeout(() => setCopiedId(null), 2000);
   }
 
@@ -399,11 +417,11 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }
 
-  function startEdit(envVar: EnvVarDisplay) {
-    setEditingId(envVar.id);
+  function startEdit(envVar: EnvVar) {
+    setEditingId(envVar.key);
     setEditKey(envVar.key);
     setEditValue("");
-    setEditIsSecret(envVar.is_secret);
+    setEditIsSecret(envVar.isSecret);
   }
 
   async function handleLoadAvailableFiles() {
@@ -763,10 +781,10 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           <div className="space-y-2">
             {envVars.map((envVar) => (
               <div
-                key={envVar.id}
+                key={envVar.key}
                 className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30"
               >
-                {editingId === envVar.id ? (
+                {editingId === envVar.key ? (
                   // Edit Mode
                   <div className="flex-1 space-y-2">
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -796,7 +814,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                       <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
                         <X className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" onClick={() => handleUpdate(envVar.id)}>
+                      <Button size="sm" onClick={() => handleUpdate(envVar.key)}>
                         <Save className="h-4 w-4" />
                       </Button>
                     </div>
@@ -807,7 +825,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <code className="text-sm font-mono font-medium">{envVar.key}</code>
-                        {envVar.is_secret && (
+                        {envVar.isSecret && (
                           <Badge variant="outline" className="text-xs">
                             secret
                           </Badge>
@@ -815,14 +833,14 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <code className="text-xs text-muted-foreground font-mono">
-                          {revealedValues[envVar.id] || envVar.value_masked}
+                          {revealedValues[envVar.key] || (envVar.isSecret ? "••••••••" : envVar.value)}
                         </code>
-                        {revealedValues[envVar.id] && (
+                        {revealedValues[envVar.key] && (
                           <button
-                            onClick={() => handleCopy(envVar.id, revealedValues[envVar.id])}
+                            onClick={() => handleCopy(envVar.key, revealedValues[envVar.key])}
                             className="text-muted-foreground hover:text-foreground"
                           >
-                            {copiedId === envVar.id ? (
+                            {copiedId === envVar.key ? (
                               <Check className="h-3 w-3 text-success" />
                             ) : (
                               <Copy className="h-3 w-3" />
@@ -835,12 +853,12 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleReveal(envVar.id)}
-                        disabled={revealingId === envVar.id}
+                        onClick={() => handleReveal(envVar.key)}
+                        disabled={revealingId === envVar.key}
                       >
-                        {revealingId === envVar.id ? (
+                        {revealingId === envVar.key ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : revealedValues[envVar.id] ? (
+                        ) : revealedValues[envVar.key] ? (
                           <EyeOff className="h-4 w-4" />
                         ) : (
                           <Eye className="h-4 w-4" />
@@ -852,7 +870,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(envVar.id)}
+                        onClick={() => handleDelete(envVar.key)}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
