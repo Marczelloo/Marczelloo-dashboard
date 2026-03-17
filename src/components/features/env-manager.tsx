@@ -24,6 +24,7 @@ import {
   Copy,
   Check,
   Upload,
+  Download,
   Key,
   FileText,
   RefreshCw,
@@ -371,6 +372,66 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     await navigator.clipboard.writeText(value);
     setCopiedId(key);
     setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function handleImport() {
+    const lines = importText.split("\n").filter(l => l.trim() && !l.startsWith("#"));
+    const parsed: EnvVar[] = [];
+
+    for (const line of lines) {
+      const eqIndex = line.indexOf("=");
+      if (eqIndex > 0) {
+        const key = line.slice(0, eqIndex).trim();
+        let value = line.slice(eqIndex + 1).trim();
+
+        // Remove surrounding quotes
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+
+        if (key) {
+          parsed.push({ key, value, isSecret: true });
+        }
+      }
+    }
+
+    if (parsed.length === 0) {
+      setError("No valid KEY=VALUE pairs found");
+      return;
+    }
+
+    // Merge with existing (new values override)
+    const merged = [...envVars];
+    for (const newVar of parsed) {
+      const existingIndex = merged.findIndex(v => v.key === newVar.key);
+      if (existingIndex >= 0) {
+        merged[existingIndex] = newVar;
+      } else {
+        merged.push(newVar);
+      }
+    }
+
+    setEnvVars(merged);
+    setShowImportModal(false);
+    setImportText("");
+
+    const success = await saveToFileAndRestart(merged);
+    if (success) {
+      toast.success(`Imported ${parsed.length} variables`);
+    }
+  }
+
+  function handleExport() {
+    const content = envVars.map(v => `${v.key}=${v.value}`).join("\n");
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = selectedFile;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Downloaded ${selectedFile}`);
   }
 
   async function handleBulkImport() {
