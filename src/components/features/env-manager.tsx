@@ -179,6 +179,65 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }, [repoPath, selectedFile]);
 
+  // Save env vars to file and restart service
+  const saveToFileAndRestart = useCallback(async (vars: EnvVar[]) => {
+    if (!repoPath) return false;
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/env-vars/save-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repoPath,
+          filename: selectedFile,
+          action: "write",
+          vars: vars.map(v => ({ key: v.key, value: v.value })),
+        }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        setError(result.error || "Failed to save");
+        return false;
+      }
+
+      // Restart the service
+      if (serviceId) {
+        setIsRestarting(true);
+        try {
+          const restartResponse = await fetch(`/api/services/${serviceId}/restart`, {
+            method: "POST",
+          });
+          const restartResult = await restartResponse.json();
+
+          if (!restartResult.success) {
+            toast.warning("Env saved, but restart failed", {
+              description: restartResult.error,
+            });
+          } else {
+            toast.success("Env saved and service restarted");
+          }
+        } catch (restartErr) {
+          toast.warning("Env saved, but restart failed");
+        } finally {
+          setIsRestarting(false);
+        }
+      } else {
+        toast.success("Env file saved");
+      }
+
+      setLastSynced(new Date());
+      return true;
+    } catch (err) {
+      console.error("[EnvManager] Save error:", err);
+      setError("Failed to save env file");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [repoPath, selectedFile, serviceId]);
+
   // Initial load
   useEffect(() => {
     if (repoPath) {
