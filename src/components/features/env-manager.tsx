@@ -14,23 +14,32 @@ import {
 } from "@/components/ui";
 import {
   Plus,
-  Eye,
-  EyeOff,
   Trash2,
   Edit2,
   Save,
   X,
   Loader2,
-  Copy,
-  Check,
   Upload,
   Download,
   Key,
-  FileText,
   RefreshCw,
-  HardDrive,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Helper function for relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 // Types
 interface EnvVar {
@@ -590,49 +599,62 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             <Key className="h-4 w-4" />
             Environment Variables
           </CardTitle>
-          <CardDescription>Manage encrypted environment variables for {serviceName || "this service"}</CardDescription>
-        </div>
-        <div className="flex items-center gap-3">
-          {repoPath && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer" title="Sync all changes to .env file">
-              <input
-                type="checkbox"
-                checked={syncToFile}
-                onChange={(e) => setSyncToFile(e.target.checked)}
-                className="rounded"
-              />
-              <HardDrive className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Sync to file</span>
-            </label>
-          )}
-          <div className="flex gap-2">
-            {repoPath && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowLoadFromFile(!showLoadFromFile);
-                  if (!showLoadFromFile) handleLoadAvailableFiles();
-                }}
-              >
-                <FileText className="h-4 w-4" />
-                Load .env
-              </Button>
+          <CardDescription>
+            {serviceName || "Service"} • {selectedFile}
+            {lastSynced && (
+              <span className="ml-2 text-xs">
+                Synced {formatRelativeTime(lastSynced)}
+              </span>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowBulkImport(!showBulkImport)}>
-              <Upload className="h-4 w-4" />
-              Import
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAddForm(!showAddForm)}>
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
-          </div>
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          {isRestarting && (
+            <Badge variant="warning" className="animate-pulse">
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Restarting...
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadFromFile()}
+            disabled={loading || saving}
+            title="Refresh from server"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportModal(!showImportModal)}
+          >
+            <Upload className="h-4 w-4" />
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={envVars.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddForm(!showAddForm)}
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Error Banner */}
         {error && (
-          <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
             {error}
             <button onClick={() => setError(null)}>
               <X className="h-4 w-4" />
@@ -640,135 +662,52 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </div>
         )}
 
-        {/* Load from .env File */}
-        {showLoadFromFile && (
-          <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Load from .env file
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">{repoPath}</p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => handleLoadAvailableFiles()} disabled={loadingFromFile}>
-                <RefreshCw className={`h-4 w-4 ${loadingFromFile ? "animate-spin" : ""}`} />
-              </Button>
-            </div>
-
-            {availableEnvFiles.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <select
-                    value={selectedEnvFile}
-                    onChange={(e) => setSelectedEnvFile(e.target.value)}
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {availableEnvFiles.map((file) => (
-                      <option key={file} value={file}>
-                        {file}
-                      </option>
-                    ))}
-                  </select>
-                  <Button size="sm" variant="outline" onClick={handleLoadEnvFile} disabled={loadingFromFile}>
-                    {loadingFromFile ? <Loader2 className="h-4 w-4 animate-spin" /> : "Load"}
-                  </Button>
-                </div>
-
-                {fileEnvVars.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {selectedFileVars.size} of {fileEnvVars.length} selected
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setSelectedFileVars(new Set(fileEnvVars.map((v) => v.key)))}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          onClick={() => setSelectedFileVars(new Set())}
-                          className="text-xs text-muted-foreground hover:underline"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1">
-                      {fileEnvVars.map((v) => (
-                        <label
-                          key={v.key}
-                          className="flex items-center gap-2 p-2 rounded hover:bg-secondary/50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedFileVars.has(v.key)}
-                            onChange={() => toggleFileVarSelection(v.key)}
-                            className="rounded"
-                          />
-                          <code className="text-xs font-mono">{v.key}</code>
-                          <span className="text-xs text-muted-foreground truncate">
-                            = {v.value.substring(0, 30)}
-                            {v.value.length > 30 ? "..." : ""}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        onClick={handleImportSelectedVars}
-                        disabled={adding || selectedFileVars.size === 0}
-                      >
-                        {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                        Import Selected
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowLoadFromFile(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>{loadingFromFile ? "Searching for .env files..." : `No .env files found at ${repoPath}`}</p>
-                {!loadingFromFile && (
-                  <p className="text-xs">
-                    Make sure the path is correct and .env files exist. You can also use &quot;Import&quot; to paste env
-                    vars directly.
-                  </p>
-                )}
-              </div>
-            )}
+        {/* File Selector */}
+        {availableFiles.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">File:</Label>
+            <select
+              value={selectedFile}
+              onChange={(e) => {
+                setSelectedFile(e.target.value);
+                loadFromFile(e.target.value);
+              }}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              disabled={loading}
+            >
+              {availableFiles.map((file) => (
+                <option key={file} value={file}>{file}</option>
+              ))}
+            </select>
           </div>
         )}
 
-        {/* Bulk Import Form */}
-        {showBulkImport && (
+        {/* Import Modal */}
+        {showImportModal && (
           <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
-            <Label>Bulk Import (KEY=VALUE format)</Label>
+            <Label>Import .env content</Label>
             <textarea
-              value={bulkText}
-              onChange={(e) => setBulkText(e.target.value)}
-              placeholder={`# Paste your .env file content\nDATABASE_URL=postgres://...\nAPI_KEY=xxx`}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder="KEY=value&#10;ANOTHER_KEY=value"
               className="w-full h-32 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleBulkImport} disabled={adding || !bulkText.trim()}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <Button size="sm" onClick={handleImport} disabled={!importText.trim()}>
+                <Upload className="h-4 w-4 mr-1" />
                 Import
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowBulkImport(false)}>
+              <Button size="sm" variant="outline" onClick={() => {
+                setShowImportModal(false);
+                setImportText("");
+              }}>
                 Cancel
               </Button>
             </div>
           </div>
         )}
 
-        {/* Add New Form */}
+        {/* Add Form */}
         {showAddForm && (
           <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -791,53 +730,43 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 />
               </div>
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
-              {repoPath ? (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={saveToFile}
-                    onChange={(e) => {
-                      setSaveToFile(e.target.checked);
-                      if (e.target.checked) setNewIsSecret(false);
-                    }}
-                    className="rounded"
-                  />
-                  Save to .env file
-                </label>
-              ) : null}
-              {!saveToFile && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={newIsSecret}
-                    onChange={(e) => setNewIsSecret(e.target.checked)}
-                    className="rounded"
-                  />
-                  Secret (encrypted in DB)
-                </label>
-              )}
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={newIsSecret}
+                  onChange={(e) => setNewIsSecret(e.target.checked)}
+                  className="rounded"
+                />
+                Mask in UI
+              </label>
               <div className="flex-1" />
               <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAdd} disabled={adding || !newKey.trim()}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {saveToFile ? "Add to .env" : "Add to DB"}
+              <Button size="sm" onClick={handleAdd} disabled={saving || !newKey.trim()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Add
               </Button>
             </div>
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : envVars.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No environment variables yet. Click &quot;Add&quot; to create one.
-          </p>
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-4">
+              No environment variables in {selectedFile}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add your first variable
+            </Button>
+          </div>
         ) : (
           <div className="space-y-2">
             {envVars.map((envVar) => (
@@ -846,7 +775,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30"
               >
                 {editingId === envVar.key ? (
-                  // Edit Mode
                   <div className="flex-1 space-y-2">
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Input
@@ -869,63 +797,41 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                           onChange={(e) => setEditIsSecret(e.target.checked)}
                           className="rounded"
                         />
-                        Secret
+                        Mask in UI
                       </label>
                       <div className="flex-1" />
                       <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
                         <X className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" onClick={() => handleUpdate(envVar.key)}>
-                        <Save className="h-4 w-4" />
+                      <Button size="sm" onClick={() => handleUpdate(envVar.key)} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  // View Mode
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <code className="text-sm font-mono font-medium">{envVar.key}</code>
                         {envVar.isSecret && (
-                          <Badge variant="outline" className="text-xs">
-                            secret
-                          </Badge>
+                          <Badge variant="outline" className="text-xs">masked</Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-xs text-muted-foreground font-mono">
-                          {revealedValues[envVar.key] || (envVar.isSecret ? "••••••••" : envVar.value)}
-                        </code>
-                        {revealedValues[envVar.key] && (
-                          <button
-                            onClick={() => handleCopy(envVar.key, revealedValues[envVar.key])}
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            {copiedId === envVar.key ? (
-                              <Check className="h-3 w-3 text-success" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      <code className="text-xs text-muted-foreground font-mono">
+                        {envVar.isSecret ? "••••••••" : envVar.value}
+                      </code>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleReveal(envVar.key)}
-                        disabled={revealingId === envVar.key}
+                        onClick={() => {
+                          setEditingId(envVar.key);
+                          setEditKey(envVar.key);
+                          setEditValue("");
+                          setEditIsSecret(envVar.isSecret);
+                        }}
                       >
-                        {revealingId === envVar.key ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : revealedValues[envVar.key] ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(envVar)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
@@ -933,6 +839,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                         variant="ghost"
                         onClick={() => handleDelete(envVar.key)}
                         className="text-destructive hover:text-destructive"
+                        disabled={saving}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -941,6 +848,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* No repo path warning */}
+        {!repoPath && (
+          <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
+            Configure a repository path in service settings to manage env files.
           </div>
         )}
       </CardContent>
