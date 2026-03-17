@@ -253,188 +253,70 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
   async function handleAdd() {
     if (!newKey.trim()) return;
-    setAdding(true);
 
-    try {
-      // First save to database (encrypted)
-      const response = await fetch("/api/env-vars", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: serviceId,
-          key: newKey.trim(),
-          value: newValue,
-          is_secret: newIsSecret,
-        }),
-      });
-      const result = await response.json();
+    const newVar: EnvVar = {
+      key: newKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, ""),
+      value: newValue,
+      isSecret: newIsSecret,
+    };
 
-      if (!result.success) {
-        setError(result.error);
-        toast.error("Failed to add variable", { description: result.error });
-        return;
-      }
+    // Check for duplicate
+    if (envVars.some(v => v.key === newVar.key)) {
+      setError(`Variable ${newVar.key} already exists`);
+      return;
+    }
 
-      setEnvVars([...envVars, result.data]);
+    const updatedVars = [...envVars, newVar];
+    setEnvVars(updatedVars);
 
-      // Also save to .env file if sync is enabled
-      if ((saveToFile || syncToFile) && repoPath) {
-        const fileResponse = await fetch("/api/env-vars/save-file", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            repoPath,
-            filename: ".env",
-            action: "append",
-            vars: [{ key: newKey.trim(), value: newValue }],
-          }),
-        });
-        const fileResult = await fileResponse.json();
-
-        if (fileResult.success) {
-          toast.success(`Added ${newKey}`, {
-            description: syncToFile ? "Saved to DB and .env file" : "Saved to database",
-          });
-        } else {
-          toast.warning(`Added ${newKey} to DB`, {
-            description: `Failed to sync to .env: ${fileResult.error}`,
-          });
-        }
-      } else {
-        toast.success(`Added ${newKey}`, { description: "Saved to database" });
-      }
-
+    const success = await saveToFileAndRestart(updatedVars);
+    if (success) {
       setNewKey("");
       setNewValue("");
       setNewIsSecret(true);
       setShowAddForm(false);
-    } catch (_err) {
-      setError("Failed to add environment variable");
-      toast.error("Failed to add variable");
-    } finally {
-      setAdding(false);
     }
   }
 
-  async function handleUpdate(id: string) {
-    try {
-      // Get the current env var for the key
-      const currentVar = envVars.find((v) => v.id === id);
+  async function handleUpdate(originalKey: string) {
+    if (!editKey.trim()) return;
 
-      const response = await fetch(`/api/env-vars/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: editKey.trim(),
-          value: editValue || undefined,
-          is_secret: editIsSecret,
-        }),
-      });
-      const result = await response.json();
+    const updatedKey = editKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
 
-      if (result.success) {
-        setEnvVars(envVars.map((v) => (v.id === id ? result.data : v)));
-        setEditingId(null);
-        // Clear revealed value since it's been updated
-        setRevealedValues((prev) => {
-          const updated = { ...prev };
-          delete updated[id];
-          return updated;
-        });
+    // Check for duplicate if key changed
+    if (originalKey !== updatedKey && envVars.some(v => v.key === updatedKey)) {
+      setError(`Variable ${updatedKey} already exists`);
+      return;
+    }
 
-        // Sync to .env file if enabled and we have a value
-        if (syncToFile && repoPath && editValue) {
-          // If key changed, delete old key first
-          if (currentVar && currentVar.key !== editKey.trim()) {
-            await fetch("/api/env-vars/save-file", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                repoPath,
-                filename: ".env",
-                action: "delete",
-                vars: [{ key: currentVar.key, value: "" }],
-              }),
-            });
-          }
-
-          const fileResponse = await fetch("/api/env-vars/save-file", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              repoPath,
-              filename: ".env",
-              action: "append",
-              vars: [{ key: editKey.trim(), value: editValue }],
-            }),
-          });
-          const fileResult = await fileResponse.json();
-
-          if (fileResult.success) {
-            toast.success(`Updated ${editKey}`, { description: "Synced to DB and .env file" });
-          } else {
-            toast.warning(`Updated ${editKey} in DB`, {
-              description: `Failed to sync to .env: ${fileResult.error}`,
-            });
-          }
-        } else {
-          toast.success(`Updated ${editKey}`, { description: "Saved to database" });
-        }
-      } else {
-        setError(result.error);
-        toast.error("Failed to update", { description: result.error });
+    const updatedVars = envVars.map(v => {
+      if (v.key === originalKey) {
+        return {
+          key: updatedKey,
+          value: editValue !== "" ? editValue : v.value,
+          isSecret: editIsSecret,
+        };
       }
-    } catch {
-      setError("Failed to update environment variable");
-      toast.error("Failed to update variable");
+      return v;
+    });
+
+    setEnvVars(updatedVars);
+    setEditingKey(null);
+
+    const success = await saveToFileAndRestart(updatedVars);
+    if (success) {
+      setEditKey("");
+      setEditValue("");
     }
   }
 
-  async function handleDelete(id: string) {
-    const varToDelete = envVars.find((v) => v.id === id);
-    if (!varToDelete) return;
+  async function handleDelete(key: string) {
+    if (!confirm(`Delete ${key}?`)) return;
 
-    if (!confirm(`Are you sure you want to delete ${varToDelete.key}?`)) return;
+    const updatedVars = envVars.filter(v => v.key !== key);
+    setEnvVars(updatedVars);
 
-    try {
-      const response = await fetch(`/api/env-vars/${id}`, { method: "DELETE" });
-      const result = await response.json();
-
-      if (result.success) {
-        setEnvVars(envVars.filter((v) => v.id !== id));
-
-        // Sync to .env file if enabled
-        if (syncToFile && repoPath) {
-          const fileResponse = await fetch("/api/env-vars/save-file", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              repoPath,
-              filename: ".env",
-              action: "delete",
-              vars: [{ key: varToDelete.key, value: "" }],
-            }),
-          });
-          const fileResult = await fileResponse.json();
-
-          if (fileResult.success) {
-            toast.success(`Deleted ${varToDelete.key}`, { description: "Removed from DB and .env file" });
-          } else {
-            toast.warning(`Deleted ${varToDelete.key} from DB`, {
-              description: `Failed to remove from .env: ${fileResult.error}`,
-            });
-          }
-        } else {
-          toast.success(`Deleted ${varToDelete.key}`);
-        }
-      } else {
-        setError(result.error);
-        toast.error("Failed to delete", { description: result.error });
-      }
-    } catch {
-      setError("Failed to delete environment variable");
-      toast.error("Failed to delete variable");
-    }
+    await saveToFileAndRestart(updatedVars);
   }
 
   async function handleReveal(id: string) {
