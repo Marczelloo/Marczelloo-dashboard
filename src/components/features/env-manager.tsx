@@ -117,6 +117,77 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }, [serviceId]);
 
+  // Load available .env files
+  const loadAvailableFiles = useCallback(async () => {
+    if (!repoPath) return;
+
+    try {
+      const response = await fetch("/api/env-vars/load-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, action: "list" }),
+      });
+      const result = await response.json();
+
+      if (result.success && result.files?.length > 0) {
+        setAvailableFiles(result.files);
+        if (!result.files.includes(selectedFile)) {
+          setSelectedFile(result.files[0]);
+        }
+      }
+    } catch (err) {
+      console.error("[EnvManager] Failed to list files:", err);
+    }
+  }, [repoPath, selectedFile]);
+
+  // Load env vars from file
+  const loadFromFile = useCallback(async (filename?: string) => {
+    if (!repoPath) {
+      setError("No repository path configured");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const fileToLoad = filename || selectedFile;
+      const response = await fetch("/api/env-vars/load-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, filename: fileToLoad }),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const vars: EnvVar[] = (result.vars || []).map((v: { key: string; value: string }) => ({
+          key: v.key,
+          value: v.value,
+          isSecret: true, // Default all to secret for safety
+        }));
+        setEnvVars(vars);
+        setLastSynced(new Date());
+      } else {
+        setError(result.error || "Failed to load env file");
+      }
+    } catch (err) {
+      console.error("[EnvManager] Load error:", err);
+      setError("Failed to load env file");
+    } finally {
+      setLoading(false);
+    }
+  }, [repoPath, selectedFile]);
+
+  // Initial load
+  useEffect(() => {
+    if (repoPath) {
+      loadAvailableFiles().then(() => loadFromFile());
+    } else {
+      setLoading(false);
+    }
+  }, [repoPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     loadEnvVars();
   }, [loadEnvVars]);
