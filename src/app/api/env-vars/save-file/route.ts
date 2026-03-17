@@ -9,6 +9,19 @@ interface EnvVar {
   value: string;
 }
 
+// Valid env var key pattern: starts with letter or underscore, followed by letters, digits, or underscores
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function validateEnvKeys(vars: EnvVar[]): { valid: boolean; invalidKeys: string[] } {
+  const invalidKeys: string[] = [];
+  for (const v of vars) {
+    if (!ENV_KEY_PATTERN.test(v.key)) {
+      invalidKeys.push(v.key);
+    }
+  }
+  return { valid: invalidKeys.length === 0, invalidKeys };
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -37,6 +50,14 @@ export async function POST(request: Request) {
     // Action: append a single variable
     if (action === "append" && vars?.length === 1) {
       const { key, value } = vars[0] as EnvVar;
+
+      // Validate env var key
+      if (!ENV_KEY_PATTERN.test(key)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid env var key: "${key}". Keys must start with a letter or underscore and contain only letters, digits, and underscores.` },
+          { status: 400 }
+        );
+      }
 
       // Escape value for shell (use single quotes, escape existing single quotes)
       const escapedValue = value.replace(/'/g, "'\\''");
@@ -97,6 +118,15 @@ export async function POST(request: Request) {
 
     // Action: write entire file
     if (action === "write" && Array.isArray(vars)) {
+      // Validate env var keys
+      const validation = validateEnvKeys(vars);
+      if (!validation.valid) {
+        return NextResponse.json(
+          { success: false, error: `Invalid env var key(s): ${validation.invalidKeys.join(", ")}. Keys must start with a letter or underscore and contain only letters, digits, and underscores.` },
+          { status: 400 }
+        );
+      }
+
       // Build the .env content
       const content = vars.map((v: EnvVar) => `${v.key}=${v.value}`).join("\n");
 

@@ -83,23 +83,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [editValue, setEditValue] = useState("");
   const [editIsSecret, setEditIsSecret] = useState(true);
 
-  const loadEnvVars = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/env-vars?serviceId=${serviceId}`);
-      const result = await response.json();
-      if (result.success) {
-        setEnvVars(result.data);
-      } else {
-        setError(result.error);
-      }
-    } catch {
-      setError("Failed to load environment variables");
-    } finally {
-      setLoading(false);
-    }
-  }, [serviceId]);
-
   // Load available .env files
   const loadAvailableFiles = useCallback(async () => {
     if (!repoPath) return;
@@ -230,10 +213,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }, [repoPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    loadEnvVars();
-  }, [loadEnvVars]);
-
   async function handleAdd() {
     if (!newKey.trim()) return;
 
@@ -249,6 +228,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       return;
     }
 
+    const previousVars = envVars;
     const updatedVars = [...envVars, newVar];
     setEnvVars(updatedVars);
 
@@ -259,9 +239,14 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         setNewValue("");
         setNewIsSecret(true);
         setShowAddForm(false);
+      } else {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
       }
     } catch (err) {
       console.error("[EnvManager] Add error:", err);
+      setEnvVars(previousVars);
       setError("Failed to add environment variable");
     }
   }
@@ -277,6 +262,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       return;
     }
 
+    const previousVars = envVars;
     const updatedVars = envVars.map(v => {
       if (v.key === id) {
         return {
@@ -296,9 +282,14 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       if (success) {
         setEditKey("");
         setEditValue("");
+      } else {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
       }
     } catch (err) {
       console.error("[EnvManager] Update error:", err);
+      setEnvVars(previousVars);
       setError("Failed to update environment variable");
     }
   }
@@ -309,13 +300,20 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
     if (!confirm(`Delete ${envVar.key}?`)) return;
 
+    const previousVars = envVars;
     const updatedVars = envVars.filter(v => v.key !== id);
     setEnvVars(updatedVars);
 
     try {
-      await saveToFileAndRestart(updatedVars);
+      const success = await saveToFileAndRestart(updatedVars);
+      if (!success) {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
+      }
     } catch (err) {
       console.error("[EnvManager] Delete error:", err);
+      setEnvVars(previousVars);
       setError("Failed to delete environment variable");
     }
   }
@@ -358,6 +356,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       }
     }
 
+    const previousVars = envVars;
     setEnvVars(merged);
     setShowImportModal(false);
     setImportText("");
@@ -365,6 +364,10 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     const success = await saveToFileAndRestart(merged);
     if (success) {
       toast.success(`Imported ${parsed.length} variables`);
+    } else {
+      // Rollback on failure
+      setEnvVars(previousVars);
+      toast.error("Failed to import - changes not persisted");
     }
   }
 
