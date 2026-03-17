@@ -31,6 +31,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// Types
+interface EnvVar {
+  key: string;
+  value: string;
+  isSecret: boolean;
+}
+
+// Legacy interface - kept for compatibility during migration
 interface EnvVarDisplay {
   id: string;
   service_id: string;
@@ -47,44 +55,49 @@ interface EnvManagerProps {
 }
 
 export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps) {
-  const [envVars, setEnvVars] = useState<EnvVarDisplay[]>([]);
+  // Data state
+  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>(".env");
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [isRestarting, setIsRestarting] = useState(false);
 
-  // Sync to file mode - when enabled, all operations sync to .env file
-  const [syncToFile, setSyncToFile] = useState(!!repoPath);
+  // Edit state
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editIsSecret, setEditIsSecret] = useState(true);
 
-  // New env var form
+  // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [newIsSecret, setNewIsSecret] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+
+  // Legacy state - kept for compatibility during migration (will be removed)
+  const [syncToFile, setSyncToFile] = useState(!!repoPath);
   const [saveToFile, setSaveToFile] = useState(false);
   const [adding, setAdding] = useState(false);
-
-  // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editKey, setEditKey] = useState("");
-  const [editValue, setEditValue] = useState("");
-  const [editIsSecret, setEditIsSecret] = useState(true);
-
-  // Reveal state
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
   const [revealingId, setRevealingId] = useState<string | null>(null);
-
-  // Bulk import
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkText, setBulkText] = useState("");
-
-  // Load from file state
   const [showLoadFromFile, setShowLoadFromFile] = useState(false);
   const [loadingFromFile, setLoadingFromFile] = useState(false);
   const [availableEnvFiles, setAvailableEnvFiles] = useState<string[]>([]);
   const [selectedEnvFile, setSelectedEnvFile] = useState(".env");
   const [fileEnvVars, setFileEnvVars] = useState<{ key: string; value: string }[]>([]);
   const [selectedFileVars, setSelectedFileVars] = useState<Set<string>>(new Set());
-
-  // Copied state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadEnvVars = useCallback(async () => {
