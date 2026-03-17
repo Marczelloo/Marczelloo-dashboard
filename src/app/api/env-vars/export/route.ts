@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/server/lib/auth";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
+    }
+
     const { repoPath, filename } = await request.json();
 
     if (!repoPath) {
