@@ -48,16 +48,6 @@ interface EnvVar {
   isSecret: boolean;
 }
 
-// Legacy interface - kept for compatibility during migration
-interface EnvVarDisplay {
-  id: string;
-  service_id: string;
-  key: string;
-  value_masked: string;
-  is_secret: boolean;
-  updated_at: string;
-}
-
 interface EnvManagerProps {
   serviceId: string;
   serviceName?: string;
@@ -76,11 +66,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
 
-  // Edit state
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [editIsSecret, setEditIsSecret] = useState(true);
-
   // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [newKey, setNewKey] = useState("");
@@ -92,23 +77,11 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState("");
 
-  // Legacy state - kept for compatibility during migration (will be removed)
-  const [syncToFile, setSyncToFile] = useState(!!repoPath);
-  const [saveToFile, setSaveToFile] = useState(false);
-  const [adding, setAdding] = useState(false);
+  // Edit state (inline editing)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editKey, setEditKey] = useState("");
-  const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
-  const [revealingId, setRevealingId] = useState<string | null>(null);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [bulkText, setBulkText] = useState("");
-  const [showLoadFromFile, setShowLoadFromFile] = useState(false);
-  const [loadingFromFile, setLoadingFromFile] = useState(false);
-  const [availableEnvFiles, setAvailableEnvFiles] = useState<string[]>([]);
-  const [selectedEnvFile, setSelectedEnvFile] = useState(".env");
-  const [fileEnvVars, setFileEnvVars] = useState<{ key: string; value: string }[]>([]);
-  const [selectedFileVars, setSelectedFileVars] = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editIsSecret, setEditIsSecret] = useState(true);
 
   const loadEnvVars = useCallback(async () => {
     setLoading(true);
@@ -347,42 +320,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }
 
-  async function handleReveal(key: string) {
-    if (revealedValues[key]) {
-      // Hide if already revealed
-      setRevealedValues((prev) => {
-        const updated = { ...prev };
-        delete updated[key];
-        return updated;
-      });
-      return;
-    }
-
-    setRevealingId(key);
-    try {
-      const response = await fetch(`/api/env-vars/${encodeURIComponent(key)}?serviceId=${serviceId}`);
-      const result = await response.json();
-
-      if (result.success) {
-        setRevealedValues((prev) => ({ ...prev, [key]: result.value }));
-      } else if (result.requirePin) {
-        setError("PIN verification required. Please verify PIN first.");
-      } else {
-        setError(result.error);
-      }
-    } catch {
-      setError("Failed to reveal value");
-    } finally {
-      setRevealingId(null);
-    }
-  }
-
-  async function handleCopy(key: string, value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopiedId(key);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
   async function handleImport() {
     const lines = importText.split("\n").filter(l => l.trim() && !l.startsWith("#"));
     const parsed: EnvVar[] = [];
@@ -441,154 +378,6 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Downloaded ${selectedFile}`);
-  }
-
-  async function handleBulkImport() {
-    const lines = bulkText.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
-    const parsed: { key: string; value: string }[] = [];
-
-    for (const line of lines) {
-      const eqIndex = line.indexOf("=");
-      if (eqIndex > 0) {
-        const key = line.slice(0, eqIndex).trim();
-        const value = line.slice(eqIndex + 1).trim();
-        if (key) {
-          parsed.push({ key, value });
-        }
-      }
-    }
-
-    if (parsed.length === 0) {
-      setError("No valid KEY=VALUE pairs found");
-      return;
-    }
-
-    setAdding(true);
-    try {
-      for (const { key, value } of parsed) {
-        await fetch("/api/env-vars", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: serviceId,
-            key,
-            value,
-            is_secret: true,
-          }),
-        });
-      }
-      await loadEnvVars();
-      setBulkText("");
-      setShowBulkImport(false);
-    } catch {
-      setError("Failed to import some variables");
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function startEdit(envVar: EnvVar) {
-    setEditingId(envVar.key);
-    setEditKey(envVar.key);
-    setEditValue("");
-    setEditIsSecret(envVar.isSecret);
-  }
-
-  async function handleLoadAvailableFiles() {
-    if (!repoPath) {
-      setError("No repository path configured for this service");
-      return;
-    }
-    setLoadingFromFile(true);
-    setError(null);
-    try {
-      console.log("[EnvManager] Loading files from:", repoPath);
-      const response = await fetch("/api/env-vars/load-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoPath, action: "list" }),
-      });
-      const result = await response.json();
-      console.log("[EnvManager] Load result:", result);
-      if (result.success && result.files) {
-        setAvailableEnvFiles(result.files);
-        if (result.files.length > 0) {
-          setSelectedEnvFile(result.files[0]);
-        } else {
-          console.log("[EnvManager] No .env files found in:", repoPath);
-        }
-      } else if (result.error) {
-        setError(result.error);
-      }
-    } catch (err) {
-      console.error("[EnvManager] Error:", err);
-      setError("Failed to list .env files");
-    } finally {
-      setLoadingFromFile(false);
-    }
-  }
-
-  async function handleLoadEnvFile() {
-    if (!repoPath || !selectedEnvFile) return;
-    setLoadingFromFile(true);
-    try {
-      const response = await fetch("/api/env-vars/load-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoPath, filename: selectedEnvFile }),
-      });
-      const result = await response.json();
-      if (result.success && result.vars) {
-        setFileEnvVars(result.vars);
-        setSelectedFileVars(new Set(result.vars.map((v: { key: string }) => v.key)));
-      } else {
-        setError(result.error || "Failed to load file");
-      }
-    } catch {
-      setError("Failed to load .env file");
-    } finally {
-      setLoadingFromFile(false);
-    }
-  }
-
-  async function handleImportSelectedVars() {
-    setAdding(true);
-    try {
-      for (const envVar of fileEnvVars) {
-        if (selectedFileVars.has(envVar.key)) {
-          await fetch("/api/env-vars", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              service_id: serviceId,
-              key: envVar.key,
-              value: envVar.value,
-              is_secret: true,
-            }),
-          });
-        }
-      }
-      await loadEnvVars();
-      setShowLoadFromFile(false);
-      setFileEnvVars([]);
-      setSelectedFileVars(new Set());
-    } catch {
-      setError("Failed to import selected variables");
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function toggleFileVarSelection(key: string) {
-    setSelectedFileVars((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(key)) {
-        newSet.delete(key);
-      } else {
-        newSet.add(key);
-      }
-      return newSet;
-    });
   }
 
   return (
