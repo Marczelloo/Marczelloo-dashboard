@@ -46,6 +46,7 @@ interface EnvVar {
   key: string;
   value: string;
   isSecret: boolean;
+  id?: string; // DB ID for database operations
 }
 
 interface EnvManagerProps {
@@ -54,9 +55,91 @@ interface EnvManagerProps {
   repoPath?: string;
 }
 
+/**
+ * Merge env vars from database and file source.
+ * File values take precedence (runtime truth).
+ * DB provides isSecret metadata for existing vars.
+ */
+function mergeEnvVars(
+  dbVars: Array<{ id: string; key: string; value_masked: string; is_secret: boolean }>,
+  fileVars: Array<{ key: string; value: string }>
+): EnvVar[] {
+  const map = new Map<string, EnvVar>();
+
+  // Add DB vars first (for id and isSecret metadata)
+  for (const v of dbVars) {
+    map.set(v.key, {
+      key: v.key,
+      value: "", // Will be filled from file
+      isSecret: v.is_secret,
+      id: v.id,
+    });
+  }
+
+  // File values override (runtime truth)
+  for (const v of fileVars) {
+    const existing = map.get(v.key);
+    if (existing) {
+      map.set(v.key, { ...existing, value: v.value });
+    } else {
+      // New var from file, default to secret
+      map.set(v.key, { key: v.key, value: v.value, isSecret: true });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+// Calculate differences between server and working state
+function calculateDiff(server: EnvVar[], working: EnvVar[]) {
+  const serverMap = new Map(server.map((v) => [v.key, v]));
+  const workingMap = new Map(working.map((v) => [v.key, v]));
+
+  const toCreate: EnvVar[] = [];
+  const toUpdate: Array<{ id: string; key: string; value: string; is_secret: boolean }> = [];
+  const toDelete: string[] = [];
+
+  // Find new and updated vars
+  for (const [key, workingVar] of workingMap) {
+    const serverVar = serverMap.get(key);
+    if (!serverVar) {
+      // New var
+      toCreate.push(workingVar);
+    } else if (
+      workingVar.value !== serverVar.value ||
+      workingVar.isSecret !== serverVar.isSecret
+    ) {
+      // Updated var (has DB ID)
+      if (serverVar.id) {
+        toUpdate.push({
+          id: serverVar.id,
+          key: workingVar.key,
+          value: workingVar.value,
+          is_secret: workingVar.isSecret,
+        });
+      }
+    }
+  }
+
+  // Find deleted vars
+  for (const [key, serverVar] of serverMap) {
+    if (!workingMap.has(key) && serverVar.id) {
+      toDelete.push(serverVar.id);
+    }
+  }
+
+  return { toCreate, toUpdate, toDelete };
+}
+
 export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps) {
-  // Data state
-  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  // Server state (as loaded from DB + file)
+  const [serverVars, setServerVars] = useState<EnvVar[]>([]);
+
+  // Working state (local edits)
+  const [workingVars, setWorkingVars] = useState<EnvVar[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Available files and selection
   const [availableFiles, setAvailableFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>(".env");
 
@@ -64,14 +147,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const [isRestarting, setIsRestarting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [newIsSecret, setNewIsSecret] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   // Import state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -82,6 +164,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [editKey, setEditKey] = useState("");
   const [editValue, setEditValue] = useState("");
   const [editIsSecret, setEditIsSecret] = useState(true);
+  const [revealEditValue, setRevealEditValue] = useState(false);
 
   // Load available .env files
   const loadAvailableFiles = useCallback(async () => {
@@ -106,8 +189,8 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     }
   }, [repoPath, selectedFile]);
 
-  // Load env vars from file
-  const loadFromFile = useCallback(async (filename?: string) => {
+  // Load env vars from both database and file
+  const loadFromBothSources = useCallback(async () => {
     if (!repoPath) {
       setError("No repository path configured");
       setLoading(false);
@@ -118,102 +201,205 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     setError(null);
 
     try {
-      const fileToLoad = filename || selectedFile;
-      const response = await fetch("/api/env-vars/load-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoPath, filename: fileToLoad }),
-      });
-      const result = await response.json();
-
-      if (result.success) {
-        const vars: EnvVar[] = (result.vars || []).map((v: { key: string; value: string }) => ({
-          key: v.key,
-          value: v.value,
-          isSecret: true, // Default all to secret for safety
-        }));
-        setEnvVars(vars);
-        setLastSynced(new Date());
-      } else {
-        setError(result.error || "Failed to load env file");
+      // Load from database
+      let dbVars: Array<{
+        id: string;
+        key: string;
+        value_masked: string;
+        is_secret: boolean;
+      }> = [];
+      try {
+        const dbResponse = await fetch(
+          `/api/env-vars?serviceId=${serviceId}`
+        );
+        const dbResult = await dbResponse.json();
+        if (dbResult.success) {
+          dbVars = dbResult.data || [];
+        }
+      } catch (dbErr) {
+        console.error("[EnvManager] DB load error:", dbErr);
+        // Continue with file-only if DB fails
       }
+
+      // Load from file
+      let fileVars: Array<{ key: string; value: string }> = [];
+      try {
+        const fileResponse = await fetch("/api/env-vars/load-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repoPath, filename: selectedFile }),
+        });
+        const fileResult = await fileResponse.json();
+        if (fileResult.success) {
+          fileVars = fileResult.vars || [];
+        }
+      } catch (fileErr) {
+        console.error("[EnvManager] File load error:", fileErr);
+      }
+
+      // Merge both sources
+      const merged = mergeEnvVars(dbVars, fileVars);
+
+      setServerVars(merged);
+      setWorkingVars(merged);
+      setHasUnsavedChanges(false);
+      setLastSynced(new Date());
     } catch (err) {
       console.error("[EnvManager] Load error:", err);
-      setError("Failed to load env file");
+      setError("Failed to load environment variables");
     } finally {
       setLoading(false);
     }
-  }, [repoPath, selectedFile]);
+  }, [repoPath, selectedFile, serviceId]);
 
-  // Save env vars to file and restart service
-  const saveToFileAndRestart = useCallback(async (vars: EnvVar[]) => {
+  // Save all changes to both database and file, then restart
+  const saveAll = useCallback(async () => {
     if (!repoPath) return false;
 
     setSaving(true);
+    setError(null);
+
     try {
-      const response = await fetch("/api/env-vars/save-file", {
+      const { toCreate, toUpdate, toDelete } = calculateDiff(
+        serverVars,
+        workingVars
+      );
+
+      // 1. Database operations (parallel)
+      const dbOperations = [];
+
+      for (const v of toCreate) {
+        dbOperations.push(
+          fetch("/api/env-vars", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              service_id: serviceId,
+              key: v.key,
+              value: v.value,
+              is_secret: v.isSecret,
+            }),
+          })
+        );
+      }
+
+      for (const v of toUpdate) {
+        dbOperations.push(
+          fetch(`/api/env-vars/${v.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              key: v.key,
+              value: v.value,
+              is_secret: v.is_secret,
+            }),
+          })
+        );
+      }
+
+      for (const id of toDelete) {
+        dbOperations.push(fetch(`/api/env-vars/${id}`, { method: "DELETE" }));
+      }
+
+      const dbResults = await Promise.allSettled(dbOperations);
+
+      // Check for DB errors
+      const dbErrors = dbResults
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r.status === "rejected" ? r.reason : "Unknown error"));
+
+      if (dbErrors.length > 0) {
+        console.error("[EnvManager] DB errors:", dbErrors);
+        // Continue to file save even if DB fails
+      }
+
+      // 2. Save to file
+      const fileResponse = await fetch("/api/env-vars/save-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           repoPath,
           filename: selectedFile,
           action: "write",
-          vars: vars.map(v => ({ key: v.key, value: v.value })),
+          vars: workingVars.map((v) => ({ key: v.key, value: v.value })),
         }),
       });
-      const result = await response.json();
+      const fileResult = await fileResponse.json();
 
-      if (!result.success) {
-        setError(result.error || "Failed to save");
+      if (!fileResult.success) {
+        setError(fileResult.error || "Failed to save to file");
         return false;
       }
 
-      // Restart the service
+      // 3. Restart the service
       if (serviceId) {
-        setIsRestarting(true);
-        try {
-          const restartResponse = await fetch(`/api/services/${serviceId}/restart`, {
+        const restartResponse = await fetch(
+          `/api/services/${serviceId}/restart`,
+          {
             method: "POST",
-          });
-          const restartResult = await restartResponse.json();
-
-          if (!restartResult.success) {
-            toast.warning("Env saved, but restart failed", {
-              description: restartResult.error,
-            });
-          } else {
-            toast.success("Env saved and service restarted");
           }
-        } catch (restartErr) {
-          toast.warning("Env saved, but restart failed");
-        } finally {
-          setIsRestarting(false);
+        );
+        const restartResult = await restartResponse.json();
+
+        if (!restartResult.success) {
+          toast.warning("Saved successfully, but restart failed", {
+            description: restartResult.error,
+          });
+        } else {
+          toast.success("Environment variables saved and service restarted");
         }
       } else {
-        toast.success("Env file saved");
+        toast.success("Environment variables saved");
       }
 
+      // 4. Update server state
+      setServerVars(workingVars);
+      setHasUnsavedChanges(false);
       setLastSynced(new Date());
+
       return true;
     } catch (err) {
       console.error("[EnvManager] Save error:", err);
-      setError("Failed to save env file");
+      setError("Failed to save environment variables");
       return false;
     } finally {
       setSaving(false);
     }
-  }, [repoPath, selectedFile, serviceId]);
+  }, [repoPath, selectedFile, serviceId, serverVars, workingVars]);
+
+  // Discard unsaved changes
+  function handleDiscard() {
+    setWorkingVars(serverVars);
+    setHasUnsavedChanges(false);
+    setEditingId(null);
+    setShowAddForm(false);
+    setError(null);
+  }
 
   // Initial load
   useEffect(() => {
     if (repoPath) {
-      loadAvailableFiles().then(() => loadFromFile());
+      loadAvailableFiles().then(() => loadFromBothSources());
     } else {
       setLoading(false);
     }
   }, [repoPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleAdd() {
+  // Warn on unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Add new variable to working state only
+  function handleAdd() {
     if (!newKey.trim()) return;
 
     const newVar: EnvVar = {
@@ -223,103 +409,71 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     };
 
     // Check for duplicate
-    if (envVars.some(v => v.key === newVar.key)) {
+    if (workingVars.some((v) => v.key === newVar.key)) {
       setError(`Variable ${newVar.key} already exists`);
       return;
     }
 
-    const previousVars = envVars;
-    const updatedVars = [...envVars, newVar];
-    setEnvVars(updatedVars);
+    setWorkingVars([...workingVars, newVar]);
+    setHasUnsavedChanges(true);
+    setError(null);
 
-    try {
-      const success = await saveToFileAndRestart(updatedVars);
-      if (success) {
-        setNewKey("");
-        setNewValue("");
-        setNewIsSecret(true);
-        setShowAddForm(false);
-      } else {
-        // Rollback on failure
-        setEnvVars(previousVars);
-        toast.error("Failed to save changes - changes not persisted");
-      }
-    } catch (err) {
-      console.error("[EnvManager] Add error:", err);
-      setEnvVars(previousVars);
-      setError("Failed to add environment variable");
-    }
+    // Reset form
+    setNewKey("");
+    setNewValue("");
+    setNewIsSecret(true);
+    setShowAddForm(false);
   }
 
-  async function handleUpdate(id: string) {
+  // Update variable in working state only
+  function handleUpdate(originalKey: string) {
     if (!editKey.trim()) return;
 
     const updatedKey = editKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
 
     // Check for duplicate if key changed
-    if (id !== updatedKey && envVars.some(v => v.key === updatedKey)) {
+    if (
+      originalKey !== updatedKey &&
+      workingVars.some((v) => v.key === updatedKey)
+    ) {
       setError(`Variable ${updatedKey} already exists`);
       return;
     }
 
-    const previousVars = envVars;
-    const updatedVars = envVars.map(v => {
-      if (v.key === id) {
-        return {
-          key: updatedKey,
-          value: editValue !== "" ? editValue : v.value,
-          isSecret: editIsSecret,
-        };
-      }
-      return v;
-    });
+    setWorkingVars(
+      workingVars.map((v) => {
+        if (v.key === originalKey) {
+          return {
+            ...v,
+            key: updatedKey,
+            value: editValue !== "" ? editValue : v.value,
+            isSecret: editIsSecret,
+          };
+        }
+        return v;
+      })
+    );
 
-    setEnvVars(updatedVars);
+    setHasUnsavedChanges(true);
     setEditingId(null);
-
-    try {
-      const success = await saveToFileAndRestart(updatedVars);
-      if (success) {
-        setEditKey("");
-        setEditValue("");
-      } else {
-        // Rollback on failure
-        setEnvVars(previousVars);
-        toast.error("Failed to save changes - changes not persisted");
-      }
-    } catch (err) {
-      console.error("[EnvManager] Update error:", err);
-      setEnvVars(previousVars);
-      setError("Failed to update environment variable");
-    }
+    setError(null);
+    setEditKey("");
+    setEditValue("");
+    setEditIsSecret(true);
+    setRevealEditValue(false);
   }
 
-  async function handleDelete(id: string) {
-    const envVar = envVars.find(v => v.key === id);
-    if (!envVar) return;
+  // Delete variable from working state only
+  function handleDelete(key: string) {
+    if (!confirm(`Delete ${key}?`)) return;
 
-    if (!confirm(`Delete ${envVar.key}?`)) return;
-
-    const previousVars = envVars;
-    const updatedVars = envVars.filter(v => v.key !== id);
-    setEnvVars(updatedVars);
-
-    try {
-      const success = await saveToFileAndRestart(updatedVars);
-      if (!success) {
-        // Rollback on failure
-        setEnvVars(previousVars);
-        toast.error("Failed to save changes - changes not persisted");
-      }
-    } catch (err) {
-      console.error("[EnvManager] Delete error:", err);
-      setEnvVars(previousVars);
-      setError("Failed to delete environment variable");
-    }
+    setWorkingVars(workingVars.filter((v) => v.key !== key));
+    setHasUnsavedChanges(true);
   }
 
-  async function handleImport() {
-    const lines = importText.split("\n").filter(l => l.trim() && !l.startsWith("#"));
+  // Handle import
+  function handleImport() {
+    const lines = importText.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
     const parsed: EnvVar[] = [];
 
     for (const line of lines) {
@@ -329,8 +483,10 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         let value = line.slice(eqIndex + 1).trim();
 
         // Remove surrounding quotes
-        if ((value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))) {
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
           value = value.slice(1, -1);
         }
 
@@ -345,10 +501,10 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       return;
     }
 
-    // Merge with existing (new values override)
-    const merged = [...envVars];
+    // Merge with working vars (new values override)
+    const merged = [...workingVars];
     for (const newVar of parsed) {
-      const existingIndex = merged.findIndex(v => v.key === newVar.key);
+      const existingIndex = merged.findIndex((v) => v.key === newVar.key);
       if (existingIndex >= 0) {
         merged[existingIndex] = newVar;
       } else {
@@ -356,23 +512,20 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       }
     }
 
-    const previousVars = envVars;
-    setEnvVars(merged);
+    setWorkingVars(merged);
+    setHasUnsavedChanges(true);
     setShowImportModal(false);
     setImportText("");
-
-    const success = await saveToFileAndRestart(merged);
-    if (success) {
-      toast.success(`Imported ${parsed.length} variables`);
-    } else {
-      // Rollback on failure
-      setEnvVars(previousVars);
-      toast.error("Failed to import - changes not persisted");
-    }
+    toast.success(
+      `Imported ${parsed.length} variables - click Save & Restart to apply`
+    );
   }
 
+  // Handle export
   function handleExport() {
-    const content = envVars.map(v => `${v.key}=${v.value}`).join("\n");
+    const content = workingVars
+      .map((v) => `${v.key}=${v.value}`)
+      .join("\n");
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -401,42 +554,81 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
-          {isRestarting && (
+          {saving && (
             <Badge variant="warning" className="animate-pulse">
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              Restarting...
+              Saving...
             </Badge>
           )}
+
+          {hasUnsavedChanges && (
+            <Badge variant="warning" className="animate-pulse">
+              Unsaved changes
+            </Badge>
+          )}
+
           <Button
             variant="outline"
             size="sm"
-            onClick={() => loadFromFile()}
+            onClick={() => loadFromBothSources()}
             disabled={loading || saving}
             title="Refresh from server"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportModal(!showImportModal)}
+            disabled={saving}
           >
             <Upload className="h-4 w-4" />
             Import
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={handleExport}
-            disabled={envVars.length === 0}
+            disabled={workingVars.length === 0 || saving}
           >
             <Download className="h-4 w-4" />
             Export
           </Button>
+
+          {hasUnsavedChanges && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDiscard}
+                disabled={saving}
+              >
+                Discard
+              </Button>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={saveAll}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Save & Restart
+              </Button>
+            </>
+          )}
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowAddForm(!showAddForm)}
+            disabled={saving}
           >
             <Plus className="h-4 w-4" />
             Add
@@ -461,14 +653,19 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             <select
               value={selectedFile}
               onChange={(e) => {
+                if (hasUnsavedChanges && !confirm("You have unsaved changes. Discard them?")) {
+                  return;
+                }
                 setSelectedFile(e.target.value);
-                loadFromFile(e.target.value);
+                loadFromBothSources();
               }}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              disabled={loading}
+              disabled={loading || saving}
             >
               {availableFiles.map((file) => (
-                <option key={file} value={file}>{file}</option>
+                <option key={file} value={file}>
+                  {file}
+                </option>
               ))}
             </select>
           </div>
@@ -485,14 +682,22 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
               className="w-full h-32 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleImport} disabled={!importText.trim()}>
+              <Button
+                size="sm"
+                onClick={handleImport}
+                disabled={!importText.trim()}
+              >
                 <Upload className="h-4 w-4 mr-1" />
                 Import
               </Button>
-              <Button size="sm" variant="outline" onClick={() => {
-                setShowImportModal(false);
-                setImportText("");
-              }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportText("");
+                }}
+              >
                 Cancel
               </Button>
             </div>
@@ -507,7 +712,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 <Label>Key</Label>
                 <Input
                   value={newKey}
-                  onChange={(e) => setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
+                  onChange={(e) =>
+                    setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))
+                  }
                   placeholder="DATABASE_URL"
                   className="font-mono"
                 />
@@ -533,11 +740,15 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 Mask in UI
               </label>
               <div className="flex-1" />
-              <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAddForm(false)}
+              >
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAdd} disabled={saving || !newKey.trim()}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              <Button size="sm" onClick={handleAdd} disabled={!newKey.trim()}>
+                <Plus className="h-4 w-4" />
                 Add
               </Button>
             </div>
@@ -549,7 +760,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : envVars.length === 0 ? (
+        ) : workingVars.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground mb-4">
               No environment variables in {selectedFile}
@@ -561,7 +772,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </div>
         ) : (
           <div className="space-y-2">
-            {envVars.map((envVar) => (
+            {workingVars.map((envVar) => (
               <div
                 key={envVar.key}
                 className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30"
@@ -571,15 +782,32 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Input
                         value={editKey}
-                        onChange={(e) => setEditKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
+                        onChange={(e) =>
+                          setEditKey(
+                            e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "")
+                          )
+                        }
                         className="font-mono"
+                        placeholder="KEY"
                       />
-                      <Input
-                        type="password"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        placeholder="Leave empty to keep current"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={editIsSecret && !revealEditValue ? "password" : "text"}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          placeholder="Value"
+                          className="pr-10"
+                        />
+                        {editIsSecret && (
+                          <button
+                            type="button"
+                            onClick={() => setRevealEditValue(!revealEditValue)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                          >
+                            {revealEditValue ? "👁️" : "•••"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="flex items-center gap-2 text-xs">
@@ -592,11 +820,18 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                         Mask in UI
                       </label>
                       <div className="flex-1" />
-                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingId(null);
+                          setRevealEditValue(false);
+                        }}
+                      >
                         <X className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" onClick={() => handleUpdate(envVar.key)} disabled={saving}>
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <Button size="sm" onClick={() => handleUpdate(envVar.key)}>
+                        <Save className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -604,9 +839,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <code className="text-sm font-mono font-medium">{envVar.key}</code>
+                        <code className="text-sm font-mono font-medium">
+                          {envVar.key}
+                        </code>
                         {envVar.isSecret && (
-                          <Badge variant="outline" className="text-xs">masked</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            masked
+                          </Badge>
                         )}
                       </div>
                       <code className="text-xs text-muted-foreground font-mono">
@@ -620,8 +859,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                         onClick={() => {
                           setEditingId(envVar.key);
                           setEditKey(envVar.key);
-                          setEditValue("");
+                          setEditValue(envVar.value);
                           setEditIsSecret(envVar.isSecret);
+                          setRevealEditValue(false);
                         }}
                       >
                         <Edit2 className="h-4 w-4" />
