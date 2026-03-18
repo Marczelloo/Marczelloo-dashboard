@@ -18,7 +18,16 @@ import { auditLogs } from "./atlashub";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
-const DASHBOARD_REPO_PATH = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo_pi/projects/Marczelloo-dashboard";
+
+// Host path to the dashboard repo
+const DASHBOARD_REPO_PATH_HOST = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo_pi/projects/Marczelloo-dashboard";
+
+// Runner container has projects mounted at /projects
+// Translate host path /home/Marczelloo_pi/projects -> /projects
+const DASHBOARD_REPO_PATH_RUNNER = DASHBOARD_REPO_PATH_HOST.replace(
+  /\/home\/Marczelloo_pi\/projects/,
+  "/projects"
+);
 
 interface SelfDeployResult {
   success: boolean;
@@ -85,15 +94,17 @@ export async function performSafeSelfDeploy(options: {
   compareUrl?: string;
 }): Promise<SelfDeployResult> {
   const { triggeredBy, commit, commitMessage, author, compareUrl } = options;
-  const repoPath = DASHBOARD_REPO_PATH;
+  const repoPath = DASHBOARD_REPO_PATH_RUNNER; // Use runner path for commands executed via runner
 
   console.log(`[SelfDeploy] Starting safe self-deployment`);
-  console.log(`[SelfDeploy] Repo: ${repoPath}`);
+  console.log(`[SelfDeploy] Repo (host): ${DASHBOARD_REPO_PATH_HOST}`);
+  console.log(`[SelfDeploy] Repo (runner): ${repoPath}`);
 
   const output: string[] = [];
   output.push(`=== Safe Self-Deployment ===`);
   output.push(`Triggered by: ${triggeredBy}`);
-  output.push(`Repo: ${repoPath}`);
+  output.push(`Repo (host): ${DASHBOARD_REPO_PATH_HOST}`);
+  output.push(`Repo (runner): ${repoPath}`);
   output.push(`Commit: ${commit || "unknown"}`);
   output.push("");
 
@@ -118,6 +129,39 @@ export async function performSafeSelfDeploy(options: {
 
   // Step 2: Build new image (in background)
   console.log(`[SelfDeploy] Step 2: Build new image`);
+
+  // First, verify the path and docker-compose.yml exist
+  const verifyResult = await execShell(`ls -la "${repoPath}" 2>&1 && ls -la "${repoPath}/docker-compose.yml" 2>&1`);
+  if (!verifyResult.success) {
+    console.error(`[SelfDeploy] Path verification failed:`, verifyResult.stderr);
+    output.push(`=== Path Verification ===`);
+    output.push(`FAILED: Cannot access ${repoPath}`);
+    output.push(verifyResult.stderr || "");
+    output.push("");
+
+    await sendDiscordNotification({
+      title: `❌ Self-Deploy Failed: Path Error`,
+      message: `Cannot access the dashboard directory in the runner container.`,
+      color: "danger",
+      fields: [
+        { name: "Host Path", value: DASHBOARD_REPO_PATH_HOST },
+        { name: "Runner Path", value: repoPath },
+        { name: "Error", value: verifyResult.stderr || "Path not found" },
+      ],
+      url: compareUrl,
+    });
+
+    return {
+      success: false,
+      error: `Cannot access ${repoPath} in runner container`,
+      output: output.join("\n"),
+    };
+  }
+
+  output.push(`=== Path Verification ===`);
+  output.push(`SUCCESS: Path and docker-compose.yml accessible`);
+  output.push("");
+
   const buildLogFile = `/tmp/safe-deploy-${Date.now()}.log`;
 
   // Use nohup to run build in background
