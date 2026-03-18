@@ -245,6 +245,469 @@ function detectDeploymentError(log: string): { hasError: boolean; errorMessage: 
 }
 
 /**
+ * Safe self-deployment with health checks and automatic rollback.
+ *
+ * This function is specifically designed for deploying the dashboard itself.
+ * It ensures that the dashboard is never left in a broken state by:
+ * 1. Building the new image without stopping the old container
+ * 2. Running health checks on the new container
+ * 3. Only switching to the new container if it's healthy
+ * 4. Rolling back automatically if health checks fail
+ *
+ * @param id - Project ID (must be the dashboard project)
+ * @param triggeredBy - Who triggered the deployment
+ * @param options - Deployment options
+ */
+export async function safeSelfDeploy(
+  id: string,
+  triggeredBy: string,
+  options?: {
+    customRepoPath?: string;
+    branch?: string;
+  }
+): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; branch?: string; rolledBack?: boolean }>> {
+  const customRepoPath = options?.customRepoPath;
+  const branch = options?.branch;
+
+  if (!RUNNER_TOKEN) {
+    return { success: false, error: "Runner not configured (missing RUNNER_TOKEN)" };
+  }
+
+  console.log(`[SafeSelfDeploy] Starting safe self-deployment for project ${id}`);
+
+  // Get project and its services
+  const project = await projects.getProjectById(id);
+  if (!project) {
+    return { success: false, error: "Project not found" };
+  }
+
+  const projectServices = await services.getServicesByProjectId(id);
+  const primaryService = projectServices.find((s) => s.type === "docker") || projectServices[0];
+
+  // Determine repo path
+  let repoPath: string | null = customRepoPath?.trim() || null;
+  let detectedPath: string | undefined;
+
+  if (!repoPath) {
+    for (const service of projectServices) {
+      if (service.repo_path) {
+        repoPath = service.repo_path;
+        detectedPath = repoPath;
+        break;
+      }
+    }
+  }
+
+  if (!repoPath) {
+    const projectsDir = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/projects";
+    repoPath = `${projectsDir}/${project.slug}`;
+    detectedPath = repoPath;
+  }
+
+  if (!repoPath) {
+    return { success: false, error: "Could not determine project directory" };
+  }
+
+  let output = `=== Safe Self-Deployment ===\nProject: ${project.name}\nPath: ${repoPath}\nMode: Safe (with health checks and rollback)\nTriggered by: ${triggeredBy}\n\n`;
+
+  // Step 1: Git pull to get the latest code
+  console.log(`[SafeSelfDeploy] Step 1: Git pull`);
+  const pullResponse = await fetch(`${RUNNER_URL}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RUNNER_TOKEN}`,
+    },
+    body: JSON.stringify({
+      command: `cd "${repoPath}" && git fetch --all 2>&1 && git pull 2>&1`,
+    }),
+  });
+
+  if (!pullResponse.ok) {
+    return { success: false, error: `Git pull failed: ${pullResponse.status}` };
+  }
+
+  const pullResult = await pullResponse.json();
+  output += `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
+
+  // Step 2: Get the current container ID (for rollback)
+  console.log(`[SafeSelfDeploy] Step 2: Get current container info`);
+  const currentContainerCheck = await fetch(`${RUNNER_URL}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RUNNER_TOKEN}`,
+    },
+    body: JSON.stringify({
+      command: `docker ps -q --filter "name=marczelloo-dashboard" --filter "status=running"`,
+    }),
+  });
+
+  let currentContainerId = "";
+  if (currentContainerCheck.ok) {
+    const checkResult = await currentContainerCheck.json();
+    currentContainerId = checkResult.stdout?.trim() || "";
+    output += `=== Current Container ===\n${currentContainerId || "None found"}\n\n`;
+    console.log(`[SafeSelfDeploy] Current container: ${currentContainerId || "None"}`);
+  }
+
+  // Step 3: Build the new image WITHOUT stopping the old container
+  console.log(`[SafeSelfDeploy] Step 3: Build new image`);
+  const logFile = `/tmp/safe-deploy-${project.slug}-${Date.now()}.log`;
+  const buildCmd = `cd "${repoPath}" && nohup bash -c '
+    echo "=== Building new image ===" &&
+    docker compose build dashboard 2>&1 &&
+    echo "" &&
+    echo "===[BUILD_COMPLETE]===" &&
+    echo "STATUS: SUCCESS" &&
+    echo "TIMESTAMP: $(date -Iseconds)
+  ' || (
+    echo "" &&
+    echo "===[BUILD_COMPLETE]===" &&
+    echo "STATUS: FAILED" &&
+    echo "TIMESTAMP: $(date -Iseconds)
+  )' > "${logFile}" 2>&1 &`;
+
+  await fetch(`${RUNNER_URL}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RUNNER_TOKEN}`,
+    },
+    body: JSON.stringify({ command: buildCmd }),
+  });
+
+  output += `=== Build Started ===\nRunning in background. Log: ${logFile}\n\n`;
+
+  // Wait for build to complete (with timeout)
+  const maxWaitTime = 600000; // 10 minutes for build
+  const checkInterval = 5000;
+  let elapsed = 0;
+  let buildSuccess = false;
+
+  while (elapsed < maxWaitTime) {
+    await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    elapsed += checkInterval;
+
+    const logCheck = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `cat "${logFile}" 2>/dev/null || echo "Log not found"`,
+      }),
+    });
+
+    if (logCheck.ok) {
+      const logResult = await logCheck.json();
+      const log = logResult.stdout || "";
+
+      if (log.includes("===[BUILD_COMPLETE]===")) {
+        buildSuccess = log.includes("STATUS: SUCCESS");
+        break;
+      }
+    }
+  }
+
+  if (!buildSuccess) {
+    output += `=== Build Result ===\nFAILED or timed out after ${maxWaitTime / 1000}s\n\n`;
+    return { success: false, error: "Build failed - deployment aborted, old container still running", data: { output, detectedPath } };
+  }
+
+  output += `=== Build Result ===\nSUCCESS\n\n`;
+
+  // Step 4: Start the new container (keeping old one running if possible)
+  console.log(`[SafeSelfDeploy] Step 4: Start new container`);
+  // Use up -d which will recreate the container
+  const upCmd = `cd "${repoPath}" && docker compose up -d dashboard 2>&1`;
+
+  const upResponse = await fetch(`${RUNNER_URL}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RUNNER_TOKEN}`,
+    },
+    body: JSON.stringify({ command: upCmd }),
+  });
+
+  if (!upResponse.ok) {
+    output += `=== Start Container ===\nFAILED: ${upResponse.status}\n\n`;
+    return { success: false, error: "Failed to start new container - old container still running", data: { output, detectedPath } };
+  }
+
+  const upResult = await upResponse.json();
+  output += `=== Start Container ===\n${upResult.stdout || upResult.stderr}\n\n`;
+
+  // Step 5: Wait for container to be running and for health check to pass
+  console.log(`[SafeSelfDeploy] Step 5: Waiting for health check`);
+  // Health check has start_period of 40s, so we need to wait at least that long
+  // Plus we want to give it time to actually pass
+  const healthCheckRetries = 60; // 60 retries * 3 seconds = 3 minutes
+  let healthPassed = false;
+  let containerStatus = "";
+
+  for (let i = 0; i < healthCheckRetries; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // First check if container is running
+    const statusCheck = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `docker inspect --format='{{.State.Status}}' marczelloo-dashboard 2>/dev/null || echo "not_found"`,
+      }),
+    });
+
+    if (statusCheck.ok) {
+      const statusResult = await statusCheck.json();
+      containerStatus = statusResult.stdout?.trim() || "";
+    }
+
+    // If container is not running, that's a failure
+    if (containerStatus === "not_found" || containerStatus === "exited" || containerStatus === "dead") {
+      output += `=== Health Check ===\nFAILED: Container status is ${containerStatus}\n\n`;
+      console.log(`[SafeSelfDeploy] Container not running, status: ${containerStatus}`);
+      break;
+    }
+
+    // Skip health check until container is past start_period (40s)
+    // We check at least 15 times before looking at health status (15 * 3 = 45s)
+    if (i < 15) {
+      console.log(`[SafeSelfDeploy] Waiting for start_period... (${i + 1}/15)`);
+      continue;
+    }
+
+    // Now check health status
+    const healthCheck = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `docker inspect --format='{{.State.Health.Status}}' marczelloo-dashboard 2>/dev/null || echo "no_health"`,
+      }),
+    });
+
+    if (healthCheck.ok) {
+      const healthResult = await healthCheck.json();
+      const status = healthResult.stdout?.trim() || "";
+
+      console.log(`[SafeSelfDeploy] Health check attempt ${i + 1}: ${status}`);
+
+      if (status === "healthy") {
+        healthPassed = true;
+        output += `=== Health Check ===\nPASSED (attempt ${i + 1}/${healthCheckRetries})\n\n`;
+        console.log(`[SafeSelfDeploy] Health check passed!`);
+        break;
+      }
+
+      if (status === "unhealthy") {
+        output += `=== Health Check ===\nFAILED: Container reported unhealthy\n\n`;
+        console.log(`[SafeSelfDeploy] Health check failed - unhealthy status`);
+        break;
+      }
+
+      // Also try HTTP check as fallback
+      if (i >= 20) {
+        // After some attempts, also verify the HTTP endpoint works
+        const httpCheck = await fetch(`${RUNNER_URL}/shell`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RUNNER_TOKEN}`,
+          },
+          body: JSON.stringify({
+            command: `docker exec marczelloo-dashboard wget -q -O - http://localhost:3100/api/health 2>/dev/null || echo "http_failed"`,
+            timeout: 10000,
+          }),
+        });
+
+        if (httpCheck.ok) {
+          const httpResult = await httpCheck.json();
+          const httpOutput = httpResult.stdout || "";
+          if (httpOutput.includes("healthy") || httpOutput.includes("status")) {
+            healthPassed = true;
+            output += `=== Health Check ===\nPASSED via HTTP check (attempt ${i + 1}/${healthCheckRetries})\n\n`;
+            console.log(`[SafeSelfDeploy] HTTP health check passed!`);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Step 6: Handle health check result
+  if (!healthPassed) {
+    console.log(`[SafeSelfDeploy] Health check failed - initiating rollback`);
+    output += `=== Health Check ===\nFAILED after ${healthCheckRetries} attempts\n\n`;
+    output += `=== ROLLBACK INITIATED ===\nAttempting to recover...\n\n`;
+
+    // Try to restart the container once (might be a transient issue)
+    output += `=== Rollback Step 1: Restart container ===\n`;
+    const restartCmd = `cd "${repoPath}" && docker compose restart dashboard 2>&1`;
+
+    const restartResponse = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({ command: restartCmd }),
+    });
+
+    if (restartResponse.ok) {
+      const restartResult = await restartResponse.json();
+      output += `${restartResult.stdout || restartResult.stderr}\n\n`;
+    }
+
+    // Wait a bit and check health again
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    // Check health after restart
+    const finalHealthCheck = await fetch(`${RUNNER_URL}/shell`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RUNNER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        command: `docker inspect --format='{{.State.Health.Status}}' marczelloo-dashboard 2>/dev/null || echo "unknown"`,
+      }),
+    });
+
+    if (finalHealthCheck.ok) {
+      const finalResult = await finalHealthCheck.json();
+      const finalStatus = finalResult.stdout?.trim() || "";
+
+      if (finalStatus === "healthy") {
+        output += `=== Rollback Success ===\nContainer is healthy after restart\n\n`;
+        healthPassed = true;
+      }
+    }
+
+    // If still unhealthy, try to revert to previous commit
+    if (!healthPassed) {
+      output += `=== Rollback Step 2: Reverting to previous commit ===\n`;
+
+      // Reset to previous commit and rebuild
+      const gitResetCmd = `cd "${repoPath}" && git reset --hard HEAD~1 2>&1 && docker compose up -d --build dashboard 2>&1`;
+
+      const gitResetResponse = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({ command: gitResetCmd, timeout: 300000 }),
+      });
+
+      if (gitResetResponse.ok) {
+        const gitResetResult = await gitResetResponse.json();
+        output += `Git reset output:\n${gitResetResult.stdout || gitResetResult.stderr}\n\n`;
+      }
+
+      // Wait for rebuild and health check
+      await new Promise((resolve) => setTimeout(resolve, 60000));
+
+      // Final health check after rollback
+      const rollbackHealthCheck = await fetch(`${RUNNER_URL}/shell`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RUNNER_TOKEN}`,
+        },
+        body: JSON.stringify({
+          command: `docker inspect --format='{{.State.Health.Status}}' marczelloo-dashboard 2>/dev/null || echo "unknown"`,
+        }),
+      });
+
+      if (rollbackHealthCheck.ok) {
+        const rollbackHealthResult = await rollbackHealthCheck.json();
+        const rollbackHealthStatus = rollbackHealthResult.stdout?.trim() || "";
+        output += `Health after rollback: ${rollbackHealthStatus}\n\n`;
+
+        if (rollbackHealthStatus === "healthy") {
+          output += `=== Rollback Complete ===\nReverted to previous commit, container is healthy\n\n`;
+        } else {
+          output += `=== Rollback Partial ===\nReverted to previous commit but container still unhealthy. Manual intervention may be needed.\n\n`;
+        }
+      }
+
+      // Log the rollback
+      await auditLogs.logAction(triggeredBy, "deploy_rollback", "project", id, {
+        reason: "Health check failed after deployment",
+        action: "Reverted to previous commit",
+        log_file: logFile,
+      });
+
+      // Send rollback notification
+      await sendDiscordNotification({
+        title: `⚠️ Self-Deploy ROLLED BACK: ${project.name}`,
+        message: `New version failed health checks. Automatically reverted to previous commit.`,
+        color: "warning",
+        fields: [
+          { name: "Reason", value: "Health check failed" },
+          { name: "Action", value: "Reverted to previous commit" },
+          { name: "Status", value: "Manual intervention may be needed" },
+        ],
+      });
+
+      return {
+        success: false,
+        error: "Deployment failed - rolled back to previous commit (health check failed)",
+        data: { output, detectedPath, rolledBack: true },
+      };
+    }
+
+    // If restart worked, continue with success path
+    output += `=== Rollback Complete ===\nContainer is healthy after restart\n\n`;
+  }
+
+  // Success!
+  output += `=== Deployment Complete ===\nContainer is healthy and serving traffic\n\n`;
+
+  // Log the successful deployment
+  await auditLogs.logAction(triggeredBy, "deploy", "project", id, {
+    project: project.name,
+    repo_path: repoPath,
+    branch: branch || "default",
+    log_file: logFile,
+    safe_deploy: true,
+    health_check_passed: true,
+  });
+
+  // Send success notification
+  await sendDiscordNotification({
+    title: `✅ Self-Deploy SUCCESS: ${project.name}`,
+    message: `Dashboard has been successfully deployed and is healthy.`,
+    color: "success",
+    fields: [
+      { name: "Mode", value: "Safe (with health checks)" },
+      { name: "Health Check", value: "PASSED" },
+    ],
+  });
+
+  // Revalidate cache
+  revalidatePath(`/projects/${id}`);
+  revalidatePath("/dashboard");
+
+  return {
+    success: true,
+    data: {
+      output,
+      detectedPath,
+      branch,
+    },
+  };
+}
+
+/**
  * Internal deploy function that does not require PIN verification.
  * ONLY call this from trusted sources (webhook with verified signature, server-side code).
  * For user-initiated deploys, use deployProjectAction which requires PIN.

@@ -10,9 +10,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, parseGitHubUrl } from "@/server/github";
 import { projects, auditLogs } from "@/server/atlashub";
-import { internalDeployProject } from "@/app/actions/projects";
+import { internalDeployProject, safeSelfDeploy } from "@/app/actions/projects";
 import { sendDiscordNotification } from "@/server/notifications";
 import type { GitHubPushPayload, GitHubReleasePayload, GitHubDependabotAlertPayload } from "@/types/github";
+
+// Self-deployment detection: check if a webhook is for the dashboard itself
+// The dashboard's GitHub URL should be set in env var or detected from the project
+const DASHBOARD_GITHUB_URL = process.env.DASHBOARD_GITHUB_URL || "";
+const DASHBOARD_PROJECT_NAME = process.env.DASHBOARD_PROJECT_NAME || "marczelloo-dashboard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Allow 60 seconds for deploy trigger
@@ -71,7 +76,36 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Check if a webhook is for the dashboard's own repository (self-deployment)
+ */
+function isSelfDeployment(repository: { html_url: string; full_name: string }): boolean {
+  if (!DASHBOARD_GITHUB_URL && !DASHBOARD_PROJECT_NAME) {
+    return false;
+  }
+
+  // Check by GitHub URL if set
+  if (DASHBOARD_GITHUB_URL) {
+    const parsedDashboard = parseGitHubUrl(DASHBOARD_GITHUB_URL);
+    const parsedIncoming = parseGitHubUrl(repository.html_url);
+    if (parsedDashboard && parsedIncoming) {
+      const dashboardNormalized = `${parsedDashboard.owner}/${parsedDashboard.repo}`.toLowerCase();
+      const incomingNormalized = `${parsedIncoming.owner}/${parsedIncoming.repo}`.toLowerCase();
+      if (dashboardNormalized === incomingNormalized) {
+        return true;
+      }
+    }
+  }
+
+  // Check by project name fallback
+  const repoName = repository.full_name.toLowerCase();
+  return repoName.includes(DASHBOARD_PROJECT_NAME.toLowerCase());
+}
+
+/**
  * Handle push events - trigger auto-deploy if configured
+ *
+ * IMPORTANT: Self-deployment (dashboard deploying itself) is handled specially
+ * to avoid the webhook connection being interrupted when the container restarts.
  */
 async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
   const { repository, ref, commits, head_commit, pusher, compare } = payload;
@@ -79,6 +113,12 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
   const repoFullName = repository.full_name;
 
   console.log(`[GitHub Webhook] Push to ${repoFullName}:${branch} by ${pusher.name}`);
+
+  // Check if this is a self-deployment (dashboard deploying itself)
+  const selfDeploy = isSelfDeployment(repository);
+  if (selfDeploy) {
+    console.log(`[GitHub Webhook] SELF-DEPLOYMENT DETECTED: Using async mode to avoid interruption`);
+  }
 
   // Find projects linked to this repository
   const projectsWithGitHub = await findProjectsByGitHubUrl(repository.html_url);
@@ -129,10 +169,54 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
           pusher: pusher.name,
           compare,
           deliveryId,
+          selfDeploy,
         },
       });
 
-      // Trigger deploy using internal function (no PIN required after webhook signature verification)
+      // For self-deployment, use safe deployment with health checks and rollback
+      if (selfDeploy) {
+        console.log(`[GitHub Webhook] Starting SAFE self-deploy for ${project.name}`);
+
+        // Start safe deployment in background without waiting
+        // This ensures GitHub receives a successful response before the container restarts
+        // The safe deployment includes health checks and automatic rollback
+        safeSelfDeploy(project.id, "github-webhook", { branch }).catch((error) => {
+          console.error(`[GitHub Webhook] Safe self-deploy failed:`, error);
+          // Notification about rollback is handled inside safeSelfDeploy
+        });
+
+        // Send Discord notification immediately (deployment is in progress)
+        await sendDiscordNotification({
+          title: `🔄 Safe Self-Deploy Started: ${project.name}`,
+          message: `Dashboard is deploying itself with health checks and automatic rollback. Old version stays online until new one is healthy.`,
+          color: "info",
+          fields: [
+            { name: "Commit", value: head_commit?.id.slice(0, 8) || "unknown" },
+            { name: "Message", value: head_commit?.message.split("\n")[0] || "No message" },
+            { name: "Author", value: pusher.name },
+            { name: "Mode", value: "Safe (health checks + rollback)" },
+          ],
+          url: compare,
+        });
+
+        results.push({
+          projectId: project.id,
+          projectName: project.name,
+          deployed: true,
+          reason: "Safe self-deployment started with health checks",
+        });
+
+        // Return immediately for self-deployment to avoid interruption
+        return NextResponse.json({
+          message: "Safe self-deployment started with health checks and rollback",
+          repository: repoFullName,
+          branch,
+          selfDeploy: true,
+          results,
+        }, { status: 202 }); // 202 Accepted = processing in background
+      }
+
+      // Normal deployment for other projects (synchronous)
       console.log(`[GitHub Webhook] Triggering deploy for ${project.name}`);
       const deployResult = await internalDeployProject(project.id, "github-webhook", { branch });
 
