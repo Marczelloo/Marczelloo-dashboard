@@ -14,30 +14,38 @@ import {
 } from "@/components/ui";
 import {
   Plus,
-  Eye,
-  EyeOff,
   Trash2,
   Edit2,
   Save,
   X,
   Loader2,
-  Copy,
-  Check,
   Upload,
+  Download,
   Key,
-  FileText,
   RefreshCw,
-  HardDrive,
 } from "lucide-react";
 import { toast } from "sonner";
 
-interface EnvVarDisplay {
-  id: string;
-  service_id: string;
+// Helper function for relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// Types
+interface EnvVar {
   key: string;
-  value_masked: string;
-  is_secret: boolean;
-  updated_at: string;
+  value: string;
+  isSecret: boolean;
 }
 
 interface EnvManagerProps {
@@ -47,300 +55,287 @@ interface EnvManagerProps {
 }
 
 export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps) {
-  const [envVars, setEnvVars] = useState<EnvVarDisplay[]>([]);
+  // Data state
+  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  const [availableFiles, setAvailableFiles] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>(".env");
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [isRestarting, setIsRestarting] = useState(false);
 
-  // Sync to file mode - when enabled, all operations sync to .env file
-  const [syncToFile, setSyncToFile] = useState(!!repoPath);
-
-  // New env var form
+  // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [newIsSecret, setNewIsSecret] = useState(true);
-  const [saveToFile, setSaveToFile] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Edit state
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+
+  // Edit state (inline editing)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editKey, setEditKey] = useState("");
   const [editValue, setEditValue] = useState("");
   const [editIsSecret, setEditIsSecret] = useState(true);
 
-  // Reveal state
-  const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
-  const [revealingId, setRevealingId] = useState<string | null>(null);
+  // Load available .env files
+  const loadAvailableFiles = useCallback(async () => {
+    if (!repoPath) return;
 
-  // Bulk import
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [bulkText, setBulkText] = useState("");
-
-  // Load from file state
-  const [showLoadFromFile, setShowLoadFromFile] = useState(false);
-  const [loadingFromFile, setLoadingFromFile] = useState(false);
-  const [availableEnvFiles, setAvailableEnvFiles] = useState<string[]>([]);
-  const [selectedEnvFile, setSelectedEnvFile] = useState(".env");
-  const [fileEnvVars, setFileEnvVars] = useState<{ key: string; value: string }[]>([]);
-  const [selectedFileVars, setSelectedFileVars] = useState<Set<string>>(new Set());
-
-  // Copied state
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const loadEnvVars = useCallback(async () => {
-    setLoading(true);
     try {
-      const response = await fetch(`/api/env-vars?serviceId=${serviceId}`);
+      const response = await fetch("/api/env-vars/load-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, action: "list" }),
+      });
       const result = await response.json();
-      if (result.success) {
-        setEnvVars(result.data);
-      } else {
-        setError(result.error);
+
+      if (result.success && result.files?.length > 0) {
+        setAvailableFiles(result.files);
+        if (!result.files.includes(selectedFile)) {
+          setSelectedFile(result.files[0]);
+        }
       }
-    } catch {
-      setError("Failed to load environment variables");
+    } catch (err) {
+      console.error("[EnvManager] Failed to list files:", err);
+    }
+  }, [repoPath, selectedFile]);
+
+  // Load env vars from file
+  const loadFromFile = useCallback(async (filename?: string) => {
+    if (!repoPath) {
+      setError("No repository path configured");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const fileToLoad = filename || selectedFile;
+      const response = await fetch("/api/env-vars/load-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoPath, filename: fileToLoad }),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const vars: EnvVar[] = (result.vars || []).map((v: { key: string; value: string }) => ({
+          key: v.key,
+          value: v.value,
+          isSecret: true, // Default all to secret for safety
+        }));
+        setEnvVars(vars);
+        setLastSynced(new Date());
+      } else {
+        setError(result.error || "Failed to load env file");
+      }
+    } catch (err) {
+      console.error("[EnvManager] Load error:", err);
+      setError("Failed to load env file");
     } finally {
       setLoading(false);
     }
-  }, [serviceId]);
+  }, [repoPath, selectedFile]);
 
-  useEffect(() => {
-    loadEnvVars();
-  }, [loadEnvVars]);
+  // Save env vars to file and restart service
+  const saveToFileAndRestart = useCallback(async (vars: EnvVar[]) => {
+    if (!repoPath) return false;
 
-  async function handleAdd() {
-    if (!newKey.trim()) return;
-    setAdding(true);
-
+    setSaving(true);
     try {
-      // First save to database (encrypted)
-      const response = await fetch("/api/env-vars", {
+      const response = await fetch("/api/env-vars/save-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          service_id: serviceId,
-          key: newKey.trim(),
-          value: newValue,
-          is_secret: newIsSecret,
+          repoPath,
+          filename: selectedFile,
+          action: "write",
+          vars: vars.map(v => ({ key: v.key, value: v.value })),
         }),
       });
       const result = await response.json();
 
       if (!result.success) {
-        setError(result.error);
-        toast.error("Failed to add variable", { description: result.error });
-        return;
+        setError(result.error || "Failed to save");
+        return false;
       }
 
-      setEnvVars([...envVars, result.data]);
-
-      // Also save to .env file if sync is enabled
-      if ((saveToFile || syncToFile) && repoPath) {
-        const fileResponse = await fetch("/api/env-vars/save-file", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            repoPath,
-            filename: ".env",
-            action: "append",
-            vars: [{ key: newKey.trim(), value: newValue }],
-          }),
-        });
-        const fileResult = await fileResponse.json();
-
-        if (fileResult.success) {
-          toast.success(`Added ${newKey}`, {
-            description: syncToFile ? "Saved to DB and .env file" : "Saved to database",
+      // Restart the service
+      if (serviceId) {
+        setIsRestarting(true);
+        try {
+          const restartResponse = await fetch(`/api/services/${serviceId}/restart`, {
+            method: "POST",
           });
-        } else {
-          toast.warning(`Added ${newKey} to DB`, {
-            description: `Failed to sync to .env: ${fileResult.error}`,
-          });
+          const restartResult = await restartResponse.json();
+
+          if (!restartResult.success) {
+            toast.warning("Env saved, but restart failed", {
+              description: restartResult.error,
+            });
+          } else {
+            toast.success("Env saved and service restarted");
+          }
+        } catch (restartErr) {
+          toast.warning("Env saved, but restart failed");
+        } finally {
+          setIsRestarting(false);
         }
       } else {
-        toast.success(`Added ${newKey}`, { description: "Saved to database" });
+        toast.success("Env file saved");
       }
 
-      setNewKey("");
-      setNewValue("");
-      setNewIsSecret(true);
-      setShowAddForm(false);
-    } catch (_err) {
-      setError("Failed to add environment variable");
-      toast.error("Failed to add variable");
+      setLastSynced(new Date());
+      return true;
+    } catch (err) {
+      console.error("[EnvManager] Save error:", err);
+      setError("Failed to save env file");
+      return false;
     } finally {
-      setAdding(false);
+      setSaving(false);
+    }
+  }, [repoPath, selectedFile, serviceId]);
+
+  // Initial load
+  useEffect(() => {
+    if (repoPath) {
+      loadAvailableFiles().then(() => loadFromFile());
+    } else {
+      setLoading(false);
+    }
+  }, [repoPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleAdd() {
+    if (!newKey.trim()) return;
+
+    const newVar: EnvVar = {
+      key: newKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, ""),
+      value: newValue,
+      isSecret: newIsSecret,
+    };
+
+    // Check for duplicate
+    if (envVars.some(v => v.key === newVar.key)) {
+      setError(`Variable ${newVar.key} already exists`);
+      return;
+    }
+
+    const previousVars = envVars;
+    const updatedVars = [...envVars, newVar];
+    setEnvVars(updatedVars);
+
+    try {
+      const success = await saveToFileAndRestart(updatedVars);
+      if (success) {
+        setNewKey("");
+        setNewValue("");
+        setNewIsSecret(true);
+        setShowAddForm(false);
+      } else {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
+      }
+    } catch (err) {
+      console.error("[EnvManager] Add error:", err);
+      setEnvVars(previousVars);
+      setError("Failed to add environment variable");
     }
   }
 
   async function handleUpdate(id: string) {
-    try {
-      // Get the current env var for the key
-      const currentVar = envVars.find((v) => v.id === id);
+    if (!editKey.trim()) return;
 
-      const response = await fetch(`/api/env-vars/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: editKey.trim(),
-          value: editValue || undefined,
-          is_secret: editIsSecret,
-        }),
-      });
-      const result = await response.json();
+    const updatedKey = editKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
 
-      if (result.success) {
-        setEnvVars(envVars.map((v) => (v.id === id ? result.data : v)));
-        setEditingId(null);
-        // Clear revealed value since it's been updated
-        setRevealedValues((prev) => {
-          const updated = { ...prev };
-          delete updated[id];
-          return updated;
-        });
+    // Check for duplicate if key changed
+    if (id !== updatedKey && envVars.some(v => v.key === updatedKey)) {
+      setError(`Variable ${updatedKey} already exists`);
+      return;
+    }
 
-        // Sync to .env file if enabled and we have a value
-        if (syncToFile && repoPath && editValue) {
-          // If key changed, delete old key first
-          if (currentVar && currentVar.key !== editKey.trim()) {
-            await fetch("/api/env-vars/save-file", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                repoPath,
-                filename: ".env",
-                action: "delete",
-                vars: [{ key: currentVar.key, value: "" }],
-              }),
-            });
-          }
-
-          const fileResponse = await fetch("/api/env-vars/save-file", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              repoPath,
-              filename: ".env",
-              action: "append",
-              vars: [{ key: editKey.trim(), value: editValue }],
-            }),
-          });
-          const fileResult = await fileResponse.json();
-
-          if (fileResult.success) {
-            toast.success(`Updated ${editKey}`, { description: "Synced to DB and .env file" });
-          } else {
-            toast.warning(`Updated ${editKey} in DB`, {
-              description: `Failed to sync to .env: ${fileResult.error}`,
-            });
-          }
-        } else {
-          toast.success(`Updated ${editKey}`, { description: "Saved to database" });
-        }
-      } else {
-        setError(result.error);
-        toast.error("Failed to update", { description: result.error });
+    const previousVars = envVars;
+    const updatedVars = envVars.map(v => {
+      if (v.key === id) {
+        return {
+          key: updatedKey,
+          value: editValue !== "" ? editValue : v.value,
+          isSecret: editIsSecret,
+        };
       }
-    } catch {
+      return v;
+    });
+
+    setEnvVars(updatedVars);
+    setEditingId(null);
+
+    try {
+      const success = await saveToFileAndRestart(updatedVars);
+      if (success) {
+        setEditKey("");
+        setEditValue("");
+      } else {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
+      }
+    } catch (err) {
+      console.error("[EnvManager] Update error:", err);
+      setEnvVars(previousVars);
       setError("Failed to update environment variable");
-      toast.error("Failed to update variable");
     }
   }
 
   async function handleDelete(id: string) {
-    const varToDelete = envVars.find((v) => v.id === id);
-    if (!varToDelete) return;
+    const envVar = envVars.find(v => v.key === id);
+    if (!envVar) return;
 
-    if (!confirm(`Are you sure you want to delete ${varToDelete.key}?`)) return;
+    if (!confirm(`Delete ${envVar.key}?`)) return;
+
+    const previousVars = envVars;
+    const updatedVars = envVars.filter(v => v.key !== id);
+    setEnvVars(updatedVars);
 
     try {
-      const response = await fetch(`/api/env-vars/${id}`, { method: "DELETE" });
-      const result = await response.json();
-
-      if (result.success) {
-        setEnvVars(envVars.filter((v) => v.id !== id));
-
-        // Sync to .env file if enabled
-        if (syncToFile && repoPath) {
-          const fileResponse = await fetch("/api/env-vars/save-file", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              repoPath,
-              filename: ".env",
-              action: "delete",
-              vars: [{ key: varToDelete.key, value: "" }],
-            }),
-          });
-          const fileResult = await fileResponse.json();
-
-          if (fileResult.success) {
-            toast.success(`Deleted ${varToDelete.key}`, { description: "Removed from DB and .env file" });
-          } else {
-            toast.warning(`Deleted ${varToDelete.key} from DB`, {
-              description: `Failed to remove from .env: ${fileResult.error}`,
-            });
-          }
-        } else {
-          toast.success(`Deleted ${varToDelete.key}`);
-        }
-      } else {
-        setError(result.error);
-        toast.error("Failed to delete", { description: result.error });
+      const success = await saveToFileAndRestart(updatedVars);
+      if (!success) {
+        // Rollback on failure
+        setEnvVars(previousVars);
+        toast.error("Failed to save changes - changes not persisted");
       }
-    } catch {
+    } catch (err) {
+      console.error("[EnvManager] Delete error:", err);
+      setEnvVars(previousVars);
       setError("Failed to delete environment variable");
-      toast.error("Failed to delete variable");
     }
   }
 
-  async function handleReveal(id: string) {
-    if (revealedValues[id]) {
-      // Hide if already revealed
-      setRevealedValues((prev) => {
-        const updated = { ...prev };
-        delete updated[id];
-        return updated;
-      });
-      return;
-    }
-
-    setRevealingId(id);
-    try {
-      const response = await fetch(`/api/env-vars/${id}`);
-      const result = await response.json();
-
-      if (result.success) {
-        setRevealedValues((prev) => ({ ...prev, [id]: result.value }));
-      } else if (result.requirePin) {
-        setError("PIN verification required. Please verify PIN first.");
-      } else {
-        setError(result.error);
-      }
-    } catch {
-      setError("Failed to reveal value");
-    } finally {
-      setRevealingId(null);
-    }
-  }
-
-  async function handleCopy(id: string, value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  async function handleBulkImport() {
-    const lines = bulkText.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
-    const parsed: { key: string; value: string }[] = [];
+  async function handleImport() {
+    const lines = importText.split("\n").filter(l => l.trim() && !l.startsWith("#"));
+    const parsed: EnvVar[] = [];
 
     for (const line of lines) {
       const eqIndex = line.indexOf("=");
       if (eqIndex > 0) {
         const key = line.slice(0, eqIndex).trim();
-        const value = line.slice(eqIndex + 1).trim();
+        let value = line.slice(eqIndex + 1).trim();
+
+        // Remove surrounding quotes
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+
         if (key) {
-          parsed.push({ key, value });
+          parsed.push({ key, value, isSecret: true });
         }
       }
     }
@@ -350,132 +345,42 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       return;
     }
 
-    setAdding(true);
-    try {
-      for (const { key, value } of parsed) {
-        await fetch("/api/env-vars", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: serviceId,
-            key,
-            value,
-            is_secret: true,
-          }),
-        });
-      }
-      await loadEnvVars();
-      setBulkText("");
-      setShowBulkImport(false);
-    } catch {
-      setError("Failed to import some variables");
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function startEdit(envVar: EnvVarDisplay) {
-    setEditingId(envVar.id);
-    setEditKey(envVar.key);
-    setEditValue("");
-    setEditIsSecret(envVar.is_secret);
-  }
-
-  async function handleLoadAvailableFiles() {
-    if (!repoPath) {
-      setError("No repository path configured for this service");
-      return;
-    }
-    setLoadingFromFile(true);
-    setError(null);
-    try {
-      console.log("[EnvManager] Loading files from:", repoPath);
-      const response = await fetch("/api/env-vars/load-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoPath, action: "list" }),
-      });
-      const result = await response.json();
-      console.log("[EnvManager] Load result:", result);
-      if (result.success && result.files) {
-        setAvailableEnvFiles(result.files);
-        if (result.files.length > 0) {
-          setSelectedEnvFile(result.files[0]);
-        } else {
-          console.log("[EnvManager] No .env files found in:", repoPath);
-        }
-      } else if (result.error) {
-        setError(result.error);
-      }
-    } catch (err) {
-      console.error("[EnvManager] Error:", err);
-      setError("Failed to list .env files");
-    } finally {
-      setLoadingFromFile(false);
-    }
-  }
-
-  async function handleLoadEnvFile() {
-    if (!repoPath || !selectedEnvFile) return;
-    setLoadingFromFile(true);
-    try {
-      const response = await fetch("/api/env-vars/load-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoPath, filename: selectedEnvFile }),
-      });
-      const result = await response.json();
-      if (result.success && result.vars) {
-        setFileEnvVars(result.vars);
-        setSelectedFileVars(new Set(result.vars.map((v: { key: string }) => v.key)));
+    // Merge with existing (new values override)
+    const merged = [...envVars];
+    for (const newVar of parsed) {
+      const existingIndex = merged.findIndex(v => v.key === newVar.key);
+      if (existingIndex >= 0) {
+        merged[existingIndex] = newVar;
       } else {
-        setError(result.error || "Failed to load file");
+        merged.push(newVar);
       }
-    } catch {
-      setError("Failed to load .env file");
-    } finally {
-      setLoadingFromFile(false);
+    }
+
+    const previousVars = envVars;
+    setEnvVars(merged);
+    setShowImportModal(false);
+    setImportText("");
+
+    const success = await saveToFileAndRestart(merged);
+    if (success) {
+      toast.success(`Imported ${parsed.length} variables`);
+    } else {
+      // Rollback on failure
+      setEnvVars(previousVars);
+      toast.error("Failed to import - changes not persisted");
     }
   }
 
-  async function handleImportSelectedVars() {
-    setAdding(true);
-    try {
-      for (const envVar of fileEnvVars) {
-        if (selectedFileVars.has(envVar.key)) {
-          await fetch("/api/env-vars", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              service_id: serviceId,
-              key: envVar.key,
-              value: envVar.value,
-              is_secret: true,
-            }),
-          });
-        }
-      }
-      await loadEnvVars();
-      setShowLoadFromFile(false);
-      setFileEnvVars([]);
-      setSelectedFileVars(new Set());
-    } catch {
-      setError("Failed to import selected variables");
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function toggleFileVarSelection(key: string) {
-    setSelectedFileVars((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(key)) {
-        newSet.delete(key);
-      } else {
-        newSet.add(key);
-      }
-      return newSet;
-    });
+  function handleExport() {
+    const content = envVars.map(v => `${v.key}=${v.value}`).join("\n");
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = selectedFile;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Downloaded ${selectedFile}`);
   }
 
   return (
@@ -486,49 +391,62 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             <Key className="h-4 w-4" />
             Environment Variables
           </CardTitle>
-          <CardDescription>Manage encrypted environment variables for {serviceName || "this service"}</CardDescription>
-        </div>
-        <div className="flex items-center gap-3">
-          {repoPath && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer" title="Sync all changes to .env file">
-              <input
-                type="checkbox"
-                checked={syncToFile}
-                onChange={(e) => setSyncToFile(e.target.checked)}
-                className="rounded"
-              />
-              <HardDrive className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Sync to file</span>
-            </label>
-          )}
-          <div className="flex gap-2">
-            {repoPath && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowLoadFromFile(!showLoadFromFile);
-                  if (!showLoadFromFile) handleLoadAvailableFiles();
-                }}
-              >
-                <FileText className="h-4 w-4" />
-                Load .env
-              </Button>
+          <CardDescription>
+            {serviceName || "Service"} • {selectedFile}
+            {lastSynced && (
+              <span className="ml-2 text-xs">
+                Synced {formatRelativeTime(lastSynced)}
+              </span>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowBulkImport(!showBulkImport)}>
-              <Upload className="h-4 w-4" />
-              Import
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAddForm(!showAddForm)}>
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
-          </div>
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          {isRestarting && (
+            <Badge variant="warning" className="animate-pulse">
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Restarting...
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadFromFile()}
+            disabled={loading || saving}
+            title="Refresh from server"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportModal(!showImportModal)}
+          >
+            <Upload className="h-4 w-4" />
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={envVars.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddForm(!showAddForm)}
+          >
+            <Plus className="h-4 w-4" />
+            Add
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Error Banner */}
         {error && (
-          <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
             {error}
             <button onClick={() => setError(null)}>
               <X className="h-4 w-4" />
@@ -536,135 +454,52 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </div>
         )}
 
-        {/* Load from .env File */}
-        {showLoadFromFile && (
-          <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Load from .env file
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">{repoPath}</p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => handleLoadAvailableFiles()} disabled={loadingFromFile}>
-                <RefreshCw className={`h-4 w-4 ${loadingFromFile ? "animate-spin" : ""}`} />
-              </Button>
-            </div>
-
-            {availableEnvFiles.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <select
-                    value={selectedEnvFile}
-                    onChange={(e) => setSelectedEnvFile(e.target.value)}
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {availableEnvFiles.map((file) => (
-                      <option key={file} value={file}>
-                        {file}
-                      </option>
-                    ))}
-                  </select>
-                  <Button size="sm" variant="outline" onClick={handleLoadEnvFile} disabled={loadingFromFile}>
-                    {loadingFromFile ? <Loader2 className="h-4 w-4 animate-spin" /> : "Load"}
-                  </Button>
-                </div>
-
-                {fileEnvVars.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {selectedFileVars.size} of {fileEnvVars.length} selected
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setSelectedFileVars(new Set(fileEnvVars.map((v) => v.key)))}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          onClick={() => setSelectedFileVars(new Set())}
-                          className="text-xs text-muted-foreground hover:underline"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1">
-                      {fileEnvVars.map((v) => (
-                        <label
-                          key={v.key}
-                          className="flex items-center gap-2 p-2 rounded hover:bg-secondary/50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedFileVars.has(v.key)}
-                            onChange={() => toggleFileVarSelection(v.key)}
-                            className="rounded"
-                          />
-                          <code className="text-xs font-mono">{v.key}</code>
-                          <span className="text-xs text-muted-foreground truncate">
-                            = {v.value.substring(0, 30)}
-                            {v.value.length > 30 ? "..." : ""}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        onClick={handleImportSelectedVars}
-                        disabled={adding || selectedFileVars.size === 0}
-                      >
-                        {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                        Import Selected
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowLoadFromFile(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>{loadingFromFile ? "Searching for .env files..." : `No .env files found at ${repoPath}`}</p>
-                {!loadingFromFile && (
-                  <p className="text-xs">
-                    Make sure the path is correct and .env files exist. You can also use &quot;Import&quot; to paste env
-                    vars directly.
-                  </p>
-                )}
-              </div>
-            )}
+        {/* File Selector */}
+        {availableFiles.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">File:</Label>
+            <select
+              value={selectedFile}
+              onChange={(e) => {
+                setSelectedFile(e.target.value);
+                loadFromFile(e.target.value);
+              }}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              disabled={loading}
+            >
+              {availableFiles.map((file) => (
+                <option key={file} value={file}>{file}</option>
+              ))}
+            </select>
           </div>
         )}
 
-        {/* Bulk Import Form */}
-        {showBulkImport && (
+        {/* Import Modal */}
+        {showImportModal && (
           <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
-            <Label>Bulk Import (KEY=VALUE format)</Label>
+            <Label>Import .env content</Label>
             <textarea
-              value={bulkText}
-              onChange={(e) => setBulkText(e.target.value)}
-              placeholder={`# Paste your .env file content\nDATABASE_URL=postgres://...\nAPI_KEY=xxx`}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder="KEY=value&#10;ANOTHER_KEY=value"
               className="w-full h-32 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleBulkImport} disabled={adding || !bulkText.trim()}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <Button size="sm" onClick={handleImport} disabled={!importText.trim()}>
+                <Upload className="h-4 w-4 mr-1" />
                 Import
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowBulkImport(false)}>
+              <Button size="sm" variant="outline" onClick={() => {
+                setShowImportModal(false);
+                setImportText("");
+              }}>
                 Cancel
               </Button>
             </div>
           </div>
         )}
 
-        {/* Add New Form */}
+        {/* Add Form */}
         {showAddForm && (
           <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -687,62 +522,51 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 />
               </div>
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
-              {repoPath ? (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={saveToFile}
-                    onChange={(e) => {
-                      setSaveToFile(e.target.checked);
-                      if (e.target.checked) setNewIsSecret(false);
-                    }}
-                    className="rounded"
-                  />
-                  Save to .env file
-                </label>
-              ) : null}
-              {!saveToFile && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={newIsSecret}
-                    onChange={(e) => setNewIsSecret(e.target.checked)}
-                    className="rounded"
-                  />
-                  Secret (encrypted in DB)
-                </label>
-              )}
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={newIsSecret}
+                  onChange={(e) => setNewIsSecret(e.target.checked)}
+                  className="rounded"
+                />
+                Mask in UI
+              </label>
               <div className="flex-1" />
               <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAdd} disabled={adding || !newKey.trim()}>
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {saveToFile ? "Add to .env" : "Add to DB"}
+              <Button size="sm" onClick={handleAdd} disabled={saving || !newKey.trim()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Add
               </Button>
             </div>
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : envVars.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No environment variables yet. Click &quot;Add&quot; to create one.
-          </p>
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-4">
+              No environment variables in {selectedFile}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add your first variable
+            </Button>
+          </div>
         ) : (
           <div className="space-y-2">
             {envVars.map((envVar) => (
               <div
-                key={envVar.id}
+                key={envVar.key}
                 className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30"
               >
-                {editingId === envVar.id ? (
-                  // Edit Mode
+                {editingId === envVar.key ? (
                   <div className="flex-1 space-y-2">
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Input
@@ -765,70 +589,49 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                           onChange={(e) => setEditIsSecret(e.target.checked)}
                           className="rounded"
                         />
-                        Secret
+                        Mask in UI
                       </label>
                       <div className="flex-1" />
                       <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
                         <X className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" onClick={() => handleUpdate(envVar.id)}>
-                        <Save className="h-4 w-4" />
+                      <Button size="sm" onClick={() => handleUpdate(envVar.key)} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  // View Mode
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <code className="text-sm font-mono font-medium">{envVar.key}</code>
-                        {envVar.is_secret && (
-                          <Badge variant="outline" className="text-xs">
-                            secret
-                          </Badge>
+                        {envVar.isSecret && (
+                          <Badge variant="outline" className="text-xs">masked</Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-xs text-muted-foreground font-mono">
-                          {revealedValues[envVar.id] || envVar.value_masked}
-                        </code>
-                        {revealedValues[envVar.id] && (
-                          <button
-                            onClick={() => handleCopy(envVar.id, revealedValues[envVar.id])}
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            {copiedId === envVar.id ? (
-                              <Check className="h-3 w-3 text-success" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      <code className="text-xs text-muted-foreground font-mono">
+                        {envVar.isSecret ? "••••••••" : envVar.value}
+                      </code>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleReveal(envVar.id)}
-                        disabled={revealingId === envVar.id}
+                        onClick={() => {
+                          setEditingId(envVar.key);
+                          setEditKey(envVar.key);
+                          setEditValue("");
+                          setEditIsSecret(envVar.isSecret);
+                        }}
                       >
-                        {revealingId === envVar.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : revealedValues[envVar.id] ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(envVar)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(envVar.id)}
+                        onClick={() => handleDelete(envVar.key)}
                         className="text-destructive hover:text-destructive"
+                        disabled={saving}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -837,6 +640,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* No repo path warning */}
+        {!repoPath && (
+          <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
+            Configure a repository path in service settings to manage env files.
           </div>
         )}
       </CardContent>
