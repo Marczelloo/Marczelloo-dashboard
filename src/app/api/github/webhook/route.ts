@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, parseGitHubUrl } from "@/server/github";
 import { projects, auditLogs } from "@/server/atlashub";
-import { internalDeployProject, safeSelfDeploy } from "@/app/actions/projects";
+import { internalDeployProject } from "@/app/actions/projects";
+import { startBackgroundSelfDeploy } from "@/server/self-deploy";
 import { sendDiscordNotification } from "@/server/notifications";
 import type { GitHubPushPayload, GitHubReleasePayload, GitHubDependabotAlertPayload } from "@/types/github";
 
@@ -180,9 +181,14 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
         // Start safe deployment in background without waiting
         // This ensures GitHub receives a successful response before the container restarts
         // The safe deployment includes health checks and automatic rollback
-        safeSelfDeploy(project.id, "github-webhook", { branch }).catch((error) => {
-          console.error(`[GitHub Webhook] Safe self-deploy failed:`, error);
-          // Notification about rollback is handled inside safeSelfDeploy
+        startBackgroundSelfDeploy({
+          projectId: project.id,
+          triggeredBy: "github-webhook",
+          branch,
+          commit: head_commit?.id.slice(0, 8),
+          commitMessage: head_commit?.message.split("\n")[0],
+          author: pusher.name,
+          compareUrl: compare,
         });
 
         // Send Discord notification immediately (deployment is in progress)
