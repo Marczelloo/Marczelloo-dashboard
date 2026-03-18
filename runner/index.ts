@@ -39,36 +39,37 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// Allowlist configuration - loaded from file or defaults
-interface Allowlist {
+// Blocklist configuration - loaded from file or defaults
+// Blocklist: these specific items are NOT allowed, everything else is allowed
+interface Blocklist {
   repo_paths: string[];
   compose_projects: string[];
   container_names: string[];
 }
 
-function loadAllowlist(): Allowlist {
+function loadBlocklist(): Blocklist {
   try {
     if (fs.existsSync(ALLOWLIST_FILE)) {
       const data = fs.readFileSync(ALLOWLIST_FILE, "utf-8");
       return JSON.parse(data);
     }
   } catch (e) {
-    console.error("Failed to load allowlist, using defaults:", e);
+    console.error("Failed to load blocklist, using defaults:", e);
   }
 
-  // Default allowlist
+  // Default blocklist - block dangerous system containers
   return {
-    repo_paths: ["/home/Marczelloo_pi/projects/atlas-hub", "/home/Marczelloo_pi/projects/Marczelloo-dashboard"],
-    compose_projects: ["atlas-hub", "Marczelloo-dashboard"],
-    container_names: ["atlashub-postgres", "atlashub-minio", "portainer"],
+    repo_paths: [],
+    compose_projects: [],
+    container_names: [],
   };
 }
 
-function saveAllowlist(allowlist: Allowlist): void {
-  fs.writeFileSync(ALLOWLIST_FILE, JSON.stringify(allowlist, null, 2));
+function saveBlocklist(blocklist: Blocklist): void {
+  fs.writeFileSync(ALLOWLIST_FILE, JSON.stringify(blocklist, null, 2));
 }
 
-let ALLOWLIST = loadAllowlist();
+let BLOCKLIST = loadBlocklist();
 
 interface RunnerRequest {
   operation: string;
@@ -94,22 +95,26 @@ interface RunnerResponse {
   timestamp: string;
 }
 
-// Validate request against allowlist
+// Validate request against blocklist (allow everything except blocked items)
 function validateRequest(req: RunnerRequest): string | null {
   const { operation, target } = req;
 
-  if (target.repo_path && !ALLOWLIST.repo_paths.includes(target.repo_path)) {
-    return `Repository path not in allowlist: ${target.repo_path}`;
+  // Check if repo_path is blocked
+  if (target.repo_path && BLOCKLIST.repo_paths.includes(target.repo_path)) {
+    return `Repository path is blocked: ${target.repo_path}`;
   }
 
-  if (target.compose_project && !ALLOWLIST.compose_projects.includes(target.compose_project)) {
-    return `Compose project not in allowlist: ${target.compose_project}`;
+  // Check if compose_project is blocked
+  if (target.compose_project && BLOCKLIST.compose_projects.includes(target.compose_project)) {
+    return `Compose project is blocked: ${target.compose_project}`;
   }
 
-  if (target.container_name && !ALLOWLIST.container_names.includes(target.container_name)) {
-    return `Container name not in allowlist: ${target.container_name}`;
+  // Check if container_name is blocked
+  if (target.container_name && BLOCKLIST.container_names.includes(target.container_name)) {
+    return `Container name is blocked: ${target.container_name}`;
   }
 
+  // Validate operation is allowed
   const validOperations = [
     "git_pull",
     "docker_restart",
@@ -267,10 +272,10 @@ const server = http.createServer(async (req, res) => {
           user: SSH_USER,
           key_path: SSH_KEY_PATH,
         },
-        allowlist_count: {
-          repos: ALLOWLIST.repo_paths.length,
-          projects: ALLOWLIST.compose_projects.length,
-          containers: ALLOWLIST.container_names.length,
+        blocklist_count: {
+          repos: BLOCKLIST.repo_paths.length,
+          projects: BLOCKLIST.compose_projects.length,
+          containers: BLOCKLIST.container_names.length,
         },
         timestamp: new Date().toISOString(),
       })
@@ -286,38 +291,45 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // GET /allowlist - retrieve current allowlist
-  if (req.method === "GET" && url === "/allowlist") {
+  // GET /blocklist - retrieve current blocklist
+  if (req.method === "GET" && url === "/blocklist") {
     res.writeHead(200);
-    res.end(JSON.stringify({ allowlist: ALLOWLIST }));
+    res.end(JSON.stringify({ blocklist: BLOCKLIST }));
     return;
   }
 
-  // PUT /allowlist - update allowlist
-  if (req.method === "PUT" && url === "/allowlist") {
+  // PUT /blocklist - update blocklist
+  if (req.method === "PUT" && url === "/blocklist") {
     let body = "";
     for await (const chunk of req) {
       body += chunk;
     }
 
     try {
-      const { allowlist } = JSON.parse(body);
-      if (!allowlist || !allowlist.repo_paths || !allowlist.compose_projects || !allowlist.container_names) {
+      const { blocklist } = JSON.parse(body);
+      if (!blocklist || !blocklist.repo_paths || !blocklist.compose_projects || !blocklist.container_names) {
         res.writeHead(400);
-        res.end(JSON.stringify({ error: "Invalid allowlist format" }));
+        res.end(JSON.stringify({ error: "Invalid blocklist format" }));
         return;
       }
 
-      ALLOWLIST = allowlist;
-      saveAllowlist(allowlist);
+      BLOCKLIST = blocklist;
+      saveBlocklist(blocklist);
 
-      console.log(`[${new Date().toISOString()}] Allowlist updated`);
+      console.log(`[${new Date().toISOString()}] Blocklist updated`);
       res.writeHead(200);
-      res.end(JSON.stringify({ success: true, allowlist: ALLOWLIST }));
+      res.end(JSON.stringify({ success: true, blocklist: BLOCKLIST }));
     } catch {
       res.writeHead(400);
       res.end(JSON.stringify({ error: "Invalid JSON" }));
     }
+    return;
+  }
+
+  // Legacy /allowlist endpoint - redirect to blocklist
+  if (req.method === "GET" && url === "/allowlist") {
+    res.writeHead(200);
+    res.end(JSON.stringify({ blocklist: BLOCKLIST, note: "allowlist is now blocklist - use /blocklist endpoint" }));
     return;
   }
 
@@ -474,7 +486,7 @@ const server = http.createServer(async (req, res) => {
   // Not found
   res.writeHead(404);
   res.end(
-    JSON.stringify({ error: "Not found", endpoints: ["/health", "/status", "/allowlist", "/execute", "/shell"] })
+    JSON.stringify({ error: "Not found", endpoints: ["/health", "/status", "/blocklist", "/execute", "/shell"] })
   );
 });
 
@@ -483,8 +495,8 @@ const HOST = process.env.RUNNER_HOST || "0.0.0.0";
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Marczelloo Dashboard Runner listening on http://${HOST}:${PORT}`);
   console.log("");
-  console.log("Allowlist:");
-  console.log("  Repos:", ALLOWLIST.repo_paths.join(", "));
-  console.log("  Projects:", ALLOWLIST.compose_projects.join(", "));
-  console.log("  Containers:", ALLOWLIST.container_names.join(", "));
+  console.log("Blocklist Mode (everything allowed except blocked items):");
+  console.log("  Blocked Repos:", BLOCKLIST.repo_paths.length > 0 ? BLOCKLIST.repo_paths.join(", ") : "(none - all repos allowed)");
+  console.log("  Blocked Projects:", BLOCKLIST.compose_projects.length > 0 ? BLOCKLIST.compose_projects.join(", ") : "(none - all projects allowed)");
+  console.log("  Blocked Containers:", BLOCKLIST.container_names.length > 0 ? BLOCKLIST.container_names.join(", ") : "(none - all containers allowed)");
 });
