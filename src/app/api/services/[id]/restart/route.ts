@@ -3,6 +3,9 @@ import { services } from "@/server/data";
 import { dockerRestart } from "@/server/runner/client";
 import { getCurrentUser } from "@/server/lib/auth";
 
+// Container name pattern for detecting self-restart
+const DASHBOARD_CONTAINER_PATTERNS = ["marczelloo-dashboard", "dashboard"];
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -28,6 +31,29 @@ export async function POST(
         { success: false, error: "Service is not a docker container" },
         { status: 400 }
       );
+    }
+
+    // Detect self-restart (dashboard restarting itself)
+    const isSelfRestart = DASHBOARD_CONTAINER_PATTERNS.some((pattern) =>
+      service.container_id?.toLowerCase().includes(pattern) ||
+      service.name?.toLowerCase().includes(pattern)
+    );
+
+    if (isSelfRestart) {
+      console.log("[Restart] Self-restart detected - using fire-and-forget mode");
+
+      // Start restart in background without waiting for response
+      // This prevents 502 errors when the container restarts itself
+      dockerRestart(service.container_id).catch((error) => {
+        console.error("[Restart] Background restart failed:", error);
+      });
+
+      // Return immediately with 202 Accepted
+      return NextResponse.json({
+        success: true,
+        message: "Dashboard is restarting...",
+        selfRestart: true,
+      }, { status: 202 });
     }
 
     const result = await dockerRestart(service.container_id);

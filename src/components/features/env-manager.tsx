@@ -333,20 +333,38 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
       // 3. Restart the service
       if (serviceId) {
-        const restartResponse = await fetch(
-          `/api/services/${serviceId}/restart`,
-          {
-            method: "POST",
-          }
-        );
-        const restartResult = await restartResponse.json();
+        try {
+          const restartResponse = await fetch(
+            `/api/services/${serviceId}/restart`,
+            {
+              method: "POST",
+            }
+          );
 
-        if (!restartResult.success) {
-          toast.warning("Saved successfully, but restart failed", {
-            description: restartResult.error,
+          // Handle successful responses (including 202 Accepted for self-restart)
+          if (restartResponse.ok || restartResponse.status === 202) {
+            const restartResult = await restartResponse.json().catch(() => ({ success: true, selfRestart: true }));
+
+            if (restartResult.selfRestart) {
+              toast.success("Environment variables saved - Dashboard is restarting...", {
+                duration: 5000,
+              });
+            } else {
+              toast.success("Environment variables saved and service restarted");
+            }
+          } else {
+            // Restart failed but file was saved - warn the user
+            console.error("[EnvManager] Restart failed with status:", restartResponse.status);
+            toast.warning("Saved successfully, but restart failed", {
+              description: `Status: ${restartResponse.status}`,
+            });
+          }
+        } catch (restartErr) {
+          // Restart failed but file was saved - warn the user
+          console.error("[EnvManager] Restart error:", restartErr);
+          toast.warning("Environment variables saved, but restart request failed", {
+            description: restartErr instanceof Error ? restartErr.message : "Network error",
           });
-        } else {
-          toast.success("Environment variables saved and service restarted");
         }
       } else {
         toast.success("Environment variables saved");
