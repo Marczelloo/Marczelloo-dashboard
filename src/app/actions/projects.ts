@@ -3,7 +3,7 @@
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
-import { notifyDeploySuccess, notifyDeployFailed } from "@/server/notifications";
+import { notifyDeploySuccess, notifyDeployFailed, sendDiscordNotification } from "@/server/notifications";
 import {
   createRelease,
   generateReleaseNotes,
