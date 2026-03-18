@@ -371,7 +371,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Validate against allowlist
+    // Validate against blocklist
     const validationError = validateRequest(request);
     if (validationError) {
       res.writeHead(403);

@@ -45,7 +45,7 @@ interface PortInfo {
   label: string | null;
 }
 
-interface Allowlist {
+interface Blocklist {
   repo_paths: string[];
   compose_projects: string[];
   container_names: string[];
@@ -75,7 +75,7 @@ export default function SettingsPage() {
         <MonitoringIntervalSettings />
         <PortainerSettings />
         <RunnerSettings />
-        <RunnerAllowlistSettings />
+        <RunnerBlocklistSettings />
         <PortTrackerSettings />
         <NotificationSettings />
       </div>
@@ -641,8 +641,8 @@ function RunnerSettings() {
   );
 }
 
-function RunnerAllowlistSettings() {
-  const [allowlist, setAllowlist] = useState<Allowlist | null>(null);
+function RunnerBlocklistSettings() {
+  const [blocklist, setBlocklist] = useState<Blocklist | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<ConnectionStatus>({ status: "unknown" });
   const [newRepo, setNewRepo] = useState("");
@@ -650,16 +650,16 @@ function RunnerAllowlistSettings() {
   const [newContainer, setNewContainer] = useState("");
 
   useEffect(() => {
-    loadAllowlist();
+    loadBlocklist();
   }, []);
 
-  async function loadAllowlist() {
+  async function loadBlocklist() {
     setLoading(true);
     try {
       const response = await fetch("/api/settings/runner-allowlist");
       const result = await response.json();
       if (result.success) {
-        setAllowlist(result.allowlist);
+        setBlocklist(result.blocklist || result.allowlist);
       }
     } catch {
       // Runner may not be running
@@ -667,45 +667,45 @@ function RunnerAllowlistSettings() {
     setLoading(false);
   }
 
-  async function saveAllowlist() {
-    if (!allowlist) return;
+  async function saveBlocklist() {
+    if (!blocklist) return;
     setStatus({ status: "loading" });
     try {
       const response = await fetch("/api/settings/runner-allowlist", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ allowlist }),
+        body: JSON.stringify({ blocklist }),
       });
       const result = await response.json();
 
       if (result.success) {
-        setStatus({ status: "success", message: "Allowlist saved" });
-        setAllowlist(result.allowlist);
+        setStatus({ status: "success", message: "Blocklist saved" });
+        setBlocklist(result.blocklist || result.allowlist);
       } else {
         setStatus({ status: "error", message: result.error });
       }
     } catch {
-      setStatus({ status: "error", message: "Failed to save allowlist" });
+      setStatus({ status: "error", message: "Failed to save blocklist" });
     }
   }
 
-  function addItem(type: keyof Allowlist, value: string) {
-    if (!allowlist || !value.trim()) return;
-    if (allowlist[type].includes(value.trim())) return;
-    setAllowlist({
-      ...allowlist,
-      [type]: [...allowlist[type], value.trim()],
+  function addItem(type: keyof Blocklist, value: string) {
+    if (!blocklist || !value.trim()) return;
+    if (blocklist[type].includes(value.trim())) return;
+    setBlocklist({
+      ...blocklist,
+      [type]: [...blocklist[type], value.trim()],
     });
     if (type === "repo_paths") setNewRepo("");
     if (type === "compose_projects") setNewProject("");
     if (type === "container_names") setNewContainer("");
   }
 
-  function removeItem(type: keyof Allowlist, value: string) {
-    if (!allowlist) return;
-    setAllowlist({
-      ...allowlist,
-      [type]: allowlist[type].filter((v) => v !== value),
+  function removeItem(type: keyof Blocklist, value: string) {
+    if (!blocklist) return;
+    setBlocklist({
+      ...blocklist,
+      [type]: blocklist[type].filter((v) => v !== value),
     });
   }
 
@@ -714,20 +714,20 @@ function RunnerAllowlistSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Shield className="h-5 w-5" />
-          Runner Allowlist
+          Runner Blocklist
         </CardTitle>
-        <CardDescription>Control which repositories, projects, and containers the runner can manage</CardDescription>
+        <CardDescription>Block specific repositories, projects, and containers from being managed by the runner (everything else is allowed)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {loading ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading allowlist...
+            Loading blocklist...
           </div>
-        ) : !allowlist ? (
+        ) : !blocklist ? (
           <div className="text-muted-foreground">
-            <p>Could not load allowlist. Make sure the runner is running.</p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={loadAllowlist}>
+            <p>Could not load blocklist. Make sure the runner is running.</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={loadBlocklist}>
               <RefreshCw className="h-4 w-4" />
               Retry
             </Button>
@@ -736,13 +736,13 @@ function RunnerAllowlistSettings() {
           <>
             {/* Repository Paths */}
             <div>
-              <Label className="text-sm font-medium">Repository Paths</Label>
+              <Label className="text-sm font-medium">Blocked Repository Paths</Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Allowed paths for git operations (e.g., /home/pi/projects/my-app)
+                Blocked paths for git operations (e.g., /home/pi/sensitive-project)
               </p>
               <div className="flex gap-2 mb-2">
                 <Input
-                  placeholder="/home/pi/projects/my-app"
+                  placeholder="/home/pi/sensitive-project"
                   value={newRepo}
                   onChange={(e) => setNewRepo(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addItem("repo_paths", newRepo)}
@@ -752,7 +752,7 @@ function RunnerAllowlistSettings() {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {allowlist.repo_paths.map((path) => (
+                {blocklist.repo_paths.map((path) => (
                   <Badge key={path} variant="secondary" className="gap-1">
                     <code className="text-xs">{path}</code>
                     <button onClick={() => removeItem("repo_paths", path)} className="hover:text-danger">
@@ -765,8 +765,8 @@ function RunnerAllowlistSettings() {
 
             {/* Compose Projects */}
             <div>
-              <Label className="text-sm font-medium">Compose Projects</Label>
-              <p className="text-xs text-muted-foreground mb-2">Allowed docker compose project names</p>
+              <Label className="text-sm font-medium">Blocked Compose Projects</Label>
+              <p className="text-xs text-muted-foreground mb-2">Docker compose projects to block</p>
               <div className="flex gap-2 mb-2">
                 <Input
                   placeholder="my-app"
@@ -779,7 +779,7 @@ function RunnerAllowlistSettings() {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {allowlist.compose_projects.map((name) => (
+                {blocklist.compose_projects.map((name) => (
                   <Badge key={name} variant="secondary" className="gap-1">
                     {name}
                     <button onClick={() => removeItem("compose_projects", name)} className="hover:text-danger">
@@ -792,8 +792,8 @@ function RunnerAllowlistSettings() {
 
             {/* Container Names */}
             <div>
-              <Label className="text-sm font-medium">Container Names</Label>
-              <p className="text-xs text-muted-foreground mb-2">Allowed container names for restart/logs operations</p>
+              <Label className="text-sm font-medium">Blocked Container Names</Label>
+              <p className="text-xs text-muted-foreground mb-2">Container names to block from restart/logs operations</p>
               <div className="flex gap-2 mb-2">
                 <Input
                   placeholder="my-container"
@@ -806,7 +806,7 @@ function RunnerAllowlistSettings() {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {allowlist.container_names.map((name) => (
+                {blocklist.container_names.map((name) => (
                   <Badge key={name} variant="secondary" className="gap-1">
                     {name}
                     <button onClick={() => removeItem("container_names", name)} className="hover:text-danger">
@@ -818,13 +818,13 @@ function RunnerAllowlistSettings() {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="default" size="sm" onClick={saveAllowlist} disabled={status.status === "loading"}>
+              <Button variant="default" size="sm" onClick={saveBlocklist} disabled={status.status === "loading"}>
                 {status.status === "loading" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Save Allowlist
+                Save Blocklist
               </Button>
               <StatusIndicator status={status} />
             </div>
