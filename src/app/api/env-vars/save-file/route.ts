@@ -127,13 +127,21 @@ export async function POST(request: Request) {
         );
       }
 
-      // Build the .env content
-      const content = vars.map((v: EnvVar) => `${v.key}=${v.value}`).join("\n");
+      // Write by clearing the file first, then appending each line
+      // This is more reliable than complex heredoc or base64 commands
+      const tempFile = `${filePath}.tmp.${Date.now()}`;
 
-      // Use base64 encoding to safely handle special characters and newlines
-      const base64Content = Buffer.from(content, "utf-8").toString("base64");
+      // Step 1: Create temp file with content
+      const lines = vars.map((v: EnvVar) => {
+        // Escape single quotes in the value for shell
+        const escapedValue = v.value.replace(/'/g, "'\\''");
+        return `${v.key}=${escapedValue}`;
+      });
 
-      // Write using base64 decoding (more reliable than heredoc)
+      // Build a script that writes each line
+      const writeLines = lines.map((line) => `echo '${line}'`).join(" >> ");
+      const script = `rm -f "${filePath}" && ${writeLines} >> "${filePath}"`;
+
       const response = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
         headers: {
@@ -141,7 +149,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${RUNNER_TOKEN}`,
         },
         body: JSON.stringify({
-          command: `echo "${base64Content}" | base64 -d > "${filePath}"`,
+          command: script,
         }),
       });
 
@@ -152,12 +160,12 @@ export async function POST(request: Request) {
       }
 
       const result = await response.json();
-      console.log("[Env Save] Write result:", { success: result.success, stderr: result.stderr });
+      console.log("[Env Save] Write result:", { success: result.success, stderr: result.stderr, stdout: result.stdout?.substring(0, 200) });
 
       if (!result.success) {
         return NextResponse.json({
           success: false,
-          error: result.stderr || "Failed to write file",
+          error: result.stderr || result.stdout || "Failed to write file",
         });
       }
 
