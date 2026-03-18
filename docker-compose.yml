@@ -54,6 +54,9 @@ services:
       - GITHUB_PRIVATE_KEY_BASE64=${GITHUB_PRIVATE_KEY_BASE64}
       - GITHUB_INSTALLATION_ID=${GITHUB_INSTALLATION_ID}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+
+      # Dashboard Self-Management
+      - DASHBOARD_REPO_PATH=${DASHBOARD_REPO_PATH:-/home/Marczelloo_pi/projects/Marczelloo-dashboard}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
