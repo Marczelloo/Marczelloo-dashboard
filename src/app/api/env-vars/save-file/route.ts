@@ -130,10 +130,10 @@ export async function POST(request: Request) {
       // Build the .env content
       const content = vars.map((v: EnvVar) => `${v.key}=${v.value}`).join("\n");
 
-      // Write to temp file first, then move (atomic operation)
-      const tempFile = `${filePath}.tmp.${Date.now()}`;
+      // Use base64 encoding to safely handle special characters and newlines
+      const base64Content = Buffer.from(content, "utf-8").toString("base64");
 
-      // Use printf to handle special characters better
+      // Write using base64 decoding (more reliable than heredoc)
       const response = await fetch(`${RUNNER_URL}/shell`, {
         method: "POST",
         headers: {
@@ -141,10 +141,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${RUNNER_TOKEN}`,
         },
         body: JSON.stringify({
-          command: `cat > "${tempFile}" << 'ENVEOF'
-${content}
-ENVEOF
-mv "${tempFile}" "${filePath}"`,
+          command: `echo "${base64Content}" | base64 -d > "${filePath}"`,
         }),
       });
 

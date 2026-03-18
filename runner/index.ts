@@ -51,13 +51,35 @@ function loadBlocklist(): Blocklist {
   try {
     if (fs.existsSync(ALLOWLIST_FILE)) {
       const data = fs.readFileSync(ALLOWLIST_FILE, "utf-8");
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+
+      // Migration: if old allowlist format (non-empty arrays), clear to empty blocklist
+      // Old allowlist meant "only these are allowed", new blocklist means "only these are blocked"
+      // So we clear old allowed items since we now allow everything by default
+      const hasOldAllowlistData =
+        (parsed.repo_paths && parsed.repo_paths.length > 0) ||
+        (parsed.compose_projects && parsed.compose_projects.length > 0) ||
+        (parsed.container_names && parsed.container_names.length > 0);
+
+      if (hasOldAllowlistData) {
+        console.log("[Runner] Migrating old allowlist to blocklist - clearing old entries");
+        const emptyBlocklist: Blocklist = {
+          repo_paths: [],
+          compose_projects: [],
+          container_names: [],
+        };
+        // Save the new empty blocklist
+        fs.writeFileSync(ALLOWLIST_FILE, JSON.stringify(emptyBlocklist, null, 2));
+        return emptyBlocklist;
+      }
+
+      return parsed;
     }
   } catch (e) {
     console.error("Failed to load blocklist, using defaults:", e);
   }
 
-  // Default blocklist - block dangerous system containers
+  // Default blocklist - nothing blocked (allow everything)
   return {
     repo_paths: [],
     compose_projects: [],
