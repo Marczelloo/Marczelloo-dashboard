@@ -640,7 +640,7 @@ export async function safeSelfDeploy(
       }
 
       // Log the rollback
-      await auditLogs.logAction(triggeredBy, "deploy_rollback", "project", id, {
+      await auditLogs.logAction(triggeredBy, "rollback", "project", id, {
         reason: "Health check failed after deployment",
         action: "Reverted to previous commit",
         log_file: logFile,

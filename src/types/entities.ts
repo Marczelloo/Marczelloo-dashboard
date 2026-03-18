@@ -123,7 +123,8 @@ export type AuditAction =
   | "link"
   | "unlink"
   | "sync"
-  | "import";
+  | "import"
+  | "rollback";
 
 export type EntityType =
   | "project"
