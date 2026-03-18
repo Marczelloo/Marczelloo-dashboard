@@ -108,6 +108,7 @@ async function AuditLogList() {
     unlink: "secondary",
     sync: "secondary",
     import: "success",
+    rollback: "warning",
   };
 
   const entityLinks: Record<string, (id: string) => string> = {
