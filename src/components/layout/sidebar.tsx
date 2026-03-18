@@ -27,6 +27,7 @@ import {
   Gauge,
   type LucideIcon,
 } from "lucide-react";
+import { VersionDisplay } from "./version-display";
 
 interface NavItem {
   href: string;
@@ -278,7 +279,8 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom section */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-border/50 p-3 bg-card/95">
+      <div className="absolute bottom-0 left-0 right-0 border-t border-border/50 bg-card/95">
+        <VersionDisplay />
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
