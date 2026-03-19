@@ -21,10 +21,12 @@ export async function getServiceById(id: string): Promise<Service | null> {
 }
 
 export async function getServicesByProjectId(projectId: string): Promise<Service[]> {
+  console.log("[getServicesByProjectId] Querying for project_id:", projectId, "type:", typeof projectId);
   const response = await db.select<Service>(TABLE, {
     filters: [{ operator: "eq", column: "project_id", value: projectId }],
     order: { column: "name", direction: "asc" },
   });
+  console.log("[getServicesByProjectId] Found services:", response.data.length);
   return response.data;
 }
 
@@ -57,12 +59,14 @@ export async function getMonitorableServices(): Promise<Service[]> {
 
 export async function createService(input: CreateServiceInput): Promise<Service> {
   const now = new Date().toISOString();
+  console.log("[createService] Input project_id:", input.project_id, "type:", typeof input.project_id);
   const response = await db.insert<Service>(TABLE, {
     ...input,
     deploy_strategy: input.deploy_strategy || "manual",
     created_at: now,
     updated_at: now,
   });
+  console.log("[createService] Created service:", response.data[0]?.id, "project_id:", response.data[0]?.project_id);
   return response.data[0];
 }
 

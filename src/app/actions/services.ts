@@ -39,8 +39,10 @@ export async function createServiceAction(input: CreateServiceInput) {
     const demoCheck = checkDemoModeBlocked();
     if (demoCheck.blocked) return demoCheck.result;
 
+    console.log("[createServiceAction] Received input project_id:", input.project_id);
     const user = await requirePinVerification();
     const parsed = createServiceSchema.parse(input);
+    console.log("[createServiceAction] Parsed project_id:", parsed.project_id);
 
     const service = await services.createService(parsed);
 

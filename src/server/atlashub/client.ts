@@ -165,7 +165,9 @@ export async function select<T>(
   revalidate?: number
 ): Promise<AtlasHubResponse<T[]>> {
   const queryString = buildQueryString(options);
-  return atlasRequest<AtlasHubResponse<T[]>>(`/v1/db/${table}${queryString}`, { method: "GET" }, revalidate);
+  const url = `/v1/db/${table}${queryString}`;
+  console.log("[select] URL:", url);
+  return atlasRequest<AtlasHubResponse<T[]>>(url, { method: "GET" }, revalidate);
 }
 
 /**
