@@ -29,6 +29,10 @@ const DASHBOARD_REPO_PATH_RUNNER = DASHBOARD_REPO_PATH_HOST.replace(
   "/projects"
 );
 
+// Status file in the projects directory (accessible from both dashboard and runner)
+const STATUS_FILE_RUNNER = `${DASHBOARD_REPO_PATH_RUNNER}/.deploy-status.json`;
+const STATUS_FILE_HOST = `${DASHBOARD_REPO_PATH_HOST}/.deploy-status.json`;
+
 interface SelfDeployResult {
   success: boolean;
   error?: string;
@@ -79,6 +83,33 @@ async function execShell(command: string, timeout = 30000): Promise<ShellResult>
 }
 
 /**
+ * Update deployment status file (visible to frontend via API)
+ */
+async function updateDeploymentStatus(
+  status: "deploying" | "success" | "failed",
+  message?: string,
+  commit?: string
+): Promise<void> {
+  try {
+    const statusData = {
+      status,
+      message,
+      commit,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Write via runner shell to ensure it's on the shared projects directory
+    await execShell(
+      `cat > "${STATUS_FILE_RUNNER}" << 'EOFSTATUS'
+${JSON.stringify(statusData)}
+EOFSTATUS`
+    );
+  } catch (error) {
+    console.error("[SelfDeploy] Failed to update status:", error);
+  }
+}
+
+/**
  * Perform safe self-deployment with health checks and automatic rollback
  *
  * This function is designed to be run asynchronously from the webhook handler.
@@ -100,6 +131,9 @@ export async function performSafeSelfDeploy(options: {
   console.log(`[SelfDeploy] Repo (host): ${DASHBOARD_REPO_PATH_HOST}`);
   console.log(`[SelfDeploy] Repo (runner): ${repoPath}`);
 
+  // Set initial status
+  await updateDeploymentStatus("deploying", "Starting self-deployment...", commit);
+
   const output: string[] = [];
   output.push(`=== Safe Self-Deployment ===`);
   output.push(`Triggered by: ${triggeredBy}`);
@@ -120,6 +154,7 @@ export async function performSafeSelfDeploy(options: {
 
   if (!pullResult.success) {
     console.error(`[SelfDeploy] Git pull failed:`, pullResult.stderr);
+    await updateDeploymentStatus("failed", "Git pull failed", commit);
     return {
       success: false,
       error: `Git pull failed: ${pullResult.stderr}`,
@@ -129,6 +164,7 @@ export async function performSafeSelfDeploy(options: {
 
   // Step 2: Build new image (in background)
   console.log(`[SelfDeploy] Step 2: Build new image`);
+  await updateDeploymentStatus("deploying", "Building new Docker image...", commit);
 
   // First, verify the path and docker-compose.yml exist
   const verifyResult = await execShell(`ls -la "${repoPath}" 2>&1 && ls -la "${repoPath}/docker-compose.yml" 2>&1`);
@@ -227,6 +263,8 @@ export async function performSafeSelfDeploy(options: {
       url: compareUrl,
     });
 
+    await updateDeploymentStatus("failed", "Docker build failed", commit);
+
     return {
       success: false,
       error: "Build failed - deployment aborted, old container still running",
@@ -240,6 +278,7 @@ export async function performSafeSelfDeploy(options: {
 
   // Step 3: Start new container
   console.log(`[SelfDeploy] Step 3: Start new container`);
+  await updateDeploymentStatus("deploying", "Starting new container...", commit);
   const upResult = await execShell(`cd "${repoPath}" && docker compose up -d dashboard 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
@@ -248,6 +287,8 @@ export async function performSafeSelfDeploy(options: {
 
   if (!upResult.success) {
     console.error(`[SelfDeploy] Failed to start container:`, upResult.stderr);
+
+    await updateDeploymentStatus("failed", "Failed to start new container", commit);
 
     await sendDiscordNotification({
       title: `❌ Self-Deploy Failed: Start Error`,
@@ -269,6 +310,7 @@ export async function performSafeSelfDeploy(options: {
 
   // Step 4: Wait for health check
   console.log(`[SelfDeploy] Step 4: Waiting for health check`);
+  await updateDeploymentStatus("deploying", "Running health checks...", commit);
   const healthCheckRetries = 60; // 60 retries * 3 seconds = 3 minutes
   let healthPassed = false;
 
@@ -361,6 +403,8 @@ export async function performSafeSelfDeploy(options: {
       url: compareUrl,
     });
 
+    await updateDeploymentStatus("failed", "Health check failed - rollback attempted", commit);
+
     return {
       success: false,
       error: "Health check failed - rollback attempted",
@@ -374,6 +418,8 @@ export async function performSafeSelfDeploy(options: {
   output.push(`=== DEPLOYMENT SUCCESSFUL ===`);
   output.push(`New container is healthy and running`);
   output.push("");
+
+  await updateDeploymentStatus("success", `Deployed: ${commitMessage?.substring(0, 50) || "Success"}`, commit);
 
   await sendDiscordNotification({
     title: `✅ Self-Deploy Successful`,

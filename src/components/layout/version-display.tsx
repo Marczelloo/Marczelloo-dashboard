@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GitCommit, AlertCircle, CheckCircle, Rocket } from "lucide-react";
+import { GitCommit, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DeploymentStatusBanner } from "./deployment-status-banner";
 
 interface VersionInfo {
   shortCommit: string;
@@ -69,11 +70,7 @@ export function VersionDisplay() {
 
   return (
     <div className="space-y-1">
-      {/* Auto-deploy indicator - remove this to confirm self-deploy works */}
-      <div className="mx-3 mt-2 flex items-center justify-center rounded bg-green-500/10 border border-green-500/20 px-2 py-1">
-        <Rocket className="h-3 w-3 text-green-500" />
-        <span className="ml-1.5 text-[10px] font-medium text-green-500">AUTO-DEPLOY TEST</span>
-      </div>
+      <DeploymentStatusBanner />
 
       <div className="flex items-center gap-2 px-3 py-2 text-xs">
         <GitCommit className="h-3 w-3 text-muted-foreground" />
