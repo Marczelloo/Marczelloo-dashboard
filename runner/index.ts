@@ -100,10 +100,19 @@ interface RunnerRequest {
     compose_project?: string;
     container_name?: string;
     service_name?: string;
+    // Package management fields
+    packages?: string[];      // Specific packages to update
+    ecosystem?: string;       // 'npm', 'yarn', 'pnpm', etc.
+    test_command?: string;    // Custom test command
+    build_command?: string;   // Custom build command
   };
   options?: {
     tail?: number;
     build?: boolean;
+    // Package update options
+    run_tests?: boolean;
+    run_build?: boolean;
+    backup_data?: string;     // Pre-stored backup data
   };
 }
 
@@ -144,6 +153,13 @@ function validateRequest(req: RunnerRequest): string | null {
     "compose_up",
     "docker_logs",
     "docker_status",
+    // Package management operations
+    "npm_check",
+    "npm_update",
+    "npm_test",
+    "npm_build",
+    "npm_backup",
+    "npm_restore",
   ];
   if (!validOperations.includes(operation)) {
     return `Invalid operation: ${operation}`;
@@ -213,6 +229,90 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
         if (!name) throw new Error("container_name or compose_project required");
         const result = await execAsync(`docker ps -a --filter "name=${name}" --format "{{.Status}}"`);
         output = result.stdout.trim();
+        break;
+      }
+
+      case "npm_check": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_check");
+        const cwd = `cd "${target.repo_path}" &&`;
+        const result = await execAsync(`${cwd} npm outdated --json`);
+        output = result.stdout;
+
+        // npm outdated returns non-zero when packages are outdated, treat as success
+        if (result.stderr && !result.stdout) {
+          output = result.stderr;
+        }
+        break;
+      }
+
+      case "npm_update": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_update");
+        const packages = target.packages && target.packages.length > 0
+          ? target.packages.join(" ")
+          : "";
+        const result = await execAsync(
+          `cd "${target.repo_path}" && npm update ${packages} --json`
+        );
+        output = result.stdout + result.stderr;
+        break;
+      }
+
+      case "npm_test": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_test");
+        const testCmd = options?.test_command || "npm test";
+        const result = await execAsync(`cd "${target.repo_path}" && ${testCmd} -- --json`, {
+          timeout: 5 * 60 * 1000, // 5 minute timeout for tests
+        });
+        output = result.stdout + result.stderr;
+        break;
+      }
+
+      case "npm_build": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_build");
+        const buildCmd = options?.build_command || "npm run build";
+        const result = await execAsync(`cd "${target.repo_path}" && ${buildCmd}`, {
+          timeout: 10 * 60 * 1000, // 10 minute timeout for builds
+        });
+        output = result.stdout + result.stderr;
+        break;
+      }
+
+      case "npm_backup": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_backup");
+        const fs = require("fs").promises;
+
+        const backupData: Record<string, string> = {};
+        const filesToBackup = ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
+
+        for (const file of filesToBackup) {
+          try {
+            const filePath = `${target.repo_path}/${file}`;
+            const content = await fs.readFile(filePath, "utf-8");
+            backupData[file] = content;
+          } catch {
+            // File doesn't exist, skip
+          }
+        }
+
+        output = JSON.stringify(backupData);
+        break;
+      }
+
+      case "npm_restore": {
+        if (!target.repo_path) throw new Error("repo_path required for npm_restore");
+        if (!options?.backup_data) throw new Error("backup_data required for npm_restore");
+
+        const fs = require("fs").promises;
+        const backupData = JSON.parse(options.backup_data as string);
+
+        for (const [filename, content] of Object.entries(backupData)) {
+          const filePath = `${target.repo_path}/${filename}`;
+          await fs.writeFile(filePath, content as string);
+        }
+
+        // Run npm install to ensure dependencies match restored lockfile
+        const result = await execAsync(`cd "${target.repo_path}" && npm install`);
+        output = JSON.stringify(backupData) + "\n" + result.stdout + result.stderr;
         break;
       }
     }
