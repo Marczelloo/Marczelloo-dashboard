@@ -26,6 +26,7 @@ export function DeploymentStatusBanner() {
         if (response.ok) {
           const data = await response.json();
           if (mounted) {
+            console.log("[DeploymentBanner] Status:", data.status, data.message);
             setStatus(data);
 
             // If status is success, immediately clear it and show banner briefly
@@ -33,7 +34,10 @@ export function DeploymentStatusBanner() {
             if (data.status === "success") {
               setVisible(true);
               // Clear the status file immediately so it doesn't reappear
-              fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
+              console.log("[DeploymentBanner] Clearing success status...");
+              fetch("/api/deployment/status", { method: "DELETE" })
+                .then((res) => console.log("[DeploymentBanner] Clear response:", res.status))
+                .catch((e) => console.error("[DeploymentBanner] Clear failed:", e));
               // Auto-dismiss after 8 seconds
               const timer = setTimeout(() => {
                 if (mounted) setVisible(false);
@@ -54,7 +58,7 @@ export function DeploymentStatusBanner() {
           }
         }
       } catch (e) {
-        // Ignore errors
+        console.error("[DeploymentBanner] Error checking status:", e);
       }
     }
 
@@ -101,8 +105,14 @@ export function DeploymentStatusBanner() {
     window.location.reload();
   };
 
-  const handleDismiss = () => {
+  const handleDismiss = async () => {
     setVisible(false);
+    // Clear the status file so banner doesn't reappear on page reload
+    try {
+      await fetch("/api/deployment/status", { method: "DELETE" });
+    } catch (e) {
+      console.error("Failed to clear status:", e);
+    }
   };
 
   return (

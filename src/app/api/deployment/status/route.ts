@@ -11,8 +11,12 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE() {
   try {
+    console.log("[Deployment Status] DELETE request received, file:", STATUS_FILE);
     if (existsSync(STATUS_FILE)) {
       await unlink(STATUS_FILE);
+      console.log("[Deployment Status] Status file deleted");
+    } else {
+      console.log("[Deployment Status] Status file not found, nothing to delete");
     }
     return NextResponse.json({ success: true });
   } catch (error) {
