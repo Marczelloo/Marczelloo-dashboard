@@ -491,7 +491,7 @@ curl -X POST http://localhost:8787/execute \
   -d '{"operation":"npm_check","target":{"repo_path":"/path/to/your/project"}}'
 ```
 
-- [ ] **Step 6: Commit runner changes**
+- [ ] **Step 5: Commit runner changes**
 
 ```bash
 git add runner/index.ts
