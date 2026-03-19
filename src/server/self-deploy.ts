@@ -153,9 +153,9 @@ export async function performSafeSelfDeploy(options: {
     };
   }
 
-  // Step 2: Build new image (in background)
+  // Step 2: Build new image (synchronously with long timeout)
   console.log(`[SelfDeploy] Step 2: Build new image`);
-  await updateDeploymentStatus("deploying", "Building new Docker image...", commit);
+  await updateDeploymentStatus("deploying", "Building new Docker image (this may take 5-10 min)...", commit);
 
   // First, verify the path and docker-compose.yml exist
   const verifyResult = await execShell(`ls -la "${DASHBOARD_REPO_PATH}" 2>&1 && ls -la "${DASHBOARD_REPO_PATH}/docker-compose.yml" 2>&1`);
@@ -165,6 +165,8 @@ export async function performSafeSelfDeploy(options: {
     output.push(`FAILED: Cannot access ${DASHBOARD_REPO_PATH}`);
     output.push(verifyResult.stderr || "");
     output.push("");
+
+    await updateDeploymentStatus("failed", "Cannot access project directory", commit);
 
     await sendDiscordNotification({
       title: `❌ Self-Deploy Failed: Path Error`,
@@ -188,51 +190,42 @@ export async function performSafeSelfDeploy(options: {
   output.push(`SUCCESS: Path and docker-compose.yml accessible`);
   output.push("");
 
-  const buildLogFile = `/tmp/safe-deploy-${Date.now()}.log`;
+  // Build synchronously with extended timeout (10 minutes for Raspberry Pi)
+  console.log(`[SelfDeploy] Starting docker compose build...`);
+  const buildResult = await execShell(
+    `cd "${DASHBOARD_REPO_PATH}" && docker compose build dashboard 2>&1`,
+    600000 // 10 minute timeout
+  );
 
-  // Use nohup to run build in background
-  const buildCmd = `cd "${DASHBOARD_REPO_PATH}" && nohup bash -c '
-    echo "=== Building new image ===" &&
-    docker compose build dashboard 2>&1 &&
-    echo "" &&
-    echo "===[BUILD_COMPLETE]===" &&
-    echo "STATUS: SUCCESS" &&
-    echo "TIMESTAMP: $(date -Iseconds)
-  ' || (
-    echo "" &&
-    echo "===[BUILD_COMPLETE]===" &&
-    echo "STATUS: FAILED" &&
-    echo "TIMESTAMP: $(date -Iseconds)
-  )' > "${buildLogFile}" 2>&1 &`;
-
-  await execShell(buildCmd);
-  output.push(`=== Build Started ===`);
-  output.push(`Running in background. Log: ${buildLogFile}`);
+  output.push(`=== Build Output ===`);
+  output.push(buildResult.stdout || buildResult.stderr || "No output");
   output.push("");
 
-  // Wait for build to complete (with timeout)
-  const maxWaitTime = 600000; // 10 minutes
-  const checkInterval = 5000;
-  let elapsed = 0;
-  let buildSuccess = false;
-  let buildOutput = "";
+  if (!buildResult.success) {
+    console.error(`[SelfDeploy] Build failed`);
+    await updateDeploymentStatus("failed", "Docker build failed", commit);
 
-  console.log(`[SelfDeploy] Waiting for build to complete...`);
-  while (elapsed < maxWaitTime) {
-    await new Promise((resolve) => setTimeout(resolve, checkInterval));
-    elapsed += checkInterval;
+    await sendDiscordNotification({
+      title: `❌ Self-Deploy Failed: Build Error`,
+      message: `Docker image build failed. Check logs for details.`,
+      color: "danger",
+      fields: [
+        { name: "Commit", value: commit || "unknown" },
+        { name: "Error", value: (buildResult.stderr || "Unknown error").slice(0, 500) },
+      ],
+      url: compareUrl,
+    });
 
-    const logCheck = await execShell(`cat "${buildLogFile}" 2>/dev/null || echo "Log not found"`);
-
-    if (logCheck.success && logCheck.stdout) {
-      buildOutput = logCheck.stdout;
-
-      if (buildOutput.includes("===[BUILD_COMPLETE]===")) {
-        buildSuccess = buildOutput.includes("STATUS: SUCCESS");
-        break;
-      }
-    }
+    return {
+      success: false,
+      error: "Build failed",
+      output: output.join("\n"),
+    };
   }
+
+  output.push(`=== Build Result ===`);
+  output.push(`SUCCESS`);
+  output.push("");
 
   if (!buildSuccess) {
     console.error(`[SelfDeploy] Build failed or timed out`);
