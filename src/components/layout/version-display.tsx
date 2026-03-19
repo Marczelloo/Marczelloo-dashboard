@@ -81,9 +81,6 @@ export function VersionDisplay() {
           {version.subject}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10px] text-emerald-500 font-medium">
-            ✓ Self-deploy active
-          </span>
           <span className="text-[10px] text-muted-foreground/70">
             {version.branch} • {version.relativeDate}
           </span>
