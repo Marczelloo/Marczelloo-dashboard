@@ -15,7 +15,7 @@ interface DeploymentStatus {
 export function DeploymentStatusBanner() {
   const [status, setStatus] = useState<DeploymentStatus>({ status: "idle" });
   const [visible, setVisible] = useState(false);
-  const [autoDismissed, setAutoDismissed] = useState(false);
+  const [clearAttempted, setClearAttempted] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -31,8 +31,9 @@ export function DeploymentStatusBanner() {
 
             // If status is success, immediately clear it and show banner briefly
             // This prevents the banner from reappearing on every page load
-            if (data.status === "success") {
+            if (data.status === "success" && !clearAttempted) {
               setVisible(true);
+              setClearAttempted(true); // Mark that we've attempted to clear
               // Clear the status file immediately so it doesn't reappear
               console.log("[DeploymentBanner] Clearing success status...");
               fetch("/api/deployment/status", { method: "DELETE" })
@@ -71,7 +72,7 @@ export function DeploymentStatusBanner() {
       mounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [clearAttempted]);
 
   if (!visible) return null;
 
