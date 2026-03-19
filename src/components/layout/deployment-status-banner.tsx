@@ -83,7 +83,7 @@ export function DeploymentStatusBanner() {
       case "failed":
         return <XCircle className="h-3.5 w-3.5" />;
       default:
-        return <Rocket className="h-3.5 w-3.5" />;
+        return null;
     }
   };
 
