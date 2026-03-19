@@ -12,10 +12,13 @@ interface DeploymentStatus {
   canReload?: boolean;
 }
 
+const SESSION_STORAGE_KEY = "deploy-pending-commit";
+
 export function DeploymentStatusBanner() {
   const [status, setStatus] = useState<DeploymentStatus>({ status: "idle" });
   const [visible, setVisible] = useState(false);
-  const [clearAttempted, setClearAttempted] = useState(false);
+  const [currentCommit, setCurrentCommit] = useState<string | null>(null);
+  const [hasCheckedVersion, setHasCheckedVersion] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -27,23 +30,20 @@ export function DeploymentStatusBanner() {
           const data = await response.json();
           if (mounted) {
             console.log("[DeploymentBanner] Status:", data.status, data.message);
+
+            // If success status has a commit, store it in sessionStorage
+            if (data.status === "success" && data.commit) {
+              const pendingCommit = sessionStorage.getItem(SESSION_STORAGE_KEY);
+              if (!pendingCommit) {
+                // First time seeing this success - store the commit
+                sessionStorage.setItem(SESSION_STORAGE_KEY, data.commit);
+              }
+            }
+
             setStatus(data);
 
-            // If status is success, immediately clear it and show banner briefly
-            // This prevents the banner from reappearing on every page load
-            if (data.status === "success" && !clearAttempted) {
+            if (data.status === "success") {
               setVisible(true);
-              setClearAttempted(true); // Mark that we've attempted to clear
-              // Clear the status file immediately so it doesn't reappear
-              console.log("[DeploymentBanner] Clearing success status...");
-              fetch("/api/deployment/status", { method: "DELETE" })
-                .then((res) => console.log("[DeploymentBanner] Clear response:", res.status))
-                .catch((e) => console.error("[DeploymentBanner] Clear failed:", e));
-              // Auto-dismiss after 8 seconds
-              const timer = setTimeout(() => {
-                if (mounted) setVisible(false);
-              }, 8000);
-              return () => clearTimeout(timer);
             } else if (data.status === "deploying") {
               setVisible(true);
             } else if (data.status === "failed") {
@@ -66,13 +66,50 @@ export function DeploymentStatusBanner() {
     // Check immediately
     checkStatus();
 
-    // Poll every 3 seconds when deploying
+    // Poll every 3 seconds when visible
     const interval = setInterval(checkStatus, 3000);
     return () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, [clearAttempted]);
+  }, []);
+
+  // Check current page version to see if we're on the new deployment
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkVersion() {
+      try {
+        const response = await fetch("/api/version");
+        if (response.ok) {
+          const data = await response.json();
+          if (mounted && data.version?.commit) {
+            setCurrentCommit(data.version.commit);
+            setHasCheckedVersion(true);
+          }
+        }
+      } catch (e) {
+        console.error("[DeploymentBanner] Error checking version:", e);
+      }
+    }
+
+    checkVersion();
+  }, []);
+
+  // Auto-hide banner if we're on the new version
+  useEffect(() => {
+    if (!hasCheckedVersion || !currentCommit) return;
+
+    const pendingCommit = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (pendingCommit && currentCommit === pendingCommit) {
+      // We're on the new version! Clear the pending flag and hide banner
+      console.log("[DeploymentBanner] On new version, clearing status");
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      setVisible(false);
+      // Also clear the status file on server
+      fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
+    }
+  }, [hasCheckedVersion, currentCommit]);
 
   if (!visible) return null;
 
@@ -108,7 +145,8 @@ export function DeploymentStatusBanner() {
 
   const handleDismiss = async () => {
     setVisible(false);
-    // Clear the status file so banner doesn't reappear on page reload
+    // Clear the pending commit flag and status file
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
     try {
       await fetch("/api/deployment/status", { method: "DELETE" });
     } catch (e) {
