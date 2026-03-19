@@ -472,11 +472,9 @@ case "npm_restore": {
 }
 ```
 
-- [ ] **Step 4: Update maxBuffer for package operations**
+> **Note:** npm operations can produce large JSON output. Node's execAsync defaults to 1MB maxBuffer which should be sufficient. If you encounter "maxBuffer exceeded" errors, increase it by passing `maxBuffer: 2 * 1024 * 1024` (2MB) to the execAsync options.
 
-The npm operations can produce large JSON output. Find the execAsync import and add a note, or ensure maxBuffer is sufficient (it defaults to 1MB which should be fine).
-
-- [ ] **Step 5: Test runner locally**
+- [ ] **Step 4: Test runner locally**
 
 ```bash
 # Kill existing runner if running, then start
@@ -1509,8 +1507,8 @@ export function PackagesTab({ project }: PackagesTabProps) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update packages");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update packages");
       }
 
       const data = await response.json();
@@ -1523,7 +1521,6 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setUpdating(false);
     }
-  };
   };
 
   const togglePackage = (packageName: string) => {
