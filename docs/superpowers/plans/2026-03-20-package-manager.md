@@ -16,11 +16,30 @@
 
 ## Chunk 1: Types and Database Setup
 
+### Task 0: Define repo_path Resolution Strategy
+
+**Decision Point:** Before implementing, we need to decide where `repo_path` comes from.
+
+**Options:**
+A) **From services table** - Use `service.repo_path` from the first service with a non-null value
+B) **From project table** - Add `repo_path` column to projects table
+C) **User-selected** - Let user choose which service's path to use
+
+**Decision for MVP:** Option A - Use services table. A project may have multiple services, so we'll:
+1. Fetch all services for the project
+2. Find services with non-null `repo_path`
+3. Use the first one, or show a selector if multiple exist
+
+**Note:** For GitHub projects without local repo_path, we'll need to clone to a temp directory (Phase 4).
+
+---
+
 ### Task 1: Add Package Update Types
 
 **Files:**
 - Modify: `src/types/entities.ts` - Add PackageUpdate entity and related types
 - Modify: `src/types/runner.ts` - Add package operations to RunnerOperation type
+- Modify: `src/types/index.ts` - Export new types (automatically via re-export)
 
 - [ ] **Step 1: Add PackageUpdate type to src/types/entities.ts**
 
@@ -40,6 +59,7 @@ export interface PackageUpdate {
   branch_name: string | null; // feature branch for GitHub projects
   pr_url: string | null; // created PR URL
   rollback_data: string | null; // backed up lockfile content (JSON)
+  rollback_from_id: string | null; // ID of the update this rollback reverses (if this is a rollback)
   created_at: string;
   completed_at: string | null;
 }
@@ -60,6 +80,7 @@ export interface CreatePackageUpdateInput {
   branch_name?: string | null;
   pr_url?: string | null;
   rollback_data?: string | null;
+  rollback_from_id?: string | null; // For rollback operations
   completed_at?: string | null;
 }
 
@@ -208,6 +229,7 @@ CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
   branch_name TEXT,
   pr_url TEXT,
   rollback_data TEXT,             -- JSON backup of lockfiles
+  rollback_from_id TEXT,          -- ID of update this rollback reverses (null for non-rollbacks)
   created_at TEXT NOT NULL DEFAULT (datetime('epoch')),
   completed_at TEXT,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -851,13 +873,12 @@ Create `src/app/api/projects/[id]/packages/route.ts`:
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
-import { projects } from "@/server/atlashub";
-import { npmCheck } from "@/server/runner";
-import { RunnerError } from "@/server/runner/client";
+import { projects, services } from "@/server/atlashub";
 
 /**
  * GET /api/projects/[id]/packages
- * Get package info and outdated status for a project
+ * Get available repo_paths for a project's services
+ * Note: This endpoint helps the UI find which services have repo_path for package operations
  */
 export async function GET(
   request: NextRequest,
@@ -872,20 +893,31 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get repo path from service (if any)
-    const projectServices = await projects.getProjects({
-      filters: [{ operator: "eq", column: "id", value: id }],
-      select: ["id"], // We'd need to fetch services separately
+    // Fetch services with repo_path for this project
+    const allServices = await services.getServices({
+      filters: [
+        { operator: "eq", column: "project_id", value: id },
+        { operator: "neq", column: "repo_path", value: null }
+      ],
+      select: ["id", "name", "repo_path", "type"],
     });
 
-    // For now, use repo_path from the first service that has it
-    // TODO: Add repo_path to project table or services relation
+    // Extract available repo_paths
+    const availableRepoPaths = allServices.map((s) => ({
+      service_id: s.id,
+      service_name: s.name,
+      repo_path: s.repo_path,
+    }));
+
+    // Detect ecosystem from lockfile presence (via service name/type heuristics for MVP)
+    // Full ecosystem detection via file checking will be in Phase 3
+    const ecosystem = "npm"; // MVP default
+
     return NextResponse.json({
-      ecosystem: "npm", // MVP: npm only
-      outdated_count: 0,
-      outdated: [],
-      last_check: null,
-      repo_path: null, // Caller needs to provide or we fetch from services
+      ecosystem,
+      available_repo_paths: availableRepoPaths,
+      default_repo_path: availableRepoPaths[0]?.repo_path || null,
+      has_repo_path: availableRepoPaths.length > 0,
     });
   } catch (error) {
     console.error("Error fetching package info:", error);
@@ -1135,8 +1167,8 @@ export async function POST(
     // Step 8: Mark as success
     await packageUpdates.markAsSuccess(updateRecord.id);
 
-    // TODO: For GitHub projects, commit and push to feature branch
-    // This will be implemented in Phase 4
+    // Note: GitHub integration (commit, push to feature branch) is Phase 4
+    // For MVP, updates are applied directly to the local repo
 
     return NextResponse.json({
       success: true,
@@ -1282,6 +1314,7 @@ export async function POST(
       new_versions: updateRecord.old_versions, // Swapped: old becomes new
       status: "success",
       rollback_data: JSON.stringify(currentBackup.backup || {}),
+      rollback_from_id: update_id, // Track which update we rolled back
     });
 
     return NextResponse.json({
@@ -1376,18 +1409,42 @@ interface PackageUpdateRecord {
   completed_at: string | null;
 }
 
+interface RepoPathOption {
+  service_id: string;
+  service_name: string;
+  repo_path: string;
+}
+
 export function PackagesTab({ project }: PackagesTabProps) {
   const [checkResult, setCheckResult] = useState<PackageCheckResult | null>(null);
   const [history, setHistory] = useState<PackageUpdateRecord[]>([]);
+  const [availableRepoPaths, setAvailableRepoPaths] = useState<RepoPathOption[]>([]);
+  const [selectedRepoPath, setSelectedRepoPath] = useState<string>("");
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
 
-  // Fetch history on mount
+  // Fetch available repo paths and history on mount
   useEffect(() => {
+    fetchRepoPaths();
     fetchHistory();
   }, [project.id]);
+
+  const fetchRepoPaths = async () => {
+    try {
+      const response = await fetch(`/api/projects/${project.id}/packages`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableRepoPaths(data.available_repo_paths || []);
+        if (data.default_repo_path) {
+          setSelectedRepoPath(data.default_repo_path);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch repo paths:", err);
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -1402,16 +1459,19 @@ export function PackagesTab({ project }: PackagesTabProps) {
   };
 
   const handleCheck = async () => {
+    if (!selectedRepoPath) {
+      setError("No repository path available. Please configure a service with repo_path.");
+      return;
+    }
+
     setChecking(true);
     setError(null);
 
     try {
-      // For now, we'd need repo_path from a service
-      // In a real scenario, you'd have a service selector or store repo_path on project
       const response = await fetch(`/api/projects/${project.id}/packages/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_path: "/path/to/project" }), // TODO: Get actual path
+        body: JSON.stringify({ repo_path: selectedRepoPath }),
       });
 
       if (!response.ok) {
@@ -1428,6 +1488,11 @@ export function PackagesTab({ project }: PackagesTabProps) {
   };
 
   const handleUpdate = async () => {
+    if (!selectedRepoPath) {
+      setError("No repository path available. Please configure a service with repo_path.");
+      return;
+    }
+
     setUpdating(true);
     setError(null);
 
@@ -1436,7 +1501,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          repo_path: "/path/to/project", // TODO: Get actual path
+          repo_path: selectedRepoPath,
           packages: Array.from(selectedPackages),
           run_tests: true,
           run_build: false,
@@ -1458,6 +1523,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setUpdating(false);
     }
+  };
   };
 
   const togglePackage = (packageName: string) => {
@@ -1496,18 +1562,54 @@ export function PackagesTab({ project }: PackagesTabProps) {
     <div className="grid gap-6 lg:grid-cols-3">
       {/* Main Content */}
       <div className="lg:col-span-2 space-y-6">
+        {/* Repo Path Selection (if multiple available) */}
+        {availableRepoPaths.length > 1 && (
+          <Card>
+            <CardContent className="pt-4">
+              <label className="text-sm font-medium mb-2 block">Select Repository:</label>
+              <select
+                value={selectedRepoPath}
+                onChange={(e) => setSelectedRepoPath(e.target.value)}
+                className="w-full p-2 rounded-md border border-border bg-background"
+              >
+                {availableRepoPaths.map((option) => (
+                  <option key={option.service_id} value={option.repo_path}>
+                    {option.service_name} ({option.repo_path})
+                  </option>
+                ))}
+              </select>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* No Repo Path Warning */}
+        {availableRepoPaths.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No repository path configured.</p>
+              <p className="text-sm mt-1">Add a service with a repo_path to enable package management.</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Package Status Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Package className="h-4 w-4" />
               Package Status
+              {availableRepoPaths.length === 1 && (
+                <span className="text-xs text-muted-foreground font-normal ml-2">
+                  ({availableRepoPaths[0].service_name})
+                </span>
+              )}
             </CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={handleCheck}
-              disabled={checking}
+              disabled={checking || !selectedRepoPath}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${checking ? "animate-spin" : ""}`} />
               Check for Updates
@@ -1895,8 +1997,8 @@ The Package Manager allows updating project dependencies directly from the dashb
 ## Current Limitations (MVP)
 
 - npm ecosystem only
-- Requires `repo_path` to be provided (not stored on project)
-- GitHub integration (branch creation) not yet implemented
+- repo_path must be configured on a service (auto-detected from services table)
+- GitHub integration (branch creation) not yet implemented (Phase 4)
 - Multi-ecosystem support (pip, cargo, etc.) planned for Phase 3
 ```
 
