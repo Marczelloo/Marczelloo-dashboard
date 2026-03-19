@@ -227,8 +227,32 @@ export async function performSafeSelfDeploy(options: {
 
   // Step 3: Mark as successful BEFORE restarting (container restart will kill this process)
   console.log(`[SelfDeploy] Step 3: Mark deployment successful and restart container`);
-  await updateDeploymentStatus("success", `Deployed: ${commitMessage?.substring(0, 50) || "Success"}`, commit);
 
+  // Write success status - retry a few times to ensure it's persisted
+  const statusData = {
+    status: "success",
+    message: `Deployed: ${commitMessage?.substring(0, 50) || "Success"}`,
+    commit,
+    timestamp: new Date().toISOString(),
+  };
+  const jsonStr = JSON.stringify(statusData).replace(/'/g, "'\"'\"'");
+
+  for (let i = 0; i < 3; i++) {
+    await execShell(`echo '${jsonStr}' > "${STATUS_FILE}"`);
+    // Verify it was written
+    const verifyCheck = await execShell(`cat "${STATUS_FILE}" 2>/dev/null || echo "FAIL"`);
+    if (verifyCheck.stdout && verifyCheck.stdout.includes("success")) {
+      console.log(`[SelfDeploy] Status file verified on attempt ${i + 1}`);
+      break;
+    }
+    console.log(`[SelfDeploy] Status verification failed, attempt ${i + 1}/3`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  // Give the filesystem a moment to sync
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  console.log(`[SelfDeploy] Now restarting container...`);
   const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d --force-recreate dashboard 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
