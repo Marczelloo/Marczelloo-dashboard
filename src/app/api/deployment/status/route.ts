@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 
+// Status file is in the mounted /projects directory (shared with runner via host mount)
 const STATUS_FILE = process.env.DASHBOARD_REPO_PATH
-  ? `${process.env.DASHBOARD_REPO_PATH}/.deploy-status.json`
-  : "/home/Marczelloo_pi/projects/Marczelloo-dashboard/.deploy-status.json";
+  ? process.env.DASHBOARD_REPO_PATH.replace("/home/Marczelloo_pi/projects", "/projects") + "/.deploy-status.json"
+  : "/projects/Marczelloo-dashboard/.deploy-status.json";
 
 export const dynamic = "force-dynamic";
 

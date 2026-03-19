@@ -59,6 +59,9 @@ services:
       - DASHBOARD_REPO_PATH=${DASHBOARD_REPO_PATH:-/home/Marczelloo_pi/projects/Marczelloo-dashboard}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Mount for deployment status file (shared with runner)
+      - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:/projects:ro
     depends_on:
       - runner
       - portainer
