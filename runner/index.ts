@@ -247,6 +247,17 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
       case "npm_update": {
         if (!target.repo_path) throw new Error("repo_path required for npm_update");
+
+        // Validate package names to prevent command injection
+        if (target.packages) {
+          const dangerousChars = /[;&|`$()]/;
+          for (const pkg of target.packages) {
+            if (dangerousChars.test(pkg)) {
+              throw new Error(`Invalid package name: ${pkg}`);
+            }
+          }
+        }
+
         const packages = target.packages && target.packages.length > 0
           ? target.packages.join(" ")
           : "";
