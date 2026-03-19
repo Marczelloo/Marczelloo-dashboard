@@ -92,12 +92,10 @@ async function updateDeploymentStatus(
       timestamp: new Date().toISOString(),
     };
 
-    // Write via runner shell (executes on host via SSH)
-    await execShell(
-      `cat > "${STATUS_FILE}" << 'EOFSTATUS'
-${JSON.stringify(statusData)}
-EOFSTATUS`
-    );
+    // Use echo with JSON string (more reliable than heredoc via SSH)
+    const jsonStr = JSON.stringify(statusData).replace(/'/g, "'\"'\"'");
+    await execShell(`echo '${jsonStr}' > "${STATUS_FILE}"`);
+    console.log("[SelfDeploy] Status updated:", status, message || "");
   } catch (error) {
     console.error("[SelfDeploy] Failed to update status:", error);
   }
@@ -230,7 +228,7 @@ export async function performSafeSelfDeploy(options: {
   // Step 3: Start new container
   console.log(`[SelfDeploy] Step 3: Start new container`);
   await updateDeploymentStatus("deploying", "Starting new container...", commit);
-  const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d dashboard 2>&1`, 120000);
+  const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d --force-recreate dashboard 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
   output.push(upResult.stdout || upResult.stderr || "Command executed");
