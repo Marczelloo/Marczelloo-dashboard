@@ -289,7 +289,7 @@ export async function npmCheck(
     });
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await response.text().catch(() => response.statusText);
       return { success: false, outdated: [], error };
     }
 
@@ -309,6 +309,7 @@ export async function npmCheck(
       });
     } catch {
       // npm outdated outputs errors to stdout when no packages
+      // or the output is not valid JSON
       outdated = [];
     }
 
@@ -397,11 +398,11 @@ export async function npmBackup(
   try {
     const backup = JSON.parse(result.output || "{}");
     return { success: true, backup };
-  } catch {
+  } catch (parseError) {
     return {
       success: false,
       backup: {},
-      error: "Failed to parse backup data",
+      error: `Failed to parse backup data: ${parseError instanceof Error ? parseError.message : "Unknown error"}`,
     };
   }
 }
