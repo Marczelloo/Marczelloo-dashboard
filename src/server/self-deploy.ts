@@ -227,38 +227,6 @@ export async function performSafeSelfDeploy(options: {
   output.push(`SUCCESS`);
   output.push("");
 
-  if (!buildSuccess) {
-    console.error(`[SelfDeploy] Build failed or timed out`);
-    output.push(`=== Build Result ===`);
-    output.push(`FAILED or timed out after ${maxWaitTime / 1000}s`);
-    output.push("");
-    output.push(buildOutput);
-    output.push("");
-
-    await sendDiscordNotification({
-      title: `❌ Self-Deploy Failed: Build Error`,
-      message: `Docker image build failed. Old container still running.`,
-      color: "danger",
-      fields: [
-        { name: "Commit", value: commit || "unknown" },
-        { name: "Error", value: "Build timed out or failed" },
-      ],
-      url: compareUrl,
-    });
-
-    await updateDeploymentStatus("failed", "Docker build failed", commit);
-
-    return {
-      success: false,
-      error: "Build failed - deployment aborted, old container still running",
-      output: output.join("\n"),
-    };
-  }
-
-  output.push(`=== Build Result ===`);
-  output.push(`SUCCESS`);
-  output.push("");
-
   // Step 3: Start new container
   console.log(`[SelfDeploy] Step 3: Start new container`);
   await updateDeploymentStatus("deploying", "Starting new container...", commit);
