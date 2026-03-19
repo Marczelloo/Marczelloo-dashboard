@@ -27,19 +27,29 @@ export function DeploymentStatusBanner() {
           const data = await response.json();
           if (mounted) {
             setStatus(data);
-            // Show banner if not idle
-            setVisible(data.status !== "idle");
 
-            // Auto-dismiss success banner after 5 seconds of visibility
-            // (User has seen it and can reload manually if needed)
-            if (data.status === "success" && !autoDismissed) {
+            // If status is success, immediately clear it and show banner briefly
+            // This prevents the banner from reappearing on every page load
+            if (data.status === "success") {
+              setVisible(true);
+              // Clear the status file immediately so it doesn't reappear
+              fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
+              // Auto-dismiss after 8 seconds
               const timer = setTimeout(() => {
-                setVisible(false);
-                setAutoDismissed(true);
-                // Clear the status file on the server
-                fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
-              }, 5000);
+                if (mounted) setVisible(false);
+              }, 8000);
               return () => clearTimeout(timer);
+            } else if (data.status === "deploying") {
+              setVisible(true);
+            } else if (data.status === "failed") {
+              setVisible(true);
+              // Auto-dismiss failed status after 10 seconds
+              const timer = setTimeout(() => {
+                if (mounted) setVisible(false);
+              }, 10000);
+              return () => clearTimeout(timer);
+            } else {
+              setVisible(false);
             }
           }
         }
@@ -57,7 +67,7 @@ export function DeploymentStatusBanner() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [autoDismissed]);
+  }, []);
 
   if (!visible) return null;
 
