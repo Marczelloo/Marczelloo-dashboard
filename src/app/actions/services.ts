@@ -14,7 +14,7 @@ import type { CreateServiceInput, UpdateServiceInput } from "@/types";
 // ========================================
 
 const createServiceSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().uuid().optional(), // Optional for standalone services
   name: z.string().min(1, "Name is required").max(100),
   type: z.enum(["docker", "vercel", "external"]),
   url: z.string().url().optional().or(z.literal("")),

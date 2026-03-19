@@ -60,12 +60,21 @@ export async function getMonitorableServices(): Promise<Service[]> {
 export async function createService(input: CreateServiceInput): Promise<Service> {
   const now = new Date().toISOString();
   console.log("[createService] Input project_id:", input.project_id, "type:", typeof input.project_id);
-  const response = await db.insert<Service>(TABLE, {
+
+  // Build the insert object, handling undefined project_id for standalone services
+  const insertData: Record<string, unknown> = {
     ...input,
     deploy_strategy: input.deploy_strategy || "manual",
     created_at: now,
     updated_at: now,
-  });
+  };
+
+  // If project_id is undefined, set it to null for standalone services
+  if (insertData.project_id === undefined) {
+    insertData.project_id = null;
+  }
+
+  const response = await db.insert<Service>(TABLE, insertData);
   console.log("[createService] Created service:", response.data[0]?.id, "project_id:", response.data[0]?.project_id);
   return response.data[0];
 }
