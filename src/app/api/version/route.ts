@@ -56,7 +56,7 @@ export async function GET() {
       }
     }
 
-    // Check if there are uncommitted changes
+    // Check if there are uncommitted changes OR unpushed commits
     const statusResponse = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
@@ -64,15 +64,40 @@ export async function GET() {
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${DASHBOARD_REPO_PATH}" && git status --porcelain`,
+        command: `cd "${DASHBOARD_REPO_PATH}" && git fetch --quiet origin 2>/dev/null; git status --porcelain && git rev-parse HEAD && git rev-parse @{u} 2>/dev/null || echo "no-upstream"`,
       }),
     });
 
-    let hasUncommittedChanges = false;
+    // Status flags
+    let hasLocalChanges = false;
+    let hasUnpushedCommits = false;
+
     if (statusResponse.ok) {
       const statusResult = await statusResponse.json();
-      hasUncommittedChanges = !!(statusResult.stdout?.trim().length > 0);
+      const stdout = statusResult.stdout || "";
+      const lines = stdout.trim().split("\n");
+
+      // Check for uncommitted changes (any line from git status --porcelain)
+      const statusLineIndex = lines.findIndex((l: string) => /^[MADRCU?][MADRCU? ]/.test(l));
+      hasLocalChanges = statusLineIndex !== -1;
+
+      // Find HEAD and upstream commit SHA
+      const headIndex = lines.findIndex((l: string) => /^[a-f0-9]{40}$/i.test(l));
+      const upstreamIndex = lines.findIndex((l: string, i: number) => i > headIndex && /^[a-f0-9]{40}$/i.test(l));
+
+      // Check if HEAD is ahead/behind or has no upstream
+      if (headIndex !== -1 && upstreamIndex !== -1) {
+        const localHead = lines[headIndex];
+        const upstreamHead = lines[upstreamIndex];
+        hasUnpushedCommits = localHead !== upstreamHead;
+      } else if (headIndex !== -1) {
+        // No upstream configured - consider as unpushed if there's a commit
+        hasUnpushedCommits = true;
+      }
     }
+
+    // Determine overall status
+    const hasUncommittedChanges = hasLocalChanges || hasUnpushedCommits;
 
     return NextResponse.json({
       success: true,
@@ -85,6 +110,8 @@ export async function GET() {
         branch,
         packageVersion,
         hasUncommittedChanges,
+        hasLocalChanges,
+        hasUnpushedCommits,
       },
     });
   } catch (error) {

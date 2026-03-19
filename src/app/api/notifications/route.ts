@@ -32,7 +32,20 @@ const DEMO_NOTIFICATIONS = [
     read: true,
     link: "/services/svc-demo-3",
   },
-];
+  // This one is older than 7 days and should be filtered out
+  {
+    id: "demo-old",
+    type: "info" as const,
+    title: "Old Notification",
+    message: "This should be filtered out (10 days old)",
+    timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+    read: true,
+    link: undefined,
+  },
+].filter((n) => Date.now() - new Date(n.timestamp).getTime() < 7 * 24 * 60 * 60 * 1000);
+
+// Filter out notifications older than 7 days for quick dropdown
+const QUICK_NOTIFICATIONS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function GET() {
   try {
@@ -47,17 +60,24 @@ export async function GET() {
     }
 
     // Get recent audit logs and transform them into notifications
-    const logs = await auditLogs.getAuditLogs({ limit: 20 });
+    const logs = await auditLogs.getAuditLogs({ limit: 50 });
 
-    const notifications = logs.map((log) => ({
-      id: log.id,
-      type: getNotificationType(log.action),
-      title: getNotificationTitle(log.action, log.entity_type),
-      message: getNotificationMessage(log),
-      timestamp: log.at,
-      read: false, // For now, we don't track read status
-      link: getNotificationLink(log),
-    }));
+    // Filter out old notifications and map to notification format
+    const now = Date.now();
+    const notifications = logs
+      .filter((log) => {
+        const logTime = new Date(log.at).getTime();
+        return now - logTime < QUICK_NOTIFICATIONS_MAX_AGE_MS;
+      })
+      .map((log) => ({
+        id: log.id,
+        type: getNotificationType(log.action),
+        title: getNotificationTitle(log.action, log.entity_type),
+        message: getNotificationMessage(log),
+        timestamp: log.at,
+        read: false, // For now, we don't track read status
+        link: getNotificationLink(log),
+      }));
 
     return NextResponse.json({ notifications });
   } catch (error) {

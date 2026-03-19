@@ -107,7 +107,7 @@ export function NotificationsDropdown() {
 
             <div className="border-t border-border p-2">
               <Link
-                href="/audit"
+                href="/audit-log"
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-center gap-1 rounded p-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
               >

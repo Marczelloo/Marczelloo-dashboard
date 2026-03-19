@@ -12,6 +12,8 @@ interface VersionInfo {
   subject: string;
   branch: string;
   hasUncommittedChanges: boolean;
+  hasLocalChanges: boolean;
+  hasUnpushedCommits: boolean;
 }
 
 export function VersionDisplay() {
@@ -84,10 +86,16 @@ export function VersionDisplay() {
           <span className="text-[10px] text-muted-foreground/70">
             {version.branch} • {version.relativeDate}
           </span>
-          {version.hasUncommittedChanges && (
+          {version.hasLocalChanges && (
             <span className="flex items-center gap-1 text-[10px] text-warning">
               <AlertCircle className="h-2.5 w-2.5" />
               Uncommitted
+            </span>
+          )}
+          {!version.hasLocalChanges && version.hasUnpushedCommits && (
+            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+              <GitCommit className="h-2.5 w-2.5" />
+              Unpushed
             </span>
           )}
         </div>
