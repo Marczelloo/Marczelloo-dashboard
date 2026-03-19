@@ -103,6 +103,27 @@ export interface AuditLog {
   meta_json: Record<string, unknown> | null;
 }
 
+export interface PackageUpdate {
+  id: string;
+  project_id: string;
+  ecosystem: PackageEcosystem;
+  packages_updated: string[]; // JSON array of package names
+  old_versions: Record<string, string>; // JSON: {"react": "19.0.0", ...}
+  new_versions: Record<string, string>; // JSON: {"react": "19.0.1", ...}
+  status: PackageUpdateStatus;
+  test_output: string | null;
+  error_message: string | null;
+  branch_name: string | null; // feature branch for GitHub projects
+  pr_url: string | null; // created PR URL
+  rollback_data: string | null; // backed up lockfile content (JSON)
+  rollback_from_id: string | null; // ID of the update this rollback reverses (if this is a rollback)
+  created_at: string;
+  completed_at: string | null;
+}
+
+export type PackageEcosystem = "npm" | "yarn" | "pnpm" | "pip" | "poetry" | "cargo" | "composer";
+export type PackageUpdateStatus = "pending" | "success" | "failed" | "rolled_back";
+
 export type AuditAction =
   | "create"
   | "update"
@@ -139,7 +160,8 @@ export type EntityType =
   | "github_issue"
   | "work_item_pr"
   | "work_item_github"
-  | "github_repos";
+  | "github_repos"
+  | "package_update";
 
 // ========================================
 // Create/Update DTOs
@@ -254,4 +276,29 @@ export interface CreateAuditLogInput {
   entity_type: EntityType;
   entity_id?: string;
   meta_json?: Record<string, unknown>;
+}
+
+export interface CreatePackageUpdateInput {
+  project_id: string;
+  ecosystem: PackageEcosystem;
+  packages_updated: string[];
+  old_versions: Record<string, string>;
+  new_versions: Record<string, string>;
+  status: PackageUpdateStatus;
+  test_output?: string | null;
+  error_message?: string | null;
+  branch_name?: string | null;
+  pr_url?: string | null;
+  rollback_data?: string | null;
+  rollback_from_id?: string | null; // For rollback operations
+  completed_at?: string | null;
+}
+
+export interface UpdatePackageUpdateInput {
+  status?: PackageUpdateStatus;
+  test_output?: string | null;
+  error_message?: string | null;
+  branch_name?: string | null;
+  pr_url?: string | null;
+  completed_at?: string | null;
 }
