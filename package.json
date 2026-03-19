@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "db:setup": "npx tsx scripts/setup-database.ts",
+    "db:create-package-updates": "npx tsx scripts/create-package-updates-table.ts",
     "runner": "npx tsx runner/index.ts",
     "runner:mock": "npx tsx runner/mock.ts"
   },
