@@ -225,9 +225,10 @@ export async function performSafeSelfDeploy(options: {
   output.push(`SUCCESS`);
   output.push("");
 
-  // Step 3: Start new container
-  console.log(`[SelfDeploy] Step 3: Start new container`);
-  await updateDeploymentStatus("deploying", "Starting new container...", commit);
+  // Step 3: Mark as successful BEFORE restarting (container restart will kill this process)
+  console.log(`[SelfDeploy] Step 3: Mark deployment successful and restart container`);
+  await updateDeploymentStatus("success", `Deployed: ${commitMessage?.substring(0, 50) || "Success"}`, commit);
+
   const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d --force-recreate dashboard 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
@@ -257,122 +258,14 @@ export async function performSafeSelfDeploy(options: {
     };
   }
 
-  // Step 4: Wait for health check
-  console.log(`[SelfDeploy] Step 4: Waiting for health check`);
-  await updateDeploymentStatus("deploying", "Running health checks...", commit);
-  const healthCheckRetries = 60; // 60 retries * 3 seconds = 3 minutes
-  let healthPassed = false;
+  // Container is restarting - send Discord notification and return
+  // The process will be killed by the container restart, so we do this first
+  console.log(`[SelfDeploy] Container restart initiated, process will end shortly`);
 
-  for (let i = 0; i < healthCheckRetries; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // Check container status
-    const statusCheck = await execShell(
-      `docker inspect --format='{{.State.Status}}' marczelloo-dashboard 2>/dev/null || echo "not_found"`
-    );
-
-    const containerStatus = statusCheck.stdout?.trim() || "";
-
-    if (containerStatus === "not_found" || containerStatus === "exited" || containerStatus === "dead") {
-      console.log(`[SelfDeploy] Container not running, status: ${containerStatus}`);
-      output.push(`=== Health Check ===`);
-      output.push(`FAILED: Container status is ${containerStatus}`);
-      output.push("");
-      break;
-    }
-
-    // Skip health check until past start_period (40s)
-    if (i < 15) {
-      continue;
-    }
-
-    // Check health status
-    const healthCheck = await execShell(
-      `docker inspect --format='{{.State.Health.Status}}' marczelloo-dashboard 2>/dev/null || echo "no_health"`
-    );
-
-    if (healthCheck.success && healthCheck.stdout) {
-      const status = healthCheck.stdout.trim();
-      console.log(`[SelfDeploy] Health check attempt ${i + 1}: ${status}`);
-
-      if (status === "healthy") {
-        healthPassed = true;
-        output.push(`=== Health Check ===`);
-        output.push(`PASSED (attempt ${i + 1}/${healthCheckRetries})`);
-        output.push("");
-        break;
-      }
-
-      if (status === "unhealthy") {
-        output.push(`=== Health Check ===`);
-        output.push(`FAILED: Container reported unhealthy`);
-        output.push("");
-        break;
-      }
-    }
-
-    // Fallback HTTP check after 20 attempts
-    if (i >= 20) {
-      const httpCheck = await execShell(
-        `docker exec marczelloo-dashboard wget -q -O - http://localhost:3100/api/health 2>/dev/null || echo "http_failed"`,
-        10000
-      );
-
-      if (httpCheck.success && httpCheck.stdout && (httpCheck.stdout.includes("healthy") || httpCheck.stdout.includes("status"))) {
-        healthPassed = true;
-        output.push(`=== Health Check ===`);
-        output.push(`PASSED via HTTP check (attempt ${i + 1}/${healthCheckRetries})`);
-        output.push("");
-        break;
-      }
-    }
-  }
-
-  // Step 5: Handle result
-  if (!healthPassed) {
-    console.log(`[SelfDeploy] Health check failed - initiating rollback`);
-    output.push(`=== ROLLBACK INITIATED ===`);
-    output.push(`Attempting to restart container (transient issue recovery)...`);
-    output.push("");
-
-    const restartResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose restart dashboard 2>&1`);
-
-    output.push(`=== Restart Result ===`);
-    output.push(restartResult.stdout || restartResult.stderr || "Restart executed");
-    output.push("");
-
-    await sendDiscordNotification({
-      title: `⚠️ Self-Deploy: Rollback Initiated`,
-      message: `New container failed health check. Attempted restart as recovery.`,
-      color: "warning",
-      fields: [
-        { name: "Commit", value: commit || "unknown" },
-        { name: "Reason", value: "Health check failed" },
-      ],
-      url: compareUrl,
-    });
-
-    await updateDeploymentStatus("failed", "Health check failed - rollback attempted", commit);
-
-    return {
-      success: false,
-      error: "Health check failed - rollback attempted",
-      output: output.join("\n"),
-      rolledBack: true,
-    };
-  }
-
-  // Success!
-  console.log(`[SelfDeploy] Self-deployment completed successfully`);
-  output.push(`=== DEPLOYMENT SUCCESSFUL ===`);
-  output.push(`New container is healthy and running`);
-  output.push("");
-
-  await updateDeploymentStatus("success", `Deployed: ${commitMessage?.substring(0, 50) || "Success"}`, commit);
-
-  await sendDiscordNotification({
+  // Send notification in background (don't await)
+  sendDiscordNotification({
     title: `✅ Self-Deploy Successful`,
-    message: `Dashboard has been updated and is running the new version.`,
+    message: `Dashboard has been updated. Click reload in the sidebar to see changes.`,
     color: "success",
     fields: [
       { name: "Commit", value: commit || "unknown" },
@@ -380,28 +273,25 @@ export async function performSafeSelfDeploy(options: {
       { name: "Author", value: author || "Unknown" },
     ],
     url: compareUrl,
-  });
+  }).catch((e) => console.error("[SelfDeploy] Discord notification failed:", e));
 
-  // Log to audit
-  try {
-    if (options.projectId) {
-      await auditLogs.createAuditLog({
-        actor_email: triggeredBy,
-        action: "deploy",
-        entity_type: "project",
-        entity_id: options.projectId,
-        meta_json: {
-          method: "github_webhook_self_deploy",
-          commit,
-          branch: options.branch,
-          success: true,
-        },
-      });
-    }
-  } catch (e) {
-    console.error("[SelfDeploy] Failed to create audit log:", e);
+  // Log to audit (background)
+  if (options.projectId) {
+    auditLogs.createAuditLog({
+      actor_email: triggeredBy,
+      action: "deploy",
+      entity_type: "project",
+      entity_id: options.projectId,
+      meta_json: {
+        method: "github_webhook_self_deploy",
+        commit,
+        branch: options.branch,
+        success: true,
+      },
+    }).catch((e) => console.error("[SelfDeploy] Audit log failed:", e));
   }
 
+  // Return success - the container will restart momentarily
   return {
     success: true,
     output: output.join("\n"),
