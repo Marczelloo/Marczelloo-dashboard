@@ -20,18 +20,12 @@ const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 
 // Host path to the dashboard repo
-const DASHBOARD_REPO_PATH_HOST = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo_pi/projects/Marczelloo-dashboard";
+// The runner's /shell endpoint uses SSH to execute commands ON THE HOST
+// So we should always use host paths, not container paths
+const DASHBOARD_REPO_PATH = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo_pi/projects/Marczelloo-dashboard";
 
-// Runner container has projects mounted at /projects
-// Translate host path /home/Marczelloo_pi/projects -> /projects
-const DASHBOARD_REPO_PATH_RUNNER = DASHBOARD_REPO_PATH_HOST.replace(
-  /\/home\/Marczelloo_pi\/projects/,
-  "/projects"
-);
-
-// Status file in the projects directory (accessible from both dashboard and runner)
-const STATUS_FILE_RUNNER = `${DASHBOARD_REPO_PATH_RUNNER}/.deploy-status.json`;
-const STATUS_FILE_HOST = `${DASHBOARD_REPO_PATH_HOST}/.deploy-status.json`;
+// Status file in the projects directory (accessible from both dashboard and host)
+const STATUS_FILE = `${DASHBOARD_REPO_PATH}/.deploy-status.json`;
 
 interface SelfDeployResult {
   success: boolean;
@@ -98,9 +92,9 @@ async function updateDeploymentStatus(
       timestamp: new Date().toISOString(),
     };
 
-    // Write via runner shell to ensure it's on the shared projects directory
+    // Write via runner shell (executes on host via SSH)
     await execShell(
-      `cat > "${STATUS_FILE_RUNNER}" << 'EOFSTATUS'
+      `cat > "${STATUS_FILE}" << 'EOFSTATUS'
 ${JSON.stringify(statusData)}
 EOFSTATUS`
     );
@@ -125,11 +119,9 @@ export async function performSafeSelfDeploy(options: {
   compareUrl?: string;
 }): Promise<SelfDeployResult> {
   const { triggeredBy, commit, commitMessage, author, compareUrl } = options;
-  const repoPath = DASHBOARD_REPO_PATH_RUNNER; // Use runner path for commands executed via runner
 
   console.log(`[SelfDeploy] Starting safe self-deployment`);
-  console.log(`[SelfDeploy] Repo (host): ${DASHBOARD_REPO_PATH_HOST}`);
-  console.log(`[SelfDeploy] Repo (runner): ${repoPath}`);
+  console.log(`[SelfDeploy] Repo path: ${DASHBOARD_REPO_PATH}`);
 
   // Set initial status
   await updateDeploymentStatus("deploying", "Starting self-deployment...", commit);
@@ -137,15 +129,14 @@ export async function performSafeSelfDeploy(options: {
   const output: string[] = [];
   output.push(`=== Safe Self-Deployment ===`);
   output.push(`Triggered by: ${triggeredBy}`);
-  output.push(`Repo (host): ${DASHBOARD_REPO_PATH_HOST}`);
-  output.push(`Repo (runner): ${repoPath}`);
+  output.push(`Repo: ${DASHBOARD_REPO_PATH}`);
   output.push(`Commit: ${commit || "unknown"}`);
   output.push("");
 
   // Step 1: Git pull
   console.log(`[SelfDeploy] Step 1: Git pull`);
   const pullResult = await execShell(
-    `cd "${repoPath}" && git fetch --all 2>&1 && git pull origin ${options.branch || "main"} 2>&1`
+    `cd "${DASHBOARD_REPO_PATH}" && git fetch --all 2>&1 && git pull origin ${options.branch || "main"} 2>&1`
   );
 
   output.push(`=== Git Pull ===`);
@@ -167,21 +158,20 @@ export async function performSafeSelfDeploy(options: {
   await updateDeploymentStatus("deploying", "Building new Docker image...", commit);
 
   // First, verify the path and docker-compose.yml exist
-  const verifyResult = await execShell(`ls -la "${repoPath}" 2>&1 && ls -la "${repoPath}/docker-compose.yml" 2>&1`);
+  const verifyResult = await execShell(`ls -la "${DASHBOARD_REPO_PATH}" 2>&1 && ls -la "${DASHBOARD_REPO_PATH}/docker-compose.yml" 2>&1`);
   if (!verifyResult.success) {
     console.error(`[SelfDeploy] Path verification failed:`, verifyResult.stderr);
     output.push(`=== Path Verification ===`);
-    output.push(`FAILED: Cannot access ${repoPath}`);
+    output.push(`FAILED: Cannot access ${DASHBOARD_REPO_PATH}`);
     output.push(verifyResult.stderr || "");
     output.push("");
 
     await sendDiscordNotification({
       title: `❌ Self-Deploy Failed: Path Error`,
-      message: `Cannot access the dashboard directory in the runner container.`,
+      message: `Cannot access the dashboard directory.`,
       color: "danger",
       fields: [
-        { name: "Host Path", value: DASHBOARD_REPO_PATH_HOST },
-        { name: "Runner Path", value: repoPath },
+        { name: "Path", value: DASHBOARD_REPO_PATH },
         { name: "Error", value: verifyResult.stderr || "Path not found" },
       ],
       url: compareUrl,
@@ -189,7 +179,7 @@ export async function performSafeSelfDeploy(options: {
 
     return {
       success: false,
-      error: `Cannot access ${repoPath} in runner container`,
+      error: `Cannot access ${DASHBOARD_REPO_PATH}`,
       output: output.join("\n"),
     };
   }
@@ -201,7 +191,7 @@ export async function performSafeSelfDeploy(options: {
   const buildLogFile = `/tmp/safe-deploy-${Date.now()}.log`;
 
   // Use nohup to run build in background
-  const buildCmd = `cd "${repoPath}" && nohup bash -c '
+  const buildCmd = `cd "${DASHBOARD_REPO_PATH}" && nohup bash -c '
     echo "=== Building new image ===" &&
     docker compose build dashboard 2>&1 &&
     echo "" &&
@@ -279,7 +269,7 @@ export async function performSafeSelfDeploy(options: {
   // Step 3: Start new container
   console.log(`[SelfDeploy] Step 3: Start new container`);
   await updateDeploymentStatus("deploying", "Starting new container...", commit);
-  const upResult = await execShell(`cd "${repoPath}" && docker compose up -d dashboard 2>&1`, 120000);
+  const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d dashboard 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
   output.push(upResult.stdout || upResult.stderr || "Command executed");
@@ -386,7 +376,7 @@ export async function performSafeSelfDeploy(options: {
     output.push(`Attempting to restart container (transient issue recovery)...`);
     output.push("");
 
-    const restartResult = await execShell(`cd "${repoPath}" && docker compose restart dashboard 2>&1`);
+    const restartResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose restart dashboard 2>&1`);
 
     output.push(`=== Restart Result ===`);
     output.push(restartResult.stdout || restartResult.stderr || "Restart executed");
