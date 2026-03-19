@@ -51,13 +51,13 @@ export async function DELETE() {
 
 export async function GET() {
   try {
-    if (!existsSync(STATUS_FILE)) {
+    if (!existsSync(STATUS_FILE_MOUNT)) {
       return NextResponse.json({
         status: "idle",
       });
     }
 
-    const content = await readFile(STATUS_FILE, "utf-8");
+    const content = await readFile(STATUS_FILE_MOUNT, "utf-8");
     const data = JSON.parse(content);
 
     // Check if status is stale (older than 10 minutes for success, 30 minutes for deploying)
