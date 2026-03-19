@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
+import { readFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 
 // Status file is in the mounted /projects directory (shared with runner via host mount)
@@ -8,6 +8,18 @@ const STATUS_FILE = process.env.DASHBOARD_REPO_PATH
   : "/projects/Marczelloo-dashboard/.deploy-status.json";
 
 export const dynamic = "force-dynamic";
+
+export async function DELETE() {
+  try {
+    if (existsSync(STATUS_FILE)) {
+      await unlink(STATUS_FILE);
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[Deployment Status] Error clearing status:", error);
+    return NextResponse.json({ success: false, error: "Failed to clear status" }, { status: 500 });
+  }
+}
 
 export async function GET() {
   try {

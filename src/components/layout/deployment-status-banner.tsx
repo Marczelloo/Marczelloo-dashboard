@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, CheckCircle, XCircle, Rocket, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui";
 
 interface DeploymentStatus {
@@ -15,6 +15,7 @@ interface DeploymentStatus {
 export function DeploymentStatusBanner() {
   const [status, setStatus] = useState<DeploymentStatus>({ status: "idle" });
   const [visible, setVisible] = useState(false);
+  const [autoDismissed, setAutoDismissed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -28,6 +29,18 @@ export function DeploymentStatusBanner() {
             setStatus(data);
             // Show banner if not idle
             setVisible(data.status !== "idle");
+
+            // Auto-dismiss success banner after 5 seconds of visibility
+            // (User has seen it and can reload manually if needed)
+            if (data.status === "success" && !autoDismissed) {
+              const timer = setTimeout(() => {
+                setVisible(false);
+                setAutoDismissed(true);
+                // Clear the status file on the server
+                fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
+              }, 5000);
+              return () => clearTimeout(timer);
+            }
           }
         }
       } catch (e) {
@@ -44,7 +57,7 @@ export function DeploymentStatusBanner() {
       mounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [autoDismissed]);
 
   if (!visible) return null;
 
