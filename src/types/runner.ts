@@ -30,10 +30,14 @@ export interface RunnerRequest {
     compose_project?: string;
     container_name?: string;
     service_name?: string;
+    packages?: string[]; // For npm_update operation
   };
   options?: {
     tail?: number;
     build?: boolean;
+    test_command?: string; // For npm_test operation
+    build_command?: string; // For npm_build operation
+    backup_data?: string; // For npm_restore operation
   };
 }
 

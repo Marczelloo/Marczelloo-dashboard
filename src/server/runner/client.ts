@@ -6,7 +6,7 @@
  */
 
 import "server-only";
-import type { RunnerRequest, RunnerResponse } from "@/types";
+import type { RunnerRequest, RunnerResponse, NpmOutdatedResult, BackupData } from "@/types";
 
 // ========================================
 // Configuration
@@ -260,4 +260,162 @@ export async function deploy(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+// ========================================
+// Package Management Operations
+// ========================================
+
+/**
+ * Check for outdated npm packages
+ */
+export async function npmCheck(
+  repoPath: string
+): Promise<{ success: boolean; outdated: NpmOutdatedResult[]; error?: string }> {
+  const config = getConfig();
+
+  try {
+    const response = await fetch(`${config.url}/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.token}`,
+      },
+      body: JSON.stringify({
+        operation: "npm_check",
+        target: { repo_path: repoPath },
+      }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return { success: false, outdated: [], error };
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      return { success: false, outdated: [], error: result.error };
+    }
+
+    // Parse JSON output from npm outdated
+    let outdated: NpmOutdatedResult[] = [];
+    try {
+      const parsed = JSON.parse(result.output);
+      outdated = Object.entries(parsed).map(([name, data]: [string, unknown]) => {
+        const pkg = data as { current: string; wanted: string; latest: string };
+        return { name, ...pkg };
+      });
+    } catch {
+      // npm outdated outputs errors to stdout when no packages
+      outdated = [];
+    }
+
+    return { success: true, outdated };
+  } catch (error) {
+    return {
+      success: false,
+      outdated: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Update npm packages
+ */
+export async function npmUpdate(
+  repoPath: string,
+  packages?: string[]
+): Promise<RunnerResponse> {
+  return runnerRequest({
+    operation: "npm_update",
+    target: { repo_path: repoPath, packages },
+  });
+}
+
+/**
+ * Run npm tests
+ */
+export async function npmTest(
+  repoPath: string,
+  testCommand?: string
+): Promise<{ success: boolean; output: string; error?: string }> {
+  const result = await runnerRequest({
+    operation: "npm_test",
+    target: { repo_path: repoPath },
+    options: { test_command: testCommand },
+  });
+
+  return {
+    success: result.success,
+    output: result.output || "",
+    error: result.error,
+  };
+}
+
+/**
+ * Run npm build
+ */
+export async function npmBuild(
+  repoPath: string,
+  buildCommand?: string
+): Promise<{ success: boolean; output: string; error?: string }> {
+  const result = await runnerRequest({
+    operation: "npm_build",
+    target: { repo_path: repoPath },
+    options: { build_command: buildCommand },
+  });
+
+  return {
+    success: result.success,
+    output: result.output || "",
+    error: result.error,
+  };
+}
+
+/**
+ * Backup package files for rollback
+ */
+export async function npmBackup(
+  repoPath: string
+): Promise<{ success: boolean; backup: BackupData; error?: string }> {
+  const result = await runnerRequest({
+    operation: "npm_backup",
+    target: { repo_path: repoPath },
+  });
+
+  if (!result.success) {
+    return {
+      success: false,
+      backup: {},
+      error: result.error,
+    };
+  }
+
+  try {
+    const backup = JSON.parse(result.output || "{}");
+    return { success: true, backup };
+  } catch {
+    return {
+      success: false,
+      backup: {},
+      error: "Failed to parse backup data",
+    };
+  }
+}
+
+/**
+ * Restore package files from backup
+ */
+export async function npmRestore(
+  repoPath: string,
+  backup: BackupData
+): Promise<RunnerResponse> {
+  return runnerRequest({
+    operation: "npm_restore",
+    target: { repo_path: repoPath },
+    options: { backup_data: JSON.stringify(backup) },
+  });
 }
