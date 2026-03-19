@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { isDemoMode } from "@/lib/demo-mode";
 import { auditLogs } from "@/server/atlashub";
 import { getCurrentUser } from "@/server/lib/auth";
+import { getSetting } from "@/server/atlashub/settings";
+
+const READ_NOTIFICATIONS_KEY = "notifications_last_read_at";
 
 // Mock notifications for demo mode
 const DEMO_NOTIFICATIONS = [
@@ -59,6 +62,17 @@ export async function GET() {
       return NextResponse.json({ notifications: DEMO_NOTIFICATIONS });
     }
 
+    // Get the last read timestamp
+    let lastReadAt: Date | null = null;
+    try {
+      const lastReadValue = await getSetting(READ_NOTIFICATIONS_KEY);
+      if (lastReadValue) {
+        lastReadAt = new Date(lastReadValue);
+      }
+    } catch {
+      // Ignore errors fetching last read time
+    }
+
     // Get recent audit logs and transform them into notifications
     const logs = await auditLogs.getAuditLogs({ limit: 50 });
 
@@ -69,15 +83,21 @@ export async function GET() {
         const logTime = new Date(log.at).getTime();
         return now - logTime < QUICK_NOTIFICATIONS_MAX_AGE_MS;
       })
-      .map((log) => ({
-        id: log.id,
-        type: getNotificationType(log.action),
-        title: getNotificationTitle(log.action, log.entity_type),
-        message: getNotificationMessage(log),
-        timestamp: log.at,
-        read: false, // For now, we don't track read status
-        link: getNotificationLink(log),
-      }));
+      .map((log) => {
+        const logTime = new Date(log.at);
+        // A notification is read if it was created before the last read time
+        const read = lastReadAt ? logTime <= lastReadAt : false;
+
+        return {
+          id: log.id,
+          type: getNotificationType(log.action),
+          title: getNotificationTitle(log.action, log.entity_type),
+          message: getNotificationMessage(log),
+          timestamp: log.at,
+          read,
+          link: getNotificationLink(log),
+        };
+      });
 
     return NextResponse.json({ notifications });
   } catch (error) {
