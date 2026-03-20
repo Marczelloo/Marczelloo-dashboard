@@ -103,12 +103,21 @@ export async function POST(
     }
 
     // Step 5: Get new versions
-    const afterCheck = await npmCheck(repo_path);
+    // Use beforeCheck to capture all packages that were updated, including those now at latest
     const newVersions: Record<string, string> = {};
-    afterCheck.outdated.forEach((pkg) => {
-      newVersions[pkg.name] = pkg.wanted; // The version after update
+    beforeCheck.outdated.forEach((pkg) => {
+      // Use 'latest' as the target version we updated to
+      newVersions[pkg.name] = pkg.latest;
     });
-    // Updated packages that are now at latest
+    // Also include explicitly requested packages that weren't showing as outdated
+    if (packages.length > 0) {
+      packages.forEach((pkgName: string) => {
+        if (!newVersions[pkgName]) {
+          newVersions[pkgName] = "updated";
+        }
+      });
+    }
+    // Updated packages list
     const allUpdated = packages.length > 0 ? packages : beforeCheck.outdated.map((p) => p.name);
 
     // Step 6: Run tests if requested
@@ -165,7 +174,10 @@ export async function POST(
       }
     }
 
-    // Step 8: Mark as success
+    // Step 8: Update record with new_versions and mark as success
+    await packageUpdates.updatePackageUpdate(updateRecord.id, {
+      new_versions: newVersions,
+    });
     await packageUpdates.markAsSuccess(updateRecord.id);
 
     // Note: GitHub integration (commit, push to feature branch) is Phase 4
