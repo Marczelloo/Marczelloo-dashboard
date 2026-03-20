@@ -381,7 +381,7 @@ export async function npmBuild(
  */
 export async function npmBackup(
   repoPath: string
-): Promise<{ success: boolean; backup: BackupData; error?: string }> {
+): Promise<{ success: boolean; backup: Partial<BackupData>; error?: string }> {
   const result = await runnerRequest({
     operation: "npm_backup",
     target: { repo_path: repoPath },
@@ -412,7 +412,7 @@ export async function npmBackup(
  */
 export async function npmRestore(
   repoPath: string,
-  backup: BackupData
+  backup: Partial<BackupData>
 ): Promise<RunnerResponse> {
   return runnerRequest({
     operation: "npm_restore",

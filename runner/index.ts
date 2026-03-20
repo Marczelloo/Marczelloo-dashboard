@@ -113,6 +113,8 @@ interface RunnerRequest {
     run_tests?: boolean;
     run_build?: boolean;
     backup_data?: string;     // Pre-stored backup data
+    test_command?: string;    // Custom test command
+    build_command?: string;   // Custom build command
   };
 }
 
@@ -270,7 +272,7 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
       case "npm_test": {
         if (!target.repo_path) throw new Error("repo_path required for npm_test");
-        const testCmd = options?.test_command || "npm test";
+        const testCmd = target.test_command || options?.test_command || "npm test";
         const result = await execAsync(`cd "${target.repo_path}" && ${testCmd} -- --json`, {
           timeout: 5 * 60 * 1000, // 5 minute timeout for tests
         });
@@ -280,7 +282,7 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
       case "npm_build": {
         if (!target.repo_path) throw new Error("repo_path required for npm_build");
-        const buildCmd = options?.build_command || "npm run build";
+        const buildCmd = target.build_command || options?.build_command || "npm run build";
         const result = await execAsync(`cd "${target.repo_path}" && ${buildCmd}`, {
           timeout: 10 * 60 * 1000, // 10 minute timeout for builds
         });
