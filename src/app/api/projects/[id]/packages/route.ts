@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { projects, services } from "@/server/atlashub";
+import type { PackageEcosystem } from "@/types";
 
 /**
  * GET /api/projects/[id]/packages
@@ -29,7 +30,7 @@ export async function GET(
     });
 
     // Filter to only include services with non-null repo_path
-    const servicesWithRepoPath = allServices.filter((s: any) => s.repo_path != null);
+    const servicesWithRepoPath = allServices.filter((s) => s.repo_path != null);
 
     // Extract available repo_paths
     const availableRepoPaths = servicesWithRepoPath.map((s) => ({
@@ -40,7 +41,7 @@ export async function GET(
 
     // Detect ecosystem from lockfile presence (via service name/type heuristics for MVP)
     // Full ecosystem detection via file checking will be in Phase 3
-    const ecosystem = "npm"; // MVP default
+    const ecosystem: PackageEcosystem = "npm"; // MVP default
 
     return NextResponse.json({
       ecosystem,

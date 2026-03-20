@@ -57,9 +57,23 @@ export async function POST(
 
     // Backup current state before rolling back
     const currentBackup = await npmBackup(repo_path);
+    if (!currentBackup.success) {
+      return NextResponse.json(
+        { error: "Failed to backup current state before rollback", details: currentBackup.error },
+        { status: 500 }
+      );
+    }
 
     // Restore the old package files
-    const backupData = JSON.parse(updateRecord.rollback_data);
+    let backupData: Partial<Record<string, string>>;
+    try {
+      backupData = JSON.parse(updateRecord.rollback_data);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid rollback data format" },
+        { status: 400 }
+      );
+    }
     const restoreResult = await npmRestore(repo_path, backupData);
 
     if (!restoreResult.success) {
