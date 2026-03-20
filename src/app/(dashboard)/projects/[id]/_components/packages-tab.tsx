@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
   Clock,
   History,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { Project } from "@/types";
 
 interface PackagesTabProps {
@@ -68,9 +68,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
   useEffect(() => {
     fetchRepoPaths();
     fetchHistory();
-  }, [project.id]);
+  }, [project.id, fetchRepoPaths, fetchHistory]);
 
-  const fetchRepoPaths = async () => {
+  const fetchRepoPaths = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${project.id}/packages`);
       if (response.ok) {
@@ -83,9 +83,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } catch (err) {
       console.error("Failed to fetch repo paths:", err);
     }
-  };
+  }, [project.id]);
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${project.id}/packages/history`);
       if (response.ok) {
@@ -95,9 +95,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } catch (err) {
       console.error("Failed to fetch history:", err);
     }
-  };
+  }, [project.id]);
 
-  const handleCheck = async () => {
+  const handleCheck = useCallback(async () => {
     if (!selectedRepoPath) {
       setError("No repository path available. Please configure a service with repo_path.");
       return;
@@ -124,9 +124,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setChecking(false);
     }
-  };
+  }, [selectedRepoPath, project.id]);
 
-  const handleUpdate = async () => {
+  const handleUpdate = useCallback(async () => {
     if (!selectedRepoPath) {
       setError("No repository path available. Please configure a service with repo_path.");
       return;
@@ -162,9 +162,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setUpdating(false);
     }
-  };
+  }, [selectedRepoPath, selectedPackages, project.id, fetchHistory, handleCheck]);
 
-  const togglePackage = (packageName: string) => {
+  const togglePackage = useCallback((packageName: string) => {
     const newSelected = new Set(selectedPackages);
     if (newSelected.has(packageName)) {
       newSelected.delete(packageName);
@@ -172,7 +172,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
       newSelected.add(packageName);
     }
     setSelectedPackages(newSelected);
-  };
+  }, [selectedPackages]);
 
   const getStatusIcon = (status: PackageUpdateRecord["status"]) => {
     switch (status) {
@@ -204,8 +204,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
         {availableRepoPaths.length > 1 && (
           <Card>
             <CardContent className="pt-4">
-              <label className="text-sm font-medium mb-2 block">Select Repository:</label>
+              <label htmlFor="repo-select" className="text-sm font-medium mb-2 block">Select Repository:</label>
               <select
+                id="repo-select"
                 value={selectedRepoPath}
                 onChange={(e) => setSelectedRepoPath(e.target.value)}
                 className="w-full p-2 rounded-md border border-border bg-background"
