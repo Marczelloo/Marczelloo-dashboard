@@ -34,7 +34,9 @@ import {
   Activity,
   RefreshCw,
   Loader2,
+  Package,
 } from "lucide-react";
+import { PackagesTab } from "./packages-tab";
 import type { Service, WorkItem, Deploy, Project } from "@/types";
 
 // ============================================================================
@@ -48,7 +50,7 @@ interface ProjectDetailTabsProps {
   deploys: Deploy[];
 }
 
-type TabId = "overview" | "github" | "repository" | "security" | "settings";
+type TabId = "overview" | "github" | "repository" | "packages" | "security" | "settings";
 
 interface Tab {
   id: TabId;
@@ -74,6 +76,12 @@ const TABS: Tab[] = [
     label: "Repository",
     icon: <FolderTree className="h-4 w-4" />,
     description: "Files & dependencies",
+  },
+  {
+    id: "packages",
+    label: "Packages",
+    icon: <Package className="h-4 w-4" />,
+    description: "Package management",
   },
   { id: "security", label: "Security", icon: <Shield className="h-4 w-4" />, description: "Alerts & changelog" },
   { id: "settings", label: "Settings", icon: <Settings className="h-4 w-4" />, description: "Project configuration" },
@@ -280,6 +288,7 @@ export function ProjectDetailTabs({ project, services, workItems, deploys }: Pro
           )}
           {activeTab === "github" && <GitHubTab project={project} />}
           {activeTab === "repository" && <RepositoryTab project={project} />}
+          {activeTab === "packages" && <PackagesTab project={project} />}
           {activeTab === "security" && <SecurityTab project={project} />}
           {activeTab === "settings" && <SettingsTab project={project} />}
         </motion.div>
