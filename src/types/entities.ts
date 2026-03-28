@@ -300,5 +300,8 @@ export interface UpdatePackageUpdateInput {
   error_message?: string | null;
   branch_name?: string | null;
   pr_url?: string | null;
+  rollback_data?: string | null;
+  rollback_from_id?: string | null;
+  new_versions?: Record<string, string>;
   completed_at?: string | null;
 }
