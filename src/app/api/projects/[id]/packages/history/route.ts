@@ -24,7 +24,15 @@ export async function GET(
       history,
       count: history.length,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // If the package_updates table doesn't exist yet, return empty history
+    if (error?.message?.includes("NOT_FOUND") || error?.status === 404) {
+      console.log("Package updates table not found, returning empty history");
+      return NextResponse.json({
+        history: [],
+        count: 0,
+      });
+    }
     console.error("Error fetching package history:", error);
     return NextResponse.json(
       { error: "Failed to fetch history" },

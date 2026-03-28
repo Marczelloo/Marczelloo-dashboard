@@ -28,6 +28,7 @@ interface PackageCheckResult {
     current: string;
     wanted: string;
     latest: string;
+    service_name?: string;
   }>;
   outdated_count: number;
   checked_at: string;
@@ -102,10 +103,16 @@ export function PackagesTab({ project }: PackagesTabProps) {
     setError(null);
 
     try {
+      // Find service name for this repo_path
+      const serviceInfo = availableRepoPaths.find(s => s.repo_path === selectedRepoPath);
+
       const response = await fetch(`/api/projects/${project.id}/packages/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_path: selectedRepoPath }),
+        body: JSON.stringify({
+          repo_path: selectedRepoPath,
+          service_name: serviceInfo?.service_name,
+        }),
       });
 
       if (!response.ok) {
@@ -119,7 +126,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setChecking(false);
     }
-  }, [selectedRepoPath, project.id]);
+  }, [selectedRepoPath, project.id, availableRepoPaths]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedRepoPath) {
@@ -174,6 +181,13 @@ export function PackagesTab({ project }: PackagesTabProps) {
     fetchRepoPaths();
     fetchHistory();
   }, [project.id, fetchRepoPaths, fetchHistory]);
+
+  // Auto-check packages when repo path is available
+  useEffect(() => {
+    if (selectedRepoPath && !checkResult) {
+      handleCheck();
+    }
+  }, [selectedRepoPath, checkResult, handleCheck]);
 
   const getStatusIcon = (status: PackageUpdateRecord["status"]) => {
     switch (status) {
@@ -314,7 +328,12 @@ export function PackagesTab({ project }: PackagesTabProps) {
                               className="h-4 w-4"
                               onClick={(e) => e.stopPropagation()}
                             />
-                            <span className="font-medium text-sm">{pkg.name}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{pkg.name}</span>
+                              {pkg.service_name && (
+                                <span className="text-xs text-muted-foreground">{pkg.service_name}</span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <code className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">

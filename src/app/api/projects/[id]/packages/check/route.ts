@@ -6,7 +6,7 @@ import { npmCheck } from "@/server/runner";
  * POST /api/projects/[id]/packages/check
  * Check for available package updates
  *
- * Body: { repo_path: string }
+ * Body: { repo_path: string, service_name?: string }
  */
 export async function POST(
   request: NextRequest,
@@ -22,7 +22,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { repo_path } = body;
+    const { repo_path, service_name } = body;
 
     if (!repo_path) {
       return NextResponse.json(
@@ -40,9 +40,15 @@ export async function POST(
       );
     }
 
+    // Add service_name to each outdated package
+    const outdatedWithService = result.outdated.map(pkg => ({
+      ...pkg,
+      service_name: service_name || null,
+    }));
+
     return NextResponse.json({
       ecosystem: "npm",
-      outdated: result.outdated,
+      outdated: outdatedWithService,
       outdated_count: result.outdated.length,
       checked_at: new Date().toISOString(),
     });
