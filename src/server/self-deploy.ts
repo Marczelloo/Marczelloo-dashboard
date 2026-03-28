@@ -191,7 +191,7 @@ export async function performSafeSelfDeploy(options: {
   // Build synchronously with extended timeout (10 minutes for Raspberry Pi)
   console.log(`[SelfDeploy] Starting docker compose build...`);
   const buildResult = await execShell(
-    `cd "${DASHBOARD_REPO_PATH}" && docker compose build dashboard 2>&1`,
+    `cd "${DASHBOARD_REPO_PATH}" && docker compose build dashboard runner 2>&1`,
     600000 // 10 minute timeout
   );
 
@@ -252,8 +252,8 @@ export async function performSafeSelfDeploy(options: {
   // Give the filesystem a moment to sync
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  console.log(`[SelfDeploy] Now restarting container...`);
-  const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d --force-recreate dashboard 2>&1`, 120000);
+  console.log(`[SelfDeploy] Now restarting containers...`);
+  const upResult = await execShell(`cd "${DASHBOARD_REPO_PATH}" && docker compose up -d --force-recreate dashboard runner 2>&1`, 120000);
 
   output.push(`=== Start Container ===`);
   output.push(upResult.stdout || upResult.stderr || "Command executed");
