@@ -64,12 +64,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
 
-  // Fetch available repo paths and history on mount
-  useEffect(() => {
-    fetchRepoPaths();
-    fetchHistory();
-  }, [project.id, fetchRepoPaths, fetchHistory]);
-
+  // Fetch functions (must be declared before useEffect that uses them)
   const fetchRepoPaths = useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${project.id}/packages`);
@@ -173,6 +168,12 @@ export function PackagesTab({ project }: PackagesTabProps) {
     }
     setSelectedPackages(newSelected);
   }, [selectedPackages]);
+
+  // Fetch available repo paths and history on mount
+  useEffect(() => {
+    fetchRepoPaths();
+    fetchHistory();
+  }, [project.id, fetchRepoPaths, fetchHistory]);
 
   const getStatusIcon = (status: PackageUpdateRecord["status"]) => {
     switch (status) {
