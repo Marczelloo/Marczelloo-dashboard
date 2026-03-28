@@ -55,6 +55,21 @@ async function runnerRequest(request: RunnerRequest): Promise<RunnerResponse> {
 // Error Class
 // ========================================
 
+/**
+ * Map host repo paths to runner container mount paths
+ * Supports multiple possible host path formats:
+ * - /home/pi/projects/* -> /projects/*
+ * - /home/Marczelloo_pi/projects/* -> /projects/*
+ */
+function mapHostToContainerPath(repoPath: string): string {
+  const mapped = repoPath
+    .replace(/^\/home\/pi\/projects\//, "/projects/")
+    .replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
+  console.log(`[Runner] Path mapping: ${repoPath} -> ${mapped}`);
+  return mapped;
+}
+
 export class RunnerError extends Error {
   constructor(
     message: string,
@@ -277,9 +292,7 @@ export async function npmCheck(
 
   try {
     // Map host path to container mount path
-    // Host: /home/Marczelloo_pi/projects/Marczelloo-dashboard
-    // Container: /projects/Marczelloo-dashboard
-    const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+    const containerPath = mapHostToContainerPath(repoPath);
 
     const response = await fetch(`${config.url}/execute`, {
       method: "POST",
@@ -337,7 +350,7 @@ export async function npmUpdate(
   repoPath: string,
   packages?: string[]
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+  const containerPath = mapHostToContainerPath(repoPath);
 
   const result = await runnerRequest({
     operation: "npm_update",
@@ -359,7 +372,7 @@ export async function npmTest(
   repoPath: string,
   testCommand?: string
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+  const containerPath = mapHostToContainerPath(repoPath);
 
   const result = await runnerRequest({
     operation: "npm_test",
@@ -382,7 +395,7 @@ export async function npmBuild(
   repoPath: string,
   buildCommand?: string
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+  const containerPath = mapHostToContainerPath(repoPath);
 
   const result = await runnerRequest({
     operation: "npm_build",
@@ -404,7 +417,7 @@ export async function npmBuild(
 export async function npmBackup(
   repoPath: string
 ): Promise<{ success: boolean; backup: Partial<BackupData>; error?: string }> {
-  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+  const containerPath = mapHostToContainerPath(repoPath);
 
   const result = await runnerRequest({
     operation: "npm_backup",
@@ -439,7 +452,7 @@ export async function npmRestore(
   repoPath: string,
   backup: Partial<BackupData>
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+  const containerPath = mapHostToContainerPath(repoPath);
 
   const result = await runnerRequest({
     operation: "npm_restore",
