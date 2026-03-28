@@ -268,6 +268,7 @@ export async function deploy(
 
 /**
  * Check for outdated npm packages
+ * Maps host repo paths to mounted container paths and executes directly
  */
 export async function npmCheck(
   repoPath: string
@@ -275,6 +276,11 @@ export async function npmCheck(
   const config = getConfig();
 
   try {
+    // Map host path to container mount path
+    // Host: /home/Marczelloo_pi/projects/Marczelloo-dashboard
+    // Container: /projects/Marczelloo-dashboard
+    const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
     const response = await fetch(`${config.url}/execute`, {
       method: "POST",
       headers: {
@@ -283,7 +289,7 @@ export async function npmCheck(
       },
       body: JSON.stringify({
         operation: "npm_check",
-        target: { repo_path: repoPath },
+        target: { repo_path: containerPath },
       }),
       cache: "no-store",
     });
@@ -325,27 +331,39 @@ export async function npmCheck(
 
 /**
  * Update npm packages
+ * Maps host repo paths to mounted container paths
  */
 export async function npmUpdate(
   repoPath: string,
   packages?: string[]
-): Promise<RunnerResponse> {
-  return runnerRequest({
+): Promise<{ success: boolean; output: string; error?: string }> {
+  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
+  const result = await runnerRequest({
     operation: "npm_update",
-    target: { repo_path: repoPath, packages },
+    target: { repo_path: containerPath, packages },
   });
+
+  return {
+    success: result.success,
+    output: result.output || "",
+    error: result.error,
+  };
 }
 
 /**
  * Run npm tests
+ * Maps host repo paths to mounted container paths
  */
 export async function npmTest(
   repoPath: string,
   testCommand?: string
 ): Promise<{ success: boolean; output: string; error?: string }> {
+  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
   const result = await runnerRequest({
     operation: "npm_test",
-    target: { repo_path: repoPath },
+    target: { repo_path: containerPath },
     options: { test_command: testCommand },
   });
 
@@ -358,14 +376,17 @@ export async function npmTest(
 
 /**
  * Run npm build
+ * Maps host repo paths to mounted container paths
  */
 export async function npmBuild(
   repoPath: string,
   buildCommand?: string
 ): Promise<{ success: boolean; output: string; error?: string }> {
+  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
   const result = await runnerRequest({
     operation: "npm_build",
-    target: { repo_path: repoPath },
+    target: { repo_path: containerPath },
     options: { build_command: buildCommand },
   });
 
@@ -378,13 +399,16 @@ export async function npmBuild(
 
 /**
  * Backup package files for rollback
+ * Maps host repo paths to mounted container paths
  */
 export async function npmBackup(
   repoPath: string
 ): Promise<{ success: boolean; backup: Partial<BackupData>; error?: string }> {
+  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
   const result = await runnerRequest({
     operation: "npm_backup",
-    target: { repo_path: repoPath },
+    target: { repo_path: containerPath },
   });
 
   if (!result.success) {
@@ -409,14 +433,23 @@ export async function npmBackup(
 
 /**
  * Restore package files from backup
+ * Maps host repo paths to mounted container paths
  */
 export async function npmRestore(
   repoPath: string,
   backup: Partial<BackupData>
-): Promise<RunnerResponse> {
-  return runnerRequest({
+): Promise<{ success: boolean; output: string; error?: string }> {
+  const containerPath = repoPath.replace(/^\/home\/Marczelloo_pi\/projects\//, "/projects/");
+
+  const result = await runnerRequest({
     operation: "npm_restore",
-    target: { repo_path: repoPath },
+    target: { repo_path: containerPath },
     options: { backup_data: JSON.stringify(backup) },
   });
+
+  return {
+    success: result.success,
+    output: result.output || "",
+    error: result.error,
+  };
 }

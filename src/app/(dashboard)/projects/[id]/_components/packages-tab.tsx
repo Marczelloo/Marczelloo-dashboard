@@ -106,6 +106,8 @@ export function PackagesTab({ project }: PackagesTabProps) {
       // Find service name for this repo_path
       const serviceInfo = availableRepoPaths.find(s => s.repo_path === selectedRepoPath);
 
+      console.log("Checking packages for:", { repoPath: selectedRepoPath, serviceName: serviceInfo?.service_name });
+
       const response = await fetch(`/api/projects/${project.id}/packages/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,12 +118,14 @@ export function PackagesTab({ project }: PackagesTabProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to check packages");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to check packages");
       }
 
       const data = await response.json();
       setCheckResult(data);
     } catch (err) {
+      console.error("Package check error:", err);
       setError(err instanceof Error ? err.message : "Failed to check packages");
     } finally {
       setChecking(false);
@@ -215,20 +219,20 @@ export function PackagesTab({ project }: PackagesTabProps) {
     <div className="grid gap-6 lg:grid-cols-3">
       {/* Main Content */}
       <div className="lg:col-span-2 space-y-6">
-        {/* Repo Path Selection (if multiple available) */}
+        {/* Service Selection (if multiple available) */}
         {availableRepoPaths.length > 1 && (
           <Card>
             <CardContent className="pt-4">
-              <label htmlFor="repo-select" className="text-sm font-medium mb-2 block">Select Repository:</label>
+              <label htmlFor="service-select" className="text-sm font-medium mb-2 block">Select Service:</label>
               <select
-                id="repo-select"
+                id="service-select"
                 value={selectedRepoPath}
                 onChange={(e) => setSelectedRepoPath(e.target.value)}
                 className="w-full p-2 rounded-md border border-border bg-background"
               >
                 {availableRepoPaths.map((option) => (
                   <option key={option.service_id} value={option.repo_path}>
-                    {option.service_name} ({option.repo_path})
+                    {option.service_name}
                   </option>
                 ))}
               </select>
