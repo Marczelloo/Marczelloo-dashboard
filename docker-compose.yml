@@ -132,9 +132,9 @@ services:
       - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:/projects:rw
       # Persist allowlist configuration
       - runner_data:/app/data
-      # Mount SSH key for host access (optional - only mount if SSH_KEY_PATH is set)
-      # If SSH_KEY_PATH is not set, SSH features will be gracefully disabled
-      - ${SSH_KEY_PATH:-/dev/null}:${SSH_KEY_PATH:-/dev/null}/root/.ssh/id_rsa:ro
+      # Mount SSH key for host access (optional - if not provided, SSH features will be disabled)
+      # Create with: ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
+      - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8787/health"]
       interval: 30s
