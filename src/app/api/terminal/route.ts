@@ -31,14 +31,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Runner not configured" }, { status: 500 });
     }
 
-    // Forward to runner
+    // Forward to runner with default cwd if not provided
+    const defaultCwd = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo_pi/projects/Marczelloo-dashboard";
+    const effectiveCwd = cwd || defaultCwd;
+
+    console.log(`[Terminal] Executing command: "${command}" in cwd: ${effectiveCwd}`);
+
     const response = await fetch(`${RUNNER_URL}/shell`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
-      body: JSON.stringify({ command, cwd }),
+      body: JSON.stringify({ command, cwd: effectiveCwd }),
     });
 
     if (!response.ok) {
