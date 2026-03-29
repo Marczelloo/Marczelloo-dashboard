@@ -162,6 +162,7 @@ function validateRequest(req: RunnerRequest): string | null {
     "npm_build",
     "npm_backup",
     "npm_restore",
+    "container_npm_check",
   ];
   if (!validOperations.includes(operation)) {
     return `Invalid operation: ${operation}`;
