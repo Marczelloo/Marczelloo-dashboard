@@ -17,12 +17,16 @@ async function createPackageUpdatesTable() {
 
   try {
     // Create the table using Schema API
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (SECRET_KEY) {
+      headers["x-api-key"] = SECRET_KEY;
+    }
+
     const response = await fetch(`${API_URL}/v1/db/schema/tables`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": SECRET_KEY,
-      },
+      headers,
       body: JSON.stringify({
         name: "package_updates",
         columns: [
@@ -125,12 +129,16 @@ async function createPackageUpdatesTable() {
     // Create indexes for better query performance
     console.log("🔧 Creating indexes...");
 
+    const indexHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (SECRET_KEY) {
+      indexHeaders["x-api-key"] = SECRET_KEY;
+    }
+
     const indexResponse = await fetch(`${API_URL}/v1/db/schema/indexes`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": SECRET_KEY,
-      },
+      headers: indexHeaders,
       body: JSON.stringify({
         name: "idx_package_updates_project",
         table: "package_updates",
@@ -146,12 +154,16 @@ async function createPackageUpdatesTable() {
     }
 
     // Create status index
+    const statusIndexHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (SECRET_KEY) {
+      statusIndexHeaders["x-api-key"] = SECRET_KEY;
+    }
+
     const statusIndexResponse = await fetch(`${API_URL}/v1/db/schema/indexes`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": SECRET_KEY,
-      },
+      headers: statusIndexHeaders,
       body: JSON.stringify({
         name: "idx_package_updates_status",
         table: "package_updates",
