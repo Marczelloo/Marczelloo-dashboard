@@ -71,9 +71,41 @@ export function PackagesTab({ project }: PackagesTabProps) {
       const response = await fetch(`/api/projects/${project.id}/packages`);
       if (response.ok) {
         const data = await response.json();
-        setAvailableRepoPaths(data.available_repo_paths || []);
-        if (data.default_repo_path) {
-          setSelectedRepoPath(data.default_repo_path);
+        const allPaths = data.available_repo_paths || [];
+
+        // Filter to only include services that actually have package.json
+        // This prevents showing services like 'runner' that don't have npm packages
+        const pathsWithPackages = await Promise.all(
+          allPaths.map(async (service: RepoPathOption) => {
+            try {
+              // Check if package.json exists by attempting to read it
+              const checkResponse = await fetch(`/api/projects/${project.id}/packages/check`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  repo_path: service.repo_path,
+                  service_name: service.service_name,
+                }),
+              });
+
+              if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                // Include this service if the check succeeded (has package.json)
+                return service;
+              }
+              return null;
+            } catch {
+              // If check fails, service doesn't have packages
+              return null;
+            }
+          })
+        );
+
+        const validPaths = pathsWithPackages.filter((s): s is RepoPathOption => s !== null);
+        setAvailableRepoPaths(validPaths);
+
+        if (validPaths.length > 0) {
+          setSelectedRepoPath(validPaths[0].repo_path);
         }
       }
     } catch (err) {
