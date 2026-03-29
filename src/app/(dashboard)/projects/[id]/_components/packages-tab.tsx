@@ -150,6 +150,16 @@ export function PackagesTab({ project }: PackagesTabProps) {
       return;
     }
 
+    // If no packages are selected, select all outdated packages
+    const packagesToUpdate = selectedPackages.size > 0
+      ? Array.from(selectedPackages)
+      : checkResult?.outdated.map(pkg => pkg.name) || [];
+
+    if (packagesToUpdate.length === 0) {
+      setError("No packages to update");
+      return;
+    }
+
     setUpdating(true);
     setError(null);
 
@@ -159,7 +169,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           repo_path: selectedRepoPath,
-          packages: Array.from(selectedPackages),
+          packages: packagesToUpdate,
           run_tests: true,
           run_build: false,
         }),
@@ -180,7 +190,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
     } finally {
       setUpdating(false);
     }
-  }, [selectedRepoPath, selectedPackages, project.id, fetchHistory, handleCheck]);
+  }, [selectedRepoPath, selectedPackages, project.id, fetchHistory, handleCheck, checkResult]);
 
   const togglePackage = useCallback((packageName: string) => {
     const newSelected = new Set(selectedPackages);
@@ -315,7 +325,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
                       </p>
                       <Button
                         size="sm"
-                        disabled={updating || selectedPackages.size === 0}
+                        disabled={updating}
                         onClick={handleUpdate}
                       >
                         {updating ? (
@@ -326,7 +336,7 @@ export function PackagesTab({ project }: PackagesTabProps) {
                         ) : (
                           <>
                             <Package className="h-4 w-4 mr-2" />
-                            Update {selectedPackages.size || "All"}
+                            Update {selectedPackages.size > 0 ? `${selectedPackages.size}` : "All"}
                           </>
                         )}
                       </Button>
