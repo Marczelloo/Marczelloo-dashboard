@@ -322,21 +322,37 @@ export async function npmCheck(
     let outdated: NpmOutdatedResult[] = [];
     try {
       const parsed = JSON.parse(result.output);
-      outdated = Object.entries(parsed).map(([name, data]: [string, unknown]) => {
-        const pkg = data as { current?: string; wanted?: string; latest?: string; dependent?: string };
-        // Ensure all required fields have values, fallback to sensible defaults
-        return {
-          name,
-          current: pkg.current || pkg.wanted || "unknown",
-          wanted: pkg.wanted || pkg.latest || "unknown",
-          latest: pkg.latest || pkg.wanted || "unknown"
-        };
-      }).filter(pkg => {
-        // Filter out packages that don't actually have updates available
-        // (current == wanted == latest means no update needed)
-        return pkg.current !== pkg.latest || pkg.wanted !== pkg.latest;
-      });
-    } catch {
+      console.log("[Runner] npm outdated parsed:", parsed);
+
+      outdated = Object.entries(parsed)
+        .map(([name, data]: [string, unknown]) => {
+          const pkg = data as { current?: string; wanted?: string; latest?: string; dependent?: string };
+
+          // Log any packages with missing data
+          if (!pkg.current || !pkg.wanted || !pkg.latest) {
+            console.log(`[Runner] Package ${name} has missing data:`, pkg);
+          }
+
+          // Ensure all required fields have values, fallback to sensible defaults
+          return {
+            name,
+            current: pkg.current || pkg.wanted || pkg.latest || "unknown",
+            wanted: pkg.wanted || pkg.latest || "unknown",
+            latest: pkg.latest || pkg.wanted || "unknown"
+          };
+        })
+        .filter(pkg => {
+          // Filter out packages that don't actually have updates available
+          // (current == wanted == latest means no update needed)
+          // Also filter out any packages with "unknown" values
+          const hasUpdate = pkg.current !== pkg.latest || pkg.wanted !== pkg.latest;
+          const hasValidData = pkg.current !== "unknown" && pkg.latest !== "unknown";
+          return hasUpdate && hasValidData;
+        });
+
+      console.log("[Runner] Filtered outdated packages:", outdated);
+    } catch (error) {
+      console.error("[Runner] Failed to parse npm outdated output:", error);
       // npm outdated outputs errors to stdout when no packages
       // or the output is not valid JSON
       outdated = [];

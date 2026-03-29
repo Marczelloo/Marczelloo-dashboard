@@ -333,41 +333,49 @@ export function PackagesTab({ project }: PackagesTabProps) {
                     </div>
 
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {checkResult.outdated.map((pkg) => (
-                        <div
-                          key={pkg.name}
-                          className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer"
-                          onClick={() => togglePackage(pkg.name)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedPackages.has(pkg.name)}
-                              onChange={() => togglePackage(pkg.name)}
-                              className="h-4 w-4"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <div className="flex flex-col">
-                              <span className="font-medium text-sm">{pkg.name}</span>
-                              {pkg.service_name && (
-                                <span className="text-xs text-muted-foreground">{pkg.service_name}</span>
-                              )}
+                      {checkResult.outdated.map((pkg) => {
+                        // Defensive: skip packages with missing data
+                        if (!pkg.current || !pkg.latest) {
+                          console.log("Skipping package with missing data:", pkg);
+                          return null;
+                        }
+
+                        return (
+                          <div
+                            key={pkg.name}
+                            className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer"
+                            onClick={() => togglePackage(pkg.name)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedPackages.has(pkg.name)}
+                                onChange={() => togglePackage(pkg.name)}
+                                className="h-4 w-4"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium text-sm">{pkg.name}</span>
+                                {pkg.service_name && (
+                                  <span className="text-xs text-muted-foreground">{pkg.service_name}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
+                                {pkg.current}
+                              </code>
+                              <span className="text-muted-foreground">→</span>
+                              <Badge
+                                variant={getVersionColor(pkg.current, pkg.latest)}
+                                className="text-xs"
+                              >
+                                {pkg.latest}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <code className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
-                              {pkg.current}
-                            </code>
-                            <span className="text-muted-foreground">→</span>
-                            <Badge
-                              variant={getVersionColor(pkg.current, pkg.latest)}
-                              className="text-xs"
-                            >
-                              {pkg.latest}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
