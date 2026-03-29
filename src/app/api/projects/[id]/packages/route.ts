@@ -26,18 +26,36 @@ export async function GET(
         { operator: "eq", column: "project_id", value: id },
         { operator: "neq", column: "repo_path", value: "" }
       ],
-      select: ["id", "name", "repo_path", "type"],
+      select: ["id", "name", "repo_path", "type", "container_id", "compose_project"],
     });
 
     // Filter to only include services with non-null repo_path
     const servicesWithRepoPath = allServices.filter((s) => s.repo_path != null);
 
-    // Extract available repo_paths
-    const availableRepoPaths = servicesWithRepoPath.map((s) => ({
-      service_id: s.id,
-      service_name: s.name,
-      repo_path: s.repo_path,
-    }));
+    // Extract available repo_paths with container info
+    const availableRepoPaths = servicesWithRepoPath.map((s) => {
+      // For Docker Compose services, construct container name
+      // Format: <compose_project>_<service_name>_1 or just <service_name>
+      let containerName: string | undefined;
+
+      if (s.type === "docker" && s.compose_project) {
+        // Try common Docker Compose naming conventions
+        containerName = `${s.compose_project}-${s.name.replace(/_/g, "-")}-1`;
+
+        // Fallback: use service name if project name matches
+        if (s.compose_project === project.name.toLowerCase().replace(/\s+/g, "-")) {
+          containerName = s.name.replace(/_/g, "-");
+        }
+      }
+
+      return {
+        service_id: s.id,
+        service_name: s.name,
+        repo_path: s.repo_path,
+        container_name: containerName,
+        compose_project: s.compose_project,
+      };
+    });
 
     // Detect ecosystem from lockfile presence (via service name/type heuristics for MVP)
     // Full ecosystem detection via file checking will be in Phase 3

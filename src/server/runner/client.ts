@@ -506,3 +506,75 @@ export async function npmRestore(
     error: result.error,
   };
 }
+
+/**
+ * Check for outdated npm packages inside a Docker container
+ * Useful for containerized Node.js applications
+ */
+export async function containerNpmCheck(
+  containerName: string
+): Promise<{ success: boolean; outdated: NpmOutdatedResult[]; error?: string }> {
+  try {
+    console.log(`[containerNpmCheck] Checking packages in container: ${containerName}`);
+
+    const result = await runnerRequest({
+      operation: "container_npm_check",
+      target: { container_name: containerName },
+    });
+
+    if (!result.success) {
+      console.error(`[containerNpmCheck] Failed:`, result.error);
+      return { success: false, outdated: [], error: result.error };
+    }
+
+    console.log(`[containerNpmCheck] Raw npm outdated output:`, result.output);
+
+    // Parse JSON output from npm outdated
+    let outdated: NpmOutdatedResult[] = [];
+    try {
+      const parsed = JSON.parse(result.output || "{}");
+      console.log("[containerNpmCheck] npm outdated parsed:", parsed);
+
+      outdated = Object.entries(parsed)
+        .map(([name, data]: [string, unknown]) => {
+          const pkg = data as { current?: string; wanted?: string; latest?: string; dependent?: string };
+
+          if (!pkg.current || !pkg.wanted || !pkg.latest) {
+            console.log(`[containerNpmCheck] Package ${name} has missing data:`, pkg);
+          }
+
+          return {
+            name,
+            current: pkg.current || pkg.wanted || pkg.latest || "unknown",
+            wanted: pkg.wanted || pkg.latest || "unknown",
+            latest: pkg.latest || pkg.wanted || "unknown"
+          };
+        })
+        .filter(pkg => {
+          const hasValidData = pkg.current !== "unknown" && pkg.latest !== "unknown";
+          const isActuallyOutdated = pkg.current !== "unknown" && pkg.latest !== "unknown" && pkg.current !== pkg.latest;
+
+          console.log(`[containerNpmCheck] Package ${pkg.name}: current=${pkg.current}, latest=${pkg.latest}, isActuallyOutdated=${isActuallyOutdated}`);
+
+          return isActuallyOutdated;
+        });
+
+      console.log("[containerNpmCheck] Filtered outdated packages:", outdated);
+    } catch (error) {
+      console.error("[containerNpmCheck] Failed to parse npm outdated output:", error);
+      console.error("[containerNpmCheck] Raw output was:", result.output);
+      outdated = [];
+    }
+
+    console.log(`[containerNpmCheck] Final result: ${outdated.length} outdated packages`);
+    return { success: true, outdated };
+  } catch (error) {
+    console.error("[containerNpmCheck] Unexpected error:", error);
+    return {
+      success: false,
+      outdated: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+

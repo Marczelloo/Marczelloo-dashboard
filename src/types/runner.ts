@@ -16,12 +16,13 @@ export type RunnerOperation =
   | "compose_up"
   | "docker_logs"
   | "docker_status"
-  | "npm_check"      // NEW: Check for outdated packages
-  | "npm_update"     // NEW: Update npm packages
-  | "npm_test"       // NEW: Run npm tests
-  | "npm_build"      // NEW: Run npm build
-  | "npm_backup"     // NEW: Backup package files
-  | "npm_restore";   // NEW: Restore package files
+  | "npm_check"      // Check for outdated packages
+  | "npm_update"     // Update npm packages
+  | "npm_test"       // Run npm tests
+  | "npm_build"      // Run npm build
+  | "npm_backup"     // Backup package files
+  | "npm_restore"    // Restore package files
+  | "container_npm_check";  // Check packages inside a Docker container
 
 export interface RunnerRequest {
   operation: RunnerOperation;

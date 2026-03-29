@@ -24,12 +24,14 @@ interface PackagesTabProps {
 
 interface PackageCheckResult {
   ecosystem: string;
+  check_mode?: "host" | "container";
   outdated: Array<{
     name: string;
     current: string;
     wanted: string;
     latest: string;
     service_name?: string;
+    container_name?: string;
   }>;
   outdated_count: number;
   checked_at: string;
@@ -54,6 +56,7 @@ interface RepoPathOption {
   service_id: string;
   service_name: string;
   repo_path: string;
+  container_name?: string;
 }
 
 export function PackagesTab({ project }: PackagesTabProps) {
@@ -118,10 +121,14 @@ export function PackagesTab({ project }: PackagesTabProps) {
     setError(null);
 
     try {
-      // Find service name for this repo_path
+      // Find service info for this repo_path
       const serviceInfo = availableRepoPaths.find(s => s.repo_path === selectedRepoPath);
 
-      console.log("Checking packages for:", { repoPath: selectedRepoPath, serviceName: serviceInfo?.service_name });
+      console.log("Checking packages for:", {
+        repoPath: selectedRepoPath,
+        serviceName: serviceInfo?.service_name,
+        containerName: serviceInfo?.container_name
+      });
 
       const response = await fetch(`/api/projects/${project.id}/packages/check`, {
         method: "POST",
@@ -129,6 +136,8 @@ export function PackagesTab({ project }: PackagesTabProps) {
         body: JSON.stringify({
           repo_path: selectedRepoPath,
           service_name: serviceInfo?.service_name,
+          container_name: serviceInfo?.container_name,
+          check_type: serviceInfo?.container_name ? "auto" : "host",
         }),
       });
 
@@ -358,6 +367,10 @@ export function PackagesTab({ project }: PackagesTabProps) {
                 <div className="flex items-center gap-4 text-sm">
                   <span>Ecosystem:</span>
                   <Badge variant="secondary">{checkResult.ecosystem}</Badge>
+                  <span>Check mode:</span>
+                  <Badge variant={checkResult.check_mode === "container" ? "outline" : "secondary"}>
+                    {checkResult.check_mode || "host"}
+                  </Badge>
                   <span>Outdated:</span>
                   <Badge
                     variant={checkResult.outdated_count > 0 ? "warning" : "success"}
@@ -415,9 +428,17 @@ export function PackagesTab({ project }: PackagesTabProps) {
                               />
                               <div className="flex flex-col">
                                 <span className="font-medium text-sm">{pkg.name}</span>
-                                {pkg.service_name && (
-                                  <span className="text-xs text-muted-foreground">{pkg.service_name}</span>
-                                )}
+                                <div className="flex gap-2">
+                                  {pkg.service_name && (
+                                    <span className="text-xs text-muted-foreground">{pkg.service_name}</span>
+                                  )}
+                                  {pkg.container_name && (
+                                    <span className="text-xs text-primary flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                      {pkg.container_name}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">

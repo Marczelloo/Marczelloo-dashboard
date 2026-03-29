@@ -334,6 +334,48 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
         output = JSON.stringify(backupData) + "\n" + result.stdout + result.stderr;
         break;
       }
+
+      case "container_npm_check": {
+        if (!target.container_name) throw new Error("container_name required for container_npm_check");
+
+        // Check if container is running
+        const checkResult = await execAsync(`docker inspect --format='{{.State.Status}}' ${target.container_name} 2>/dev/null || echo "not_found"`);
+        const containerStatus = checkResult.stdout.trim();
+
+        if (containerStatus === "not_found" || containerStatus.includes("not found")) {
+          throw new Error(`Container ${target.container_name} not found`);
+        }
+
+        if (containerStatus !== "running") {
+          throw new Error(`Container ${target.container_name} is not running (status: ${containerStatus})`);
+        }
+
+        try {
+          // Run npm outdated inside the container
+          const result = await execAsync(`docker exec ${target.container_name} npm outdated --json 2>&1`);
+          output = result.stdout;
+
+          // If npm is not installed, the error will tell us
+          if (result.stderr && result.stderr.includes("not found")) {
+            throw new Error("npm not found in container");
+          }
+        } catch (error: any) {
+          // npm outdated returns non-zero when packages are outdated
+          // This is expected behavior, so we treat stdout as success
+          if (error.stdout) {
+            output = error.stdout;
+          } else if (error.stderr) {
+            // Check if it's the "not found" error
+            if (error.stderr.includes("not found")) {
+              throw new Error("npm not found in container");
+            }
+            output = error.stderr;
+          } else {
+            throw error;
+          }
+        }
+        break;
+      }
     }
 
     return {
