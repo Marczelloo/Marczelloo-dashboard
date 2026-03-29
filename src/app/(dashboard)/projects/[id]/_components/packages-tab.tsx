@@ -239,6 +239,9 @@ export function PackagesTab({ project }: PackagesTabProps) {
   };
 
   const getVersionColor = (current: string, latest: string) => {
+    // Handle undefined/null values
+    if (!current || !latest) return "secondary";
+
     const currentParts = current.split(".").map(Number);
     const latestParts = latest.split(".").map(Number);
 

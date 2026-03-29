@@ -323,14 +323,18 @@ export async function npmCheck(
     try {
       const parsed = JSON.parse(result.output);
       outdated = Object.entries(parsed).map(([name, data]: [string, unknown]) => {
-        const pkg = data as { current?: string; wanted: string; latest: string; dependent?: string };
-        // Use wanted as current if current is not available (package is up to date)
+        const pkg = data as { current?: string; wanted?: string; latest?: string; dependent?: string };
+        // Ensure all required fields have values, fallback to sensible defaults
         return {
           name,
-          current: pkg.current || pkg.wanted,
-          wanted: pkg.wanted,
-          latest: pkg.latest
+          current: pkg.current || pkg.wanted || "unknown",
+          wanted: pkg.wanted || pkg.latest || "unknown",
+          latest: pkg.latest || pkg.wanted || "unknown"
         };
+      }).filter(pkg => {
+        // Filter out packages that don't actually have updates available
+        // (current == wanted == latest means no update needed)
+        return pkg.current !== pkg.latest || pkg.wanted !== pkg.latest;
       });
     } catch {
       // npm outdated outputs errors to stdout when no packages
