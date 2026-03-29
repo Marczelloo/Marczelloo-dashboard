@@ -293,6 +293,7 @@ export async function npmCheck(
   try {
     // Map host path to container mount path
     const containerPath = mapHostToContainerPath(repoPath);
+    console.log(`[npmCheck] Checking packages: ${repoPath} -> ${containerPath}`);
 
     const response = await fetch(`${config.url}/execute`, {
       method: "POST",
@@ -309,20 +310,26 @@ export async function npmCheck(
 
     if (!response.ok) {
       const error = await response.text().catch(() => response.statusText);
+      console.error(`[npmCheck] Runner request failed:`, error);
       return { success: false, outdated: [], error };
     }
 
     const result = await response.json();
+    console.log(`[npmCheck] Runner response:`, result);
 
     if (!result.success) {
+      console.error(`[npmCheck] npm_check operation failed:`, result.error);
       return { success: false, outdated: [], error: result.error };
     }
+
+    // Debug: show raw output
+    console.log(`[npmCheck] Raw npm outdated output:`, result.output);
 
     // Parse JSON output from npm outdated
     let outdated: NpmOutdatedResult[] = [];
     try {
       const parsed = JSON.parse(result.output);
-      console.log("[Runner] npm outdated parsed:", parsed);
+      console.log("[npmCheck] npm outdated parsed:", parsed);
 
       outdated = Object.entries(parsed)
         .map(([name, data]: [string, unknown]) => {
@@ -330,7 +337,7 @@ export async function npmCheck(
 
           // Log any packages with missing data
           if (!pkg.current || !pkg.wanted || !pkg.latest) {
-            console.log(`[Runner] Package ${name} has missing data:`, pkg);
+            console.log(`[npmCheck] Package ${name} has missing data:`, pkg);
           }
 
           // Ensure all required fields have values, fallback to sensible defaults
@@ -347,19 +354,26 @@ export async function npmCheck(
           // Also filter out any packages with "unknown" values
           const hasUpdate = pkg.current !== pkg.latest || pkg.wanted !== pkg.latest;
           const hasValidData = pkg.current !== "unknown" && pkg.latest !== "unknown";
-          return hasUpdate && hasValidData;
+          const isActuallyOutdated = pkg.current !== "unknown" && pkg.latest !== "unknown" && pkg.current !== pkg.latest;
+
+          console.log(`[npmCheck] Package ${pkg.name}: current=${pkg.current}, latest=${pkg.latest}, hasUpdate=${hasUpdate}, hasValidData=${hasValidData}, isActuallyOutdated=${isActuallyOutdated}`);
+
+          return isActuallyOutdated;
         });
 
-      console.log("[Runner] Filtered outdated packages:", outdated);
+      console.log("[npmCheck] Filtered outdated packages:", outdated);
     } catch (error) {
-      console.error("[Runner] Failed to parse npm outdated output:", error);
+      console.error("[npmCheck] Failed to parse npm outdated output:", error);
+      console.error("[npmCheck] Raw output was:", result.output);
       // npm outdated outputs errors to stdout when no packages
       // or the output is not valid JSON
       outdated = [];
     }
 
+    console.log(`[npmCheck] Final result: ${outdated.length} outdated packages`);
     return { success: true, outdated };
   } catch (error) {
+    console.error("[npmCheck] Unexpected error:", error);
     return {
       success: false,
       outdated: [],
