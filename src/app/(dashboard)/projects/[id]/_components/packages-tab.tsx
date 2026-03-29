@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Clock,
   History,
+  Bug,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Project } from "@/types";
@@ -62,6 +63,8 @@ export function PackagesTab({ project }: PackagesTabProps) {
   const [selectedRepoPath, setSelectedRepoPath] = useState<string>("");
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
 
@@ -192,6 +195,41 @@ export function PackagesTab({ project }: PackagesTabProps) {
     }
   }, [selectedRepoPath, selectedPackages, project.id, fetchHistory, handleCheck, checkResult]);
 
+  const handleDiagnose = useCallback(async () => {
+    if (!selectedRepoPath) {
+      setError("No repository path available. Please configure a service with repo_path.");
+      return;
+    }
+
+    setDiagnosing(true);
+    setDiagnostics(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/packages/diagnose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_path: selectedRepoPath,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to diagnose packages");
+      }
+
+      const data = await response.json();
+      console.log("[PackagesTab] Diagnostics:", data);
+      setDiagnostics(data);
+    } catch (err) {
+      console.error("Package diagnose error:", err);
+      setError(err instanceof Error ? err.message : "Failed to diagnose packages");
+    } finally {
+      setDiagnosing(false);
+    }
+  }, [selectedRepoPath, project.id]);
+
   const togglePackage = useCallback((packageName: string) => {
     const newSelected = new Set(selectedPackages);
     if (newSelected.has(packageName)) {
@@ -288,15 +326,26 @@ export function PackagesTab({ project }: PackagesTabProps) {
                 </span>
               )}
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCheck}
-              disabled={checking || !selectedRepoPath}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${checking ? "animate-spin" : ""}`} />
-              Check for Updates
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDiagnose}
+                disabled={diagnosing || !selectedRepoPath}
+              >
+                <Bug className={`h-4 w-4 mr-2 ${diagnosing ? "animate-pulse" : ""}`} />
+                Diagnose
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheck}
+                disabled={checking || !selectedRepoPath}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${checking ? "animate-spin" : ""}`} />
+                Check for Updates
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {checking ? (
@@ -407,6 +456,84 @@ export function PackagesTab({ project }: PackagesTabProps) {
             {error && (
               <div className="mt-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                 {error}
+              </div>
+            )}
+
+            {diagnostics && (
+              <div className="mt-4 p-4 rounded-lg bg-secondary/20 border border-border">
+                <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                  <Bug className="h-4 w-4" />
+                  Diagnostics Results
+                </h4>
+                <div className="space-y-3 text-xs font-mono">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-muted-foreground">Path: </span>
+                      {diagnostics.container_path}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Dir exists: </span>
+                      <Badge variant={diagnostics.checks?.directory_exists ? "success" : "destructive"}>
+                        {diagnostics.checks?.directory_exists ? "YES" : "NO"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">package.json: </span>
+                      <Badge variant={diagnostics.checks?.package_json_exists ? "success" : "destructive"}>
+                        {diagnostics.checks?.package_json_exists ? "EXISTS" : "NOT FOUND"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">node_modules: </span>
+                      <Badge variant={diagnostics.checks?.node_modules_exists ? "success" : "destructive"}>
+                        {diagnostics.checks?.node_modules_exists ? "EXISTS" : "NOT FOUND"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Dependencies: </span>
+                      {diagnostics.checks?.dependencies_count ?? "N/A"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Dev deps: </span>
+                      {diagnostics.checks?.dev_dependencies_count ?? "N/A"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">npm outdated: </span>
+                      {diagnostics.checks?.npm_outdated_count ?? "N/A"} packages
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">npm list: </span>
+                      {diagnostics.checks?.npm_list_dependencies_count ?? "N/A"} installed
+                    </div>
+                  </div>
+
+                  {diagnostics.checks?.npm_outdated_stderr && (
+                    <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive">
+                      <div className="font-medium mb-1">npm outdated stderr:</div>
+                      <pre className="whitespace-pre-wrap break-all">
+                        {diagnostics.checks.npm_outdated_stderr}
+                      </pre>
+                    </div>
+                  )}
+
+                  {diagnostics.checks?.npm_list_stderr && (
+                    <div className="mt-2 p-2 rounded bg-warning/10 text-warning-foreground">
+                      <div className="font-medium mb-1">npm list stderr:</div>
+                      <pre className="whitespace-pre-wrap break-all">
+                        {diagnostics.checks.npm_list_stderr}
+                      </pre>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDiagnostics(null)}
+                    className="w-full mt-2"
+                  >
+                    Close Diagnostics
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
