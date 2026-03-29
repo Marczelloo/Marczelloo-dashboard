@@ -467,14 +467,18 @@ export function PackagesTab({ project }: PackagesTabProps) {
                 </h4>
                 <div className="space-y-3 text-xs font-mono">
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-muted-foreground">Path: </span>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Container path: </span>
                       {diagnostics.container_path}
                     </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Host path: </span>
+                      {diagnostics.host_path}
+                    </div>
                     <div>
-                      <span className="text-muted-foreground">Dir exists: </span>
-                      <Badge variant={diagnostics.checks?.directory_exists ? "success" : "destructive"}>
-                        {diagnostics.checks?.directory_exists ? "YES" : "NO"}
+                      <span className="text-muted-foreground">Dir exists (host): </span>
+                      <Badge variant={diagnostics.checks?.host_directory_exists ? "success" : "destructive"}>
+                        {diagnostics.checks?.host_directory_exists ? "YES" : "NO"}
                       </Badge>
                     </div>
                     <div>
@@ -490,6 +494,10 @@ export function PackagesTab({ project }: PackagesTabProps) {
                       </Badge>
                     </div>
                     <div>
+                      <span className="text-muted-foreground">Package manager: </span>
+                      {diagnostics.checks?.detected_manager || "npm"}
+                    </div>
+                    <div>
                       <span className="text-muted-foreground">Dependencies: </span>
                       {diagnostics.checks?.dependencies_count ?? "N/A"}
                     </div>
@@ -498,29 +506,52 @@ export function PackagesTab({ project }: PackagesTabProps) {
                       {diagnostics.checks?.dev_dependencies_count ?? "N/A"}
                     </div>
                     <div>
-                      <span className="text-muted-foreground">npm outdated: </span>
+                      <span className="text-muted-foreground">Lock files: </span>
+                      {diagnostics.checks?.lock_files?.join(", ") || "NONE"}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Available PMs: </span>
+                      <span className="text-[10px]">{diagnostics.checks?.available_package_managers || "NONE"}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">npm check (execute): </span>
+                      <Badge variant={diagnostics.checks?.npm_check_success ? "success" : "destructive"}>
+                        {diagnostics.checks?.npm_check_success ? "SUCCESS" : "FAILED"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Outdated (execute): </span>
                       {diagnostics.checks?.npm_outdated_count ?? "N/A"} packages
                     </div>
                     <div>
-                      <span className="text-muted-foreground">npm list: </span>
-                      {diagnostics.checks?.npm_list_dependencies_count ?? "N/A"} installed
+                      <span className="text-muted-foreground">Outdated (shell): </span>
+                      {diagnostics.checks?.shell_npm_outdated_count ?? "N/A"} packages
                     </div>
                   </div>
 
-                  {diagnostics.checks?.npm_outdated_stderr && (
-                    <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive">
-                      <div className="font-medium mb-1">npm outdated stderr:</div>
-                      <pre className="whitespace-pre-wrap break-all">
-                        {diagnostics.checks.npm_outdated_stderr}
+                  {diagnostics.checks?.directory_listing && (
+                    <div className="mt-2 p-2 rounded bg-secondary/50">
+                      <div className="font-medium mb-1">Directory listing:</div>
+                      <pre className="whitespace-pre-wrap break-all text-[10px]">
+                        {diagnostics.checks.directory_listing}
                       </pre>
                     </div>
                   )}
 
-                  {diagnostics.checks?.npm_list_stderr && (
-                    <div className="mt-2 p-2 rounded bg-warning/10 text-warning-foreground">
-                      <div className="font-medium mb-1">npm list stderr:</div>
+                  {diagnostics.checks?.npm_check_error && (
+                    <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive">
+                      <div className="font-medium mb-1">npm check error:</div>
                       <pre className="whitespace-pre-wrap break-all">
-                        {diagnostics.checks.npm_list_stderr}
+                        {diagnostics.checks.npm_check_error}
+                      </pre>
+                    </div>
+                  )}
+
+                  {diagnostics.checks?.shell_npm_outdated_stderr && (
+                    <div className="mt-2 p-2 rounded bg-warning/10 text-warning-foreground">
+                      <div className="font-medium mb-1">npm outdated stderr:</div>
+                      <pre className="whitespace-pre-wrap break-all text-[10px]">
+                        {diagnostics.checks.shell_npm_outdated_stderr}
                       </pre>
                     </div>
                   )}
