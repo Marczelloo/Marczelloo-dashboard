@@ -236,13 +236,19 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
       case "npm_check": {
         if (!target.repo_path) throw new Error("repo_path required for npm_check");
-        const cwd = `cd "${target.repo_path}" &&`;
-        const result = await execAsync(`${cwd} npm outdated --json`);
-        output = result.stdout;
-
-        // npm outdated returns non-zero when packages are outdated, treat as success
-        if (result.stderr && !result.stdout) {
-          output = result.stderr;
+        try {
+          const result = await execAsync(`cd "${target.repo_path}" && npm outdated --json`);
+          output = result.stdout;
+        } catch (error: any) {
+          // npm outdated returns non-zero when packages are outdated
+          // This is expected behavior, so we treat stdout as success
+          if (error.stdout) {
+            output = error.stdout;
+          } else if (error.stderr) {
+            output = error.stderr;
+          } else {
+            throw error;
+          }
         }
         break;
       }
