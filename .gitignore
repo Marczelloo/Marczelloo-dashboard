@@ -63,3 +63,4 @@ Thumbs.db
 *.key
 *.secret
 secrets/
+.data/

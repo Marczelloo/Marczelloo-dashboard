@@ -2,25 +2,22 @@ import { NextResponse } from "next/server";
 import * as services from "@/server/atlashub/services";
 import * as deploys from "@/server/atlashub/deploys";
 import * as auditLogs from "@/server/atlashub/audit-logs";
-
-const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
-const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
+import { AuthError, requirePinVerification } from "@/server/lib/auth";
+import * as runner from "@/server/runner";
 
 export async function POST(request: Request) {
-  const userEmail = process.env.DEV_USER_EMAIL || "unknown";
-
-  if (!RUNNER_TOKEN) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "RUNNER_TOKEN not configured",
-      },
-      { status: 500 }
-    );
-  }
-
+  let deployId: string | undefined;
   try {
-    const { serviceId, strategy } = await request.json();
+    const user = await requirePinVerification();
+    const body = await request.json();
+    const { serviceId, strategy } = body as {
+      serviceId?: string;
+      strategy?: "pull_restart" | "pull_rebuild" | "compose_up";
+    };
+
+    if (strategy && !["pull_restart", "pull_rebuild", "compose_up"].includes(strategy)) {
+      return NextResponse.json({ success: false, error: "Invalid deploy strategy" }, { status: 400 });
+    }
 
     if (!serviceId) {
       return NextResponse.json(
@@ -55,51 +52,39 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!service.repo_path) {
+    if (!service.repo_path || !service.compose_project) {
       return NextResponse.json(
         {
           success: false,
-          error: "Service has no repo_path configured",
+          error: "Service is missing repo_path or compose_project",
         },
         { status: 400 }
       );
     }
 
+    if (service.deploy_strategy === "manual") {
+      return NextResponse.json({ success: false, error: "This service requires manual deployment" }, { status: 400 });
+    }
+
     // Create deploy record
     const deploy = await deploys.createDeploy({
       service_id: service.id,
-      triggered_by: userEmail,
+      triggered_by: user.email,
     });
+    deployId = deploy.id;
+    await deploys.startDeploy(deploy.id);
 
-    // Determine operation based on strategy
     const deployStrategy = strategy || service.deploy_strategy || "pull_restart";
-    let operation = "restart";
-    if (deployStrategy === "pull_rebuild" || deployStrategy === "compose_up") {
-      operation = "rebuild";
-    }
-
-    // Call runner
-    const response = await fetch(`${RUNNER_URL}/execute`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        repoPath: service.repo_path,
-        composeProject: service.compose_project,
-        operation,
-        pullFirst: deployStrategy.startsWith("pull_"),
-      }),
-    });
-
-    const result = await response.json();
+    const result = await runner.deploy(service.repo_path, service.compose_project, deployStrategy);
 
     // Update deploy record
-    await deploys.completeDeploy(deploy.id, result.success, { error_message: result.error });
+    await deploys.completeDeploy(deploy.id, result.success, {
+      commit_sha: result.commit_sha,
+      error_message: result.error,
+    });
 
     // Log the action
-    await auditLogs.logAction(userEmail, "deploy", "service", service.id, {
+    await auditLogs.logAction(user.email, "deploy", "service", service.id, {
       service_name: service.name,
       strategy: deployStrategy,
       success: result.success,
@@ -109,9 +94,25 @@ export async function POST(request: Request) {
       success: result.success,
       message: result.success ? "Deploy completed successfully" : result.error || "Deploy failed",
       deployId: deploy.id,
+      commitSha: result.commit_sha,
+      steps: result.steps,
     });
   } catch (error) {
     console.error("Deploy error:", error);
+
+    if (deployId) {
+      await deploys.completeDeploy(deployId, false, {
+        error_message: error instanceof Error ? error.message : "Unknown error",
+      }).catch((completionError) => console.error("Failed to mark deploy as failed:", completionError));
+    }
+
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: error.code },
+        { status: error.code === "PIN_REQUIRED" ? 403 : 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

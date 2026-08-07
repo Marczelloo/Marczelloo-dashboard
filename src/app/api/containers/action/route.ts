@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as portainer from "@/server/portainer/client";
 import * as auditLogs from "@/server/atlashub/audit-logs";
+import { requirePinVerification } from "@/server/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requirePinVerification();
     const body = await request.json();
     const { endpointId, containerId, action } = body;
 
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the action (container IDs aren't UUIDs, so store in meta instead)
-    const userEmail = process.env.DEV_USER_EMAIL || "unknown";
+    const userEmail = user.email;
     await auditLogs.logAction(
       userEmail,
       action as "start" | "stop" | "restart" | "delete",

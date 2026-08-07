@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { requirePinVerification } from "@/server/lib/auth";
 
 export async function POST() {
+  try { await requirePinVerification(); } catch { return NextResponse.json({ success: false, error: "PIN verification required" }, { status: 401 }); }
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
   if (!webhookUrl) {

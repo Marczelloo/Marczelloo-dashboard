@@ -21,6 +21,7 @@ interface TableColumn {
   type: string;
   nullable: boolean;
   defaultValue?: string;
+  unique?: boolean;
 }
 
 interface TableSchema {
@@ -29,6 +30,17 @@ interface TableSchema {
 }
 
 const tables: TableSchema[] = [
+  {
+    name: "settings",
+    columns: [
+      { name: "id", type: "uuid", nullable: false, defaultValue: "gen_random_uuid()" },
+      { name: "key", type: "varchar(255)", nullable: false, unique: true },
+      { name: "value", type: "text", nullable: false },
+      { name: "encrypted", type: "boolean", nullable: false, defaultValue: "false" },
+      { name: "created_at", type: "timestamptz", nullable: false, defaultValue: "now()" },
+      { name: "updated_at", type: "timestamptz", nullable: false, defaultValue: "now()" },
+    ],
+  },
   {
     name: "projects",
     columns: [
@@ -137,6 +149,7 @@ function generateSQL(table: TableSchema): string {
     .map((col) => {
       let def = `  ${col.name} ${col.type}`;
       if (!col.nullable) def += " NOT NULL";
+      if (col.unique) def += " UNIQUE";
       if (col.defaultValue) def += ` DEFAULT ${col.defaultValue}`;
       return def;
     })

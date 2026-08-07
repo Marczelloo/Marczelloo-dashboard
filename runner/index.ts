@@ -10,8 +10,9 @@
 
 import http from "http";
 import fs from "fs";
+import { readFile, writeFile } from "fs/promises";
 import path from "path";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import "dotenv/config";
 
@@ -130,7 +131,27 @@ interface RunnerResponse {
 
 // Validate request against blocklist (allow everything except blocked items)
 function validateRequest(req: RunnerRequest): string | null {
+  if (!req || typeof req !== "object") return "Invalid request";
+
   const { operation, target } = req;
+  if (typeof operation !== "string") return "operation is required";
+  if (!target || typeof target !== "object") return "target is required";
+
+  const validateIdentifier = (value: string | undefined, name: string) => {
+    if (value !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value)) {
+      return `${name} contains invalid characters`;
+    }
+    return null;
+  };
+
+  for (const [value, name] of [
+    [target.compose_project, "compose_project"],
+    [target.container_name, "container_name"],
+    [target.service_name, "service_name"],
+  ] as const) {
+    const error = validateIdentifier(value, name);
+    if (error) return error;
+  }
 
   // Check if repo_path is blocked
   if (target.repo_path && BLOCKLIST.repo_paths.includes(target.repo_path)) {
@@ -193,9 +214,13 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
       }
 
       case "docker_restart": {
-        const name = target.container_name || target.compose_project;
-        if (!name) throw new Error("container_name or compose_project required");
-        const result = await execAsync(`docker restart ${name}`);
+        if (!target.container_name && !target.compose_project) {
+          throw new Error("container_name or compose_project required");
+        }
+        const command = target.container_name
+          ? `docker restart ${target.container_name}`
+          : `docker compose -p ${target.compose_project} restart`;
+        const result = await execAsync(command);
         output = result.stdout + result.stderr;
         break;
       }
@@ -240,13 +265,14 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
         try {
           const result = await execAsync(`cd "${target.repo_path}" && npm outdated --json`);
           output = result.stdout;
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const execError = error as Error & { stdout?: string; stderr?: string };
           // npm outdated returns non-zero when packages are outdated
           // This is expected behavior, so we treat stdout as success
-          if (error.stdout) {
-            output = error.stdout;
-          } else if (error.stderr) {
-            output = error.stderr;
+          if (execError.stdout) {
+            output = execError.stdout;
+          } else if (execError.stderr) {
+            output = execError.stderr;
           } else {
             throw error;
           }
@@ -299,15 +325,13 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
       case "npm_backup": {
         if (!target.repo_path) throw new Error("repo_path required for npm_backup");
-        const fs = require("fs").promises;
-
         const backupData: Record<string, string> = {};
         const filesToBackup = ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
 
         for (const file of filesToBackup) {
           try {
             const filePath = `${target.repo_path}/${file}`;
-            const content = await fs.readFile(filePath, "utf-8");
+            const content = await readFile(filePath, "utf-8");
             backupData[file] = content;
           } catch {
             // File doesn't exist, skip
@@ -322,12 +346,11 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
         if (!target.repo_path) throw new Error("repo_path required for npm_restore");
         if (!options?.backup_data) throw new Error("backup_data required for npm_restore");
 
-        const fs = require("fs").promises;
         const backupData = JSON.parse(options.backup_data as string);
 
         for (const [filename, content] of Object.entries(backupData)) {
           const filePath = `${target.repo_path}/${filename}`;
-          await fs.writeFile(filePath, content as string);
+          await writeFile(filePath, content as string);
         }
 
         // Run npm install to ensure dependencies match restored lockfile
@@ -360,17 +383,18 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
           if (result.stderr && result.stderr.includes("not found")) {
             throw new Error("npm not found in container");
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const execError = error as Error & { stdout?: string; stderr?: string };
           // npm outdated returns non-zero when packages are outdated
           // This is expected behavior, so we treat stdout as success
-          if (error.stdout) {
-            output = error.stdout;
-          } else if (error.stderr) {
+          if (execError.stdout) {
+            output = execError.stdout;
+          } else if (execError.stderr) {
             // Check if it's the "not found" error
-            if (error.stderr.includes("not found")) {
+            if (execError.stderr.includes("not found")) {
               throw new Error("npm not found in container");
             }
-            output = error.stderr;
+            output = execError.stderr;
           } else {
             throw error;
           }
@@ -558,14 +582,25 @@ const server = http.createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) {
       body += chunk;
+      if (body.length > 2_000_000) {
+        res.writeHead(413);
+        res.end(JSON.stringify({ error: "Request body too large" }));
+        return;
+      }
     }
 
     try {
       const { command, cwd, timeout: requestTimeout } = JSON.parse(body);
 
-      if (!command || typeof command !== "string") {
+      if (!command || typeof command !== "string" || command.length > 100_000 || command.includes("\0")) {
         res.writeHead(400);
-        res.end(JSON.stringify({ error: "command is required" }));
+        res.end(JSON.stringify({ error: "command is required and must be at most 100000 characters" }));
+        return;
+      }
+
+      if (cwd !== undefined && (typeof cwd !== "string" || cwd.length > 500 || cwd.includes("\0"))) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: "Invalid cwd" }));
         return;
       }
 
@@ -579,7 +614,7 @@ const server = http.createServer(async (req, res) => {
 
       // Security: Block dangerous commands
       const blockedPatterns = [
-        /\brm\s+-rf\s+\/\s*$/i, // rm -rf /
+        /\brm\s+-rf\b/i, // recursive force deletes are not needed by dashboard operations
         /\bmkfs\b/i, // formatting
         /\bdd\s+if=/i, // disk operations
         />\s*\/dev\/(?!null)/i, // writing to devices (except /dev/null)
@@ -588,10 +623,18 @@ const server = http.createServer(async (req, res) => {
         /\bpasswd\b/i, // password changes
         /\buseradd\b/i, // user additions
         /\buserdel\b/i, // user deletions
+        /\b(?:docker|podman)\s+system\s+prune\b/i, // destructive global cleanup
+        /\b(?:docker|podman)\s+volume\s+(?:rm|prune)\b/i,
+        /\bfind\s+\/\s+.*\s-delete\b/i,
       ];
 
+      // The dedicated Pi-restart endpoint is PIN-protected and uses this exact
+      // command. Keep the generic shutdown block in place for every other shell
+      // request so a typo or arbitrary terminal input cannot reboot the host.
+      const approvedPiRestart = /^sudo\s+\/sbin\/shutdown\s+-r\s+\+1\s+'Dashboard initiated restart'$/i.test(command.trim());
+
       for (const pattern of blockedPatterns) {
-        if (pattern.test(command)) {
+        if (pattern.test(command) && !(approvedPiRestart && /\bshutdown\b/i.test(command))) {
           res.writeHead(403);
           res.end(JSON.stringify({ error: "Command blocked for security reasons" }));
           return;
@@ -601,15 +644,25 @@ const server = http.createServer(async (req, res) => {
       const start = Date.now();
       const workingDir = cwd || process.env.DEFAULT_CWD || "/home/Marczelloo_pi";
 
-      let shellCommand: string;
+      let executable: string;
+      let executableArgs: string[];
       let execOptions: { timeout: number; maxBuffer: number; env?: NodeJS.ProcessEnv };
 
       if (SSH_ENABLED && fs.existsSync(SSH_KEY_PATH)) {
         // Use SSH to execute command on host
         // Build the remote command with cd if cwd specified
-        const remoteCommand = cwd ? `cd ${JSON.stringify(cwd)} && ${command}` : command;
+        const quoteRemote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
+        const remoteCommand = cwd ? `cd ${quoteRemote(cwd)} && ${command}` : command;
 
-        shellCommand = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i ${SSH_KEY_PATH} ${SSH_USER}@${SSH_HOST} ${JSON.stringify(remoteCommand)}`;
+        executable = "ssh";
+        executableArgs = [
+          "-o", "StrictHostKeyChecking=no",
+          "-o", "UserKnownHostsFile=/dev/null",
+          "-o", "ConnectTimeout=5",
+          "-i", SSH_KEY_PATH,
+          `${SSH_USER}@${SSH_HOST}`,
+          remoteCommand,
+        ];
         execOptions = {
           timeout: cmdTimeout,
           maxBuffer: 10 * 1024 * 1024, // 10MB for build logs
@@ -620,7 +673,8 @@ const server = http.createServer(async (req, res) => {
       } else {
         // Fallback to local execution (for development or when SSH not configured)
         console.log(`[${new Date().toISOString()}] Local shell (SSH not configured): "${command}"`);
-        shellCommand = `/bin/sh -c ${JSON.stringify(command)}`;
+        executable = "/bin/sh";
+        executableArgs = ["-c", command];
         execOptions = {
           timeout: cmdTimeout,
           maxBuffer: 10 * 1024 * 1024, // 10MB for build logs
@@ -629,8 +683,9 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-        exec(
-          shellCommand,
+        execFile(
+          executable,
+          executableArgs,
           {
             ...execOptions,
             cwd: SSH_ENABLED ? undefined : workingDir, // Only set cwd for local execution
@@ -639,7 +694,7 @@ const server = http.createServer(async (req, res) => {
             resolve({
               stdout: stdout || "",
               stderr: stderr || "",
-              code: error?.code || (error ? 1 : 0),
+              code: typeof error?.code === "number" ? error.code : error ? 1 : 0,
             });
           }
         );

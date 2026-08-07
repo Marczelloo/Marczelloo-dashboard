@@ -12,6 +12,7 @@ import {
   generateReleaseNotes,
   GitHubError,
 } from "@/server/github";
+import { requireAuth } from "@/server/lib/auth";
 
 interface RouteParams {
   params: Promise<{
@@ -22,6 +23,7 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    await requireAuth();
     if (!isGitHubConfigured()) {
       return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
     }
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    await requireAuth();
     if (!isGitHubConfigured()) {
       return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
     }

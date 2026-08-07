@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { projects, packageUpdates } from "@/server/atlashub";
+import { requireAuth } from "@/server/lib/auth";
 
 /**
  * GET /api/projects/[id]/packages/history
@@ -12,6 +13,7 @@ export async function GET(
   const { id } = await params;
 
   try {
+    await requireAuth();
     const project = await projects.getProjectById(id);
 
     if (!project) {

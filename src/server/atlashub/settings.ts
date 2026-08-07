@@ -20,7 +20,10 @@
  */
 
 import "server-only";
+import { mkdir, readFile, rename, writeFile } from "fs/promises";
+import path from "path";
 import * as client from "./client";
+import { decrypt, encrypt } from "@/server/lib/encryption";
 
 // ========================================
 // Types
@@ -43,6 +46,49 @@ let tableWarningShown = false;
 // ========================================
 
 const TABLE = "settings";
+const PORTAINER_TOKEN_FILE =
+  process.env.PORTAINER_TOKEN_FILE || path.join(process.cwd(), ".data", "portainer-token.json");
+
+interface LocalPortainerToken {
+  token: string;
+  expiresAt: string | null;
+}
+
+async function readLocalPortainerToken(): Promise<{ token: string; expiresAt: Date | null } | null> {
+  try {
+    const raw = await readFile(/* turbopackIgnore: true */ PORTAINER_TOKEN_FILE, "utf8");
+    const stored = JSON.parse(raw) as LocalPortainerToken;
+    if (!stored.token) return null;
+
+    return {
+      token: await decrypt(stored.token),
+      expiresAt: stored.expiresAt ? new Date(stored.expiresAt) : null,
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn("[Settings] Local Portainer token could not be read:", error);
+    }
+    return null;
+  }
+}
+
+async function writeLocalPortainerToken(token: string, expiresAt?: Date): Promise<boolean> {
+  try {
+    const directory = path.dirname(PORTAINER_TOKEN_FILE);
+    await mkdir(directory, { recursive: true });
+    const temporaryFile = `${PORTAINER_TOKEN_FILE}.tmp`;
+    await writeFile(
+      temporaryFile,
+      JSON.stringify({ token: await encrypt(token), expiresAt: expiresAt?.toISOString() || null }),
+      { mode: 0o600 }
+    );
+    await rename(temporaryFile, PORTAINER_TOKEN_FILE);
+    return true;
+  } catch (error) {
+    console.error("[Settings] Failed to persist Portainer token locally:", error);
+    return false;
+  }
+}
 
 /**
  * Get a setting by key
@@ -132,7 +178,15 @@ const PORTAINER_TOKEN_EXPIRY_KEY = "portainer_token_expiry";
  * Get the stored Portainer token
  */
 export async function getPortainerToken(): Promise<string | null> {
-  return getSetting(PORTAINER_TOKEN_KEY);
+  try {
+    const databaseToken = await getSetting(PORTAINER_TOKEN_KEY);
+    if (databaseToken) return databaseToken;
+  } catch (error) {
+    console.warn("[Settings] Database token lookup failed; using local fallback:", error);
+  }
+
+  const localToken = await readLocalPortainerToken();
+  return localToken?.token || null;
 }
 
 /**
@@ -140,19 +194,33 @@ export async function getPortainerToken(): Promise<string | null> {
  * Returns true if saved successfully, false if table doesn't exist
  */
 export async function setPortainerToken(token: string, expiresAt?: Date): Promise<boolean> {
-  const saved = await setSetting(PORTAINER_TOKEN_KEY, token);
-  if (saved && expiresAt) {
-    await setSetting(PORTAINER_TOKEN_EXPIRY_KEY, expiresAt.toISOString());
+  let savedToDatabase = false;
+  try {
+    savedToDatabase = await setSetting(PORTAINER_TOKEN_KEY, token);
+    if (savedToDatabase && expiresAt) {
+      await setSetting(PORTAINER_TOKEN_EXPIRY_KEY, expiresAt.toISOString());
+    }
+  } catch (error) {
+    console.warn("[Settings] Database token persistence failed; using local fallback:", error);
   }
-  return saved;
+
+  const savedLocally = await writeLocalPortainerToken(token, expiresAt);
+  return savedToDatabase || savedLocally;
 }
 
 /**
  * Get the Portainer token expiry date
  */
 export async function getPortainerTokenExpiry(): Promise<Date | null> {
-  const expiry = await getSetting(PORTAINER_TOKEN_EXPIRY_KEY);
-  return expiry ? new Date(expiry) : null;
+  try {
+    const expiry = await getSetting(PORTAINER_TOKEN_EXPIRY_KEY);
+    if (expiry) return new Date(expiry);
+  } catch (error) {
+    console.warn("[Settings] Database token expiry lookup failed; using local fallback:", error);
+  }
+
+  const localToken = await readLocalPortainerToken();
+  return localToken?.expiresAt || null;
 }
 
 /**

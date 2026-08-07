@@ -30,6 +30,7 @@ import {
   Github,
   Settings,
 } from "lucide-react";
+import { PinDialog } from "@/components/pin-dialog";
 
 interface ConnectionStatus {
   status: "unknown" | "loading" | "success" | "error";
@@ -304,6 +305,7 @@ function MonitoringIntervalSettings() {
   const [interval, setInterval] = useState(5);
   const [status, setStatus] = useState<ConnectionStatus>({ status: "unknown" });
   const [loading, setLoading] = useState(true);
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings/monitoring-interval")
@@ -326,6 +328,12 @@ function MonitoringIntervalSettings() {
         body: JSON.stringify({ interval_ms: interval * 60000 }),
       });
       const result = await response.json();
+
+      if (result.requirePin) {
+        setStatus({ status: "unknown" });
+        setShowPinDialog(true);
+        return;
+      }
 
       if (result.success) {
         setStatus({ status: "success", message: "Interval updated" });
@@ -409,6 +417,15 @@ function MonitoringIntervalSettings() {
             </div>
           </>
         )}
+
+        <PinDialog
+          open={showPinDialog}
+          onSuccess={() => {
+            setShowPinDialog(false);
+            void saveInterval();
+          }}
+          onCancel={() => setShowPinDialog(false)}
+        />
       </CardContent>
     </Card>
   );
@@ -426,6 +443,7 @@ function PortainerSettings() {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showCredentials, setShowCredentials] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
   useEffect(() => {
     loadTokenStatus();
@@ -448,6 +466,12 @@ function PortainerSettings() {
     try {
       const response = await fetch("/api/settings/test-portainer", { method: "POST" });
       const result = await response.json();
+
+      if (result.requirePin) {
+        setTokenStatus({ status: "unknown" });
+        setShowPinDialog(true);
+        return;
+      }
 
       if (result.success) {
         setStatus({ status: "success", message: `Connected: ${result.endpoints} endpoint(s) found` });
@@ -589,6 +613,15 @@ function PortainerSettings() {
             </div>
           </div>
         )}
+
+        <PinDialog
+          open={showPinDialog}
+          onSuccess={() => {
+            setShowPinDialog(false);
+            void refreshToken();
+          }}
+          onCancel={() => setShowPinDialog(false)}
+        />
       </CardContent>
     </Card>
   );
@@ -648,6 +681,7 @@ function RunnerBlocklistSettings() {
   const [newRepo, setNewRepo] = useState("");
   const [newProject, setNewProject] = useState("");
   const [newContainer, setNewContainer] = useState("");
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
   useEffect(() => {
     loadBlocklist();
@@ -677,6 +711,12 @@ function RunnerBlocklistSettings() {
         body: JSON.stringify({ blocklist }),
       });
       const result = await response.json();
+
+      if (result.requirePin) {
+        setStatus({ status: "unknown" });
+        setShowPinDialog(true);
+        return;
+      }
 
       if (result.success) {
         setStatus({ status: "success", message: "Blocklist saved" });
@@ -830,6 +870,14 @@ function RunnerBlocklistSettings() {
             </div>
           </>
         )}
+        <PinDialog
+          open={showPinDialog}
+          onSuccess={() => {
+            setShowPinDialog(false);
+            void saveBlocklist();
+          }}
+          onCancel={() => setShowPinDialog(false)}
+        />
       </CardContent>
     </Card>
   );

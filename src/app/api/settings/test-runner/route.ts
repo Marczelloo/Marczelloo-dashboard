@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function POST() {
+  try { await requireAuth(); } catch { return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 }); }
   const runnerUrl = process.env.RUNNER_URL || "http://127.0.0.1:8787";
   const runnerToken = process.env.RUNNER_TOKEN;
 

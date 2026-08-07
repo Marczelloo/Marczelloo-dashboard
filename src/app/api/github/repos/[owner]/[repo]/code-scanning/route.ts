@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isGitHubConfigured, GitHubError, githubRequest } from "@/server/github";
+import { requireAuth } from "@/server/lib/auth";
 
 interface RouteParams {
   params: Promise<{
@@ -54,6 +55,7 @@ interface CodeScanningAlert {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    await requireAuth();
     if (!isGitHubConfigured()) {
       return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
     }

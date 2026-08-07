@@ -5,9 +5,11 @@
 
 import { NextResponse } from "next/server";
 import { isGitHubConfigured, getRateLimitStatus, listRepositories } from "@/server/github";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function GET() {
   try {
+    await requireAuth();
     const configured = isGitHubConfigured();
 
     if (!configured) {

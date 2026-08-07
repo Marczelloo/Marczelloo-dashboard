@@ -6,10 +6,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { envVars, auditLogs } from "@/server/atlashub";
-import { getCurrentUser } from "@/server/lib/auth";
+import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAuth();
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get("serviceId");
 
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await requirePinVerification();
     const body = await request.json();
     const { service_id, key, value, is_secret } = body;
 
@@ -67,6 +68,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[ENV Vars] Error:", error);
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { success: false, error: error.message, requirePin: error.code === "PIN_REQUIRED" },
+        { status: error.code === "NOT_AUTHORIZED" ? 403 : 401 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

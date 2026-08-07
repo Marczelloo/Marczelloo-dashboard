@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { projects } from "@/server/atlashub";
 import { npmCheck, containerNpmCheck } from "@/server/runner";
+import { requireAuth } from "@/server/lib/auth";
 
 /**
  * POST /api/projects/[id]/packages/check
@@ -20,6 +21,7 @@ export async function POST(
   const { id } = await params;
 
   try {
+    await requireAuth();
     const project = await projects.getProjectById(id);
 
     if (!project) {

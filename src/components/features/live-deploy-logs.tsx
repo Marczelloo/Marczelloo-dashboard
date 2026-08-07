@@ -108,12 +108,16 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
 
   // Connect to SSE stream
   useEffect(() => {
-    if (!logFile || !isRunning || !expanded) {
+    // A completed job still has useful output. The stream endpoint immediately
+    // replays the file and emits a completion event in that case.
+    if (!logFile || !expanded) {
       return;
     }
 
     setError(null);
     setIsConnected(false);
+    setLines([]);
+    lineIdRef.current = 0;
 
     const es = new EventSource(`/api/deploy/logs/stream?logFile=${encodeURIComponent(logFile)}`);
     eventSourceRef.current = es;
@@ -122,45 +126,44 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
       setIsConnected(true);
     };
 
-    es.onmessage = (event) => {
+    const handleLog = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-
-        if (data.type === "log") {
-          const cleanText = stripAnsi(data.line);
-          if (cleanText.trim()) {
-            setLines((prev) => [
-              ...prev,
-              {
-                id: lineIdRef.current++,
-                text: cleanText,
-                type: classifyLine(cleanText),
-              },
-            ]);
-          }
-        } else if (data.type === "complete") {
-          setIsConnected(false);
-          es.close();
-        } else if (data.type === "error") {
-          setError(data.message);
-          setIsConnected(false);
-          es.close();
-        }
-      } catch {
-        // Raw line without JSON wrapper
-        const cleanText = stripAnsi(event.data);
+        const cleanText = stripAnsi(String(data.content || ""));
         if (cleanText.trim()) {
           setLines((prev) => [
             ...prev,
-            {
+            ...cleanText.split("\n").filter((line: string) => line.trim()).map((line: string) => ({
               id: lineIdRef.current++,
-              text: cleanText,
-              type: classifyLine(cleanText),
-            },
+              text: line,
+              type: classifyLine(line),
+            })),
           ]);
         }
+      } catch {
+        setError("Invalid log stream response");
       }
     };
+
+    const handleComplete = () => {
+      setIsConnected(false);
+      es.close();
+    };
+
+    const handleStreamError = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        setError(data.message || "Failed to read deploy logs");
+      } catch {
+        setError("Failed to read deploy logs");
+      }
+      setIsConnected(false);
+      es.close();
+    };
+
+    es.addEventListener("log", handleLog);
+    es.addEventListener("complete", handleComplete);
+    es.addEventListener("error", handleStreamError);
 
     es.onerror = () => {
       setIsConnected(false);
@@ -168,6 +171,9 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
     };
 
     return () => {
+      es.removeEventListener("log", handleLog);
+      es.removeEventListener("complete", handleComplete);
+      es.removeEventListener("error", handleStreamError);
       es.close();
       eventSourceRef.current = null;
     };

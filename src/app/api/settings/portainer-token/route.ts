@@ -4,16 +4,18 @@
  * Authenticate with Portainer and store the JWT token in the database.
  * This allows the token to be refreshed without restarting the container.
  *
- * NOTE: Requires 'settings' table in AtlasHub. If table doesn't exist,
- * the token will still be returned but won't persist across restarts.
+ * Persists to AtlasHub when available and to an encrypted local file as a
+ * fallback, so a missing settings table no longer loses the token on restart.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { setPortainerToken } from "@/server/atlashub/settings";
 import { setInMemoryToken } from "@/server/portainer/client";
+import { requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    await requirePinVerification();
     const body = await request.json();
     const { username, password } = body;
 
@@ -66,9 +68,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: saved
-        ? "Token refreshed and saved successfully"
-        : 'Token refreshed (in-memory only - create "settings" table in AtlasHub to persist across restarts)',
+      message: saved ? "Token refreshed and saved successfully" : "Token refreshed in memory only",
       persisted: saved,
       expiresAt: expiresAt?.toISOString(),
     });
@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
+    await requireAuth();
     const { getPortainerToken, getPortainerTokenExpiry } = await import("@/server/atlashub/settings");
 
     const token = await getPortainerToken();
@@ -98,7 +99,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       hasToken: !!token || envTokenExists,
-      source: token ? "database" : envTokenExists ? "environment" : "none",
+      source: token ? "persisted" : envTokenExists ? "environment" : "none",
       expiresAt: expiry?.toISOString() || null,
       isExpired: expiry ? expiry < new Date() : null,
     });

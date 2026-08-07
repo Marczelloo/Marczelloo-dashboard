@@ -39,10 +39,12 @@ export async function POST() {
       return NextResponse.json({ success: false, error: "Failed to initiate restart" }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Pi will restart in 1 minute",
-    });
+    const result = await response.json().catch(() => ({}));
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.stderr || "Failed to initiate restart" }, { status: 502 });
+    }
+
+    return NextResponse.json({ success: true, message: "Pi will restart in 1 minute" });
   } catch (error) {
     console.error("[Pi Restart] Error:", error);
 

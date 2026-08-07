@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import * as services from "@/server/atlashub/services";
 import * as uptimeChecks from "@/server/atlashub/uptime-checks";
 import type { Service } from "@/types";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function POST() {
   try {
+    await requireAuth();
     const monitorableServices = await services.getMonitorableServices();
 
     if (monitorableServices.length === 0) {

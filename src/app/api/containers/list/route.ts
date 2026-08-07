@@ -6,9 +6,11 @@
 
 import { NextResponse } from "next/server";
 import { getEndpoints, getContainers, getContainerStatus } from "@/server/portainer/client";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function GET() {
   try {
+    await requireAuth();
     // Get all endpoints
     const endpoints = await getEndpoints();
 

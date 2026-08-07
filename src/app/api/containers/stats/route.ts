@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as portainer from "@/server/portainer/client";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAuth();
     const body = await request.json();
     const { endpointId, containerId } = body;
 

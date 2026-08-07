@@ -89,17 +89,17 @@ function isSelfDeployment(repository: { html_url: string; full_name: string }): 
     const parsedDashboard = parseGitHubUrl(DASHBOARD_GITHUB_URL);
     const parsedIncoming = parseGitHubUrl(repository.html_url);
     if (parsedDashboard && parsedIncoming) {
-      const dashboardNormalized = `${parsedDashboard.owner}/${parsedDashboard.repo}`.toLowerCase();
-      const incomingNormalized = `${parsedIncoming.owner}/${parsedIncoming.repo}`.toLowerCase();
-      if (dashboardNormalized === incomingNormalized) {
-        return true;
-      }
+    const dashboardNormalized = `${parsedDashboard.owner}/${parsedDashboard.repo}`.toLowerCase();
+    const incomingNormalized = `${parsedIncoming.owner}/${parsedIncoming.repo}`.toLowerCase();
+      return dashboardNormalized === incomingNormalized;
     }
   }
 
-  // Check by project name fallback
-  const repoName = repository.full_name.toLowerCase();
-  return repoName.includes(DASHBOARD_PROJECT_NAME.toLowerCase());
+  // Check by exact repository name fallback. A substring match could make an
+  // unrelated repository such as "my-marczelloo-dashboard-fork" self-deploy.
+  const configuredName = DASHBOARD_PROJECT_NAME.toLowerCase().replace(/^.*\//, "");
+  const incomingName = repository.full_name.toLowerCase().split("/").pop() || "";
+  return incomingName === configuredName;
 }
 
 /**
@@ -181,7 +181,7 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
         // Start safe deployment in background without waiting
         // This ensures GitHub receives a successful response before the container restarts
         // The safe deployment includes health checks and automatic rollback
-        startBackgroundSelfDeploy({
+        const launchResult = await startBackgroundSelfDeploy({
           projectId: project.id,
           triggeredBy: "github-webhook",
           branch,
@@ -190,6 +190,16 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
           author: pusher.name,
           compareUrl: compare,
         });
+
+        if (!launchResult.success) {
+          results.push({
+            projectId: project.id,
+            projectName: project.name,
+            deployed: false,
+            reason: launchResult.error || "Failed to queue self-deployment",
+          });
+          continue;
+        }
 
         // Send Discord notification immediately (deployment is in progress)
         await sendDiscordNotification({

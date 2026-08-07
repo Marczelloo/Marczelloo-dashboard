@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContents, isGitHubConfigured, GitHubError } from "@/server/github";
+import { requireAuth } from "@/server/lib/auth";
 
 /**
  * GET /api/github/repos/[owner]/[repo]/contents
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   try {
+    await requireAuth();
     const contents = await getContents(owner, repo, path, ref);
     return NextResponse.json({ data: contents });
   } catch (error) {

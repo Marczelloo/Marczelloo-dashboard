@@ -1,209 +1,126 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/server/lib/auth";
+import { AuthError, requirePinVerification } from "@/server/lib/auth";
+import { getEnvFilePath, shellQuote } from "@/server/runner/safe-paths";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+interface RunnerResult {
+  success?: boolean;
+  stdout?: string;
+  stderr?: string;
+}
 
 interface EnvVar {
   key: string;
   value: string;
 }
 
-// Valid env var key pattern: starts with letter or underscore, followed by letters, digits, or underscores
-const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+async function runShell(command: string): Promise<{ response: Response; result: RunnerResult }> {
+  const response = await fetch(`${RUNNER_URL}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RUNNER_TOKEN}`,
+    },
+    body: JSON.stringify({ command }),
+  });
 
-function validateEnvKeys(vars: EnvVar[]): { valid: boolean; invalidKeys: string[] } {
-  const invalidKeys: string[] = [];
-  for (const v of vars) {
-    if (!ENV_KEY_PATTERN.test(v.key)) {
-      invalidKeys.push(v.key);
-    }
-  }
-  return { valid: invalidKeys.length === 0, invalidKeys };
+  const result = (await response.json().catch(() => ({}))) as RunnerResult;
+  return { response, result };
+}
+
+function validateVars(vars: unknown): vars is EnvVar[] {
+  return (
+    Array.isArray(vars) &&
+    vars.every(
+      (variable): variable is EnvVar =>
+        Boolean(variable) &&
+        typeof variable === "object" &&
+        typeof (variable as EnvVar).key === "string" &&
+        typeof (variable as EnvVar).value === "string" &&
+        ENV_KEY_PATTERN.test((variable as EnvVar).key)
+    )
+  );
+}
+
+function runnerError(response: Response, result: RunnerResult): NextResponse {
+  const detail = result.stderr || result.stdout || "Runner request failed";
+  return NextResponse.json(
+    { success: false, error: detail },
+    { status: response.ok ? 502 : response.status }
+  );
 }
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
-    }
+    await requirePinVerification();
 
-    const { repoPath, filename, vars, action } = await request.json();
-
-    console.log(
-      `[Env Save] Request: repoPath=${repoPath}, filename=${filename}, action=${action}, vars count=${vars?.length}`
-    );
-
-    if (!repoPath) {
-      return NextResponse.json({ success: false, error: "repoPath is required" }, { status: 400 });
-    }
+    const body = await request.json();
+    const { repoPath, filename, vars, action } = body;
+    const target = getEnvFilePath(repoPath, filename);
 
     if (!RUNNER_TOKEN) {
-      console.log("[Env Save] ERROR: Missing RUNNER_TOKEN");
       return NextResponse.json({ success: false, error: "Runner not configured" }, { status: 500 });
     }
 
-    const envFile = filename || ".env";
-    const filePath = `${repoPath}/${envFile}`;
-
-    // Action: append a single variable
-    if (action === "append" && vars?.length === 1) {
-      const { key, value } = vars[0] as EnvVar;
-
-      // Validate env var key
-      if (!ENV_KEY_PATTERN.test(key)) {
-        return NextResponse.json(
-          { success: false, error: `Invalid env var key: "${key}". Keys must start with a letter or underscore and contain only letters, digits, and underscores.` },
-          { status: 400 }
-        );
+    if (action === "append" && Array.isArray(vars) && vars.length === 1) {
+      const [variable] = vars;
+      if (!validateVars([variable])) {
+        return NextResponse.json({ success: false, error: "Invalid env var key or value" }, { status: 400 });
       }
 
-      // Escape value for shell (use single quotes, escape existing single quotes)
-      const escapedValue = value.replace(/'/g, "'\\''");
+      const encodedLine = Buffer.from(`${variable.key}=${variable.value}\n`, "utf8").toString("base64");
+      const tempFile = `${target.filePath}.tmp`;
+      const command =
+        `touch ${shellQuote(target.filePath)} && ` +
+        `awk -v key=${shellQuote(variable.key)} 'index($0, key "=") == 1 { next } { print }' ${shellQuote(target.filePath)} > ${shellQuote(tempFile)} && ` +
+        `printf '%s' ${shellQuote(encodedLine)} | base64 -d >> ${shellQuote(tempFile)} && ` +
+        `mv -f ${shellQuote(tempFile)} ${shellQuote(target.filePath)}`;
+      const { response, result } = await runShell(command);
 
-      // Check if key already exists
-      const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNNER_TOKEN}`,
-        },
-        body: JSON.stringify({
-          command: `grep -q "^${key}=" "${filePath}" 2>/dev/null && echo "EXISTS" || echo "NEW"`,
-        }),
-      });
+      if (!response.ok || !result.success) return runnerError(response, result);
 
-      if (!checkResponse.ok) {
-        return NextResponse.json({ success: false, error: "Failed to check existing vars" }, { status: 500 });
-      }
-
-      const checkResult = await checkResponse.json();
-      const exists = checkResult.stdout?.includes("EXISTS");
-
-      let command: string;
-      if (exists) {
-        // Update existing variable using sed
-        command = `sed -i 's|^${key}=.*|${key}=${escapedValue}|' "${filePath}"`;
-      } else {
-        // Append new variable
-        command = `echo '${key}=${escapedValue}' >> "${filePath}"`;
-      }
-
-      const response = await fetch(`${RUNNER_URL}/shell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNNER_TOKEN}`,
-        },
-        body: JSON.stringify({ command }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.log("[Env Save] Runner error:", error);
-        return NextResponse.json({ success: false, error: `Runner error: ${error}` }, { status: response.status });
-      }
-
-      const result = await response.json();
-      console.log("[Env Save] Append result:", { success: result.success, stderr: result.stderr });
-
-      return NextResponse.json({
-        success: result.success,
-        action: exists ? "updated" : "added",
-        key,
-        filePath,
-      });
+      return NextResponse.json({ success: true, action: "updated", key: variable.key, filePath: target.filePath });
     }
 
-    // Action: write entire file
     if (action === "write" && Array.isArray(vars)) {
-      // Validate env var keys
-      const validation = validateEnvKeys(vars);
-      if (!validation.valid) {
-        return NextResponse.json(
-          { success: false, error: `Invalid env var key(s): ${validation.invalidKeys.join(", ")}. Keys must start with a letter or underscore and contain only letters, digits, and underscores.` },
-          { status: 400 }
-        );
+      if (!validateVars(vars)) {
+        return NextResponse.json({ success: false, error: "Invalid env var key or value" }, { status: 400 });
       }
 
-      // Write by clearing the file first, then appending each line
-      // This is more reliable than complex heredoc or base64 commands
-      const tempFile = `${filePath}.tmp.${Date.now()}`;
+      const content = vars.map((variable) => `${variable.key}=${variable.value}`).join("\n") + (vars.length ? "\n" : "");
+      const encodedContent = Buffer.from(content, "utf8").toString("base64");
+      const tempFile = `${target.filePath}.tmp`;
+      const command =
+        `umask 077 && ` +
+        `printf '%s' ${shellQuote(encodedContent)} | base64 -d > ${shellQuote(tempFile)} && ` +
+        `mv -f ${shellQuote(tempFile)} ${shellQuote(target.filePath)}`;
+      const { response, result } = await runShell(command);
 
-      // Step 1: Create temp file with content
-      const lines = vars.map((v: EnvVar) => {
-        // Escape single quotes in the value for shell
-        const escapedValue = v.value.replace(/'/g, "'\\''");
-        return `${v.key}=${escapedValue}`;
-      });
+      if (!response.ok || !result.success) return runnerError(response, result);
 
-      // Build a script that writes each line
-      const writeLines = lines.map((line) => `echo '${line}'`).join(" >> ");
-      const script = `rm -f "${filePath}" && ${writeLines} >> "${filePath}"`;
-
-      const response = await fetch(`${RUNNER_URL}/shell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNNER_TOKEN}`,
-        },
-        body: JSON.stringify({
-          command: script,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.log("[Env Save] Runner error:", error);
-        return NextResponse.json({ success: false, error: `Runner error: ${error}` }, { status: response.status });
-      }
-
-      const result = await response.json();
-      console.log("[Env Save] Write result:", { success: result.success, stderr: result.stderr, stdout: result.stdout?.substring(0, 200) });
-
-      if (!result.success) {
-        return NextResponse.json({
-          success: false,
-          error: result.stderr || result.stdout || "Failed to write file",
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        action: "written",
-        count: vars.length,
-        filePath,
-      });
+      return NextResponse.json({ success: true, action: "written", count: vars.length, filePath: target.filePath });
     }
 
-    // Action: delete a variable
-    if (action === "delete" && vars?.length === 1) {
-      const { key } = vars[0] as EnvVar;
-
-      const response = await fetch(`${RUNNER_URL}/shell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNNER_TOKEN}`,
-        },
-        body: JSON.stringify({
-          command: `sed -i '/^${key}=/d' "${filePath}"`,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        return NextResponse.json({ success: false, error: `Runner error: ${error}` }, { status: response.status });
+    if (action === "delete" && Array.isArray(vars) && vars.length === 1) {
+      const [variable] = vars;
+      if (!variable || typeof variable.key !== "string" || !ENV_KEY_PATTERN.test(variable.key)) {
+        return NextResponse.json({ success: false, error: "Invalid env var key" }, { status: 400 });
       }
 
-      const result = await response.json();
-      return NextResponse.json({
-        success: result.success,
-        action: "deleted",
-        key,
-        filePath,
-      });
+      const tempFile = `${target.filePath}.tmp`;
+      const command =
+        `if [ -f ${shellQuote(target.filePath)} ]; then ` +
+        `awk -v key=${shellQuote(variable.key)} 'index($0, key "=") == 1 { next } { print }' ${shellQuote(target.filePath)} > ${shellQuote(tempFile)} && ` +
+        `mv -f ${shellQuote(tempFile)} ${shellQuote(target.filePath)}; ` +
+        `fi`;
+      const { response, result } = await runShell(command);
+
+      if (!response.ok || !result.success) return runnerError(response, result);
+
+      return NextResponse.json({ success: true, action: "deleted", key: variable.key, filePath: target.filePath });
     }
 
     return NextResponse.json(
@@ -212,6 +129,18 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("[Env Save] Error:", error);
+
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { success: false, error: error.message, requirePin: error.code === "PIN_REQUIRED" },
+        { status: error.code === "NOT_AUTHORIZED" ? 403 : 401 }
+      );
+    }
+
+    if (error instanceof Error && (error.message.includes("repoPath") || error.message.includes("filename"))) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Failed to save env file" },
       { status: 500 }

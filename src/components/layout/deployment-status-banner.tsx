@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui";
+import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 
 interface DeploymentStatus {
   status: "idle" | "deploying" | "success" | "failed";
@@ -10,6 +11,11 @@ interface DeploymentStatus {
   commit?: string;
   timestamp?: string;
   canReload?: boolean;
+  step?: string;
+  progress?: number;
+  jobId?: string;
+  logFile?: string;
+  rollback?: boolean;
 }
 
 const SESSION_STORAGE_KEY = "deploy-pending-commit";
@@ -21,14 +27,14 @@ export function DeploymentStatusBanner() {
   const [hasCheckedVersion, setHasCheckedVersion] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    const mounted = { current: true };
 
     async function checkStatus() {
       try {
         const response = await fetch("/api/deployment/status");
         if (response.ok) {
           const data = await response.json();
-          if (mounted) {
+          if (mounted.current) {
             console.log("[DeploymentBanner] Status:", data.status, data.message);
 
             // If success status has a commit, store it in sessionStorage
@@ -50,7 +56,7 @@ export function DeploymentStatusBanner() {
               setVisible(true);
               // Auto-dismiss failed status after 10 seconds
               const timer = setTimeout(() => {
-                if (mounted) setVisible(false);
+                if (mounted.current) setVisible(false);
               }, 10000);
               return () => clearTimeout(timer);
             } else {
@@ -69,14 +75,14 @@ export function DeploymentStatusBanner() {
     // Poll every 3 seconds when visible
     const interval = setInterval(checkStatus, 3000);
     return () => {
-      mounted = false;
+      mounted.current = false;
       clearInterval(interval);
     };
   }, []);
 
   // Check current page version to see if we're on the new deployment
   useEffect(() => {
-    let mounted = true;
+    const mounted = true;
 
     async function checkVersion() {
       try {
@@ -101,7 +107,10 @@ export function DeploymentStatusBanner() {
     if (!hasCheckedVersion || !currentCommit) return;
 
     const pendingCommit = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (pendingCommit && currentCommit === pendingCommit) {
+    if (
+      pendingCommit &&
+      (currentCommit === pendingCommit || currentCommit.startsWith(pendingCommit) || pendingCommit.startsWith(currentCommit))
+    ) {
       // We're on the new version! Clear the pending flag and hide banner
       console.log("[DeploymentBanner] On new version, clearing status");
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -167,6 +176,17 @@ export function DeploymentStatusBanner() {
           {status.message && (
             <p className="text-[10px] opacity-80 truncate mt-0.5">{status.message}</p>
           )}
+          {status.status === "deploying" && status.progress !== undefined && (
+            <div className="mt-1.5">
+              <div className="flex justify-between text-[9px] opacity-70">
+                <span>{status.step || "working"}</span>
+                <span>{status.progress}%</span>
+              </div>
+              <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-black/10">
+                <div className="h-full rounded-full bg-current transition-[width] duration-500" style={{ width: `${status.progress}%` }} />
+              </div>
+            </div>
+          )}
           {status.commit && (
             <p className="text-[9px] opacity-60 font-mono mt-0.5">{status.commit}</p>
           )}
@@ -191,6 +211,14 @@ export function DeploymentStatusBanner() {
           </button>
         )}
       </div>
+      {status.logFile && (
+        <LiveDeployLogs
+          logFile={status.logFile}
+          isRunning={status.status === "deploying"}
+          defaultExpanded={status.status === "deploying"}
+          className="mt-2"
+        />
+      )}
     </div>
   );
 }

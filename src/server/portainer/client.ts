@@ -11,7 +11,7 @@ import type {
   ContainerLogs,
   PortainerActionResult,
 } from "@/types";
-import { getPortainerToken, setPortainerToken } from "@/server/atlashub/settings";
+import { getPortainerToken, getPortainerTokenExpiry, setPortainerToken } from "@/server/atlashub/settings";
 
 // ========================================
 // Configuration
@@ -28,6 +28,15 @@ const TOKEN_CACHE_TTL = 60_000; // 1 minute
 
 // Track if we're currently refreshing the token
 let isRefreshing = false;
+
+function getTokenExpiry(token: string): Date | undefined {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+    return typeof payload.exp === "number" ? new Date(payload.exp * 1000) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Set token in memory (used when DB save fails)
@@ -90,8 +99,7 @@ export async function refreshPortainerToken(): Promise<string | null> {
       return null;
     }
 
-    // Token typically expires in 8 hours
-    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const expiresAt = getTokenExpiry(token) || new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     // Save to DB
     const saved = await setPortainerToken(token, expiresAt);
@@ -127,6 +135,10 @@ async function getConfig() {
   } else {
     try {
       token = await getPortainerToken();
+      const expiry = await getPortainerTokenExpiry().catch(() => null);
+      if (token && expiry && expiry <= new Date()) {
+        token = null;
+      }
       cachedDbToken = token;
       tokenCacheTime = Date.now();
     } catch {

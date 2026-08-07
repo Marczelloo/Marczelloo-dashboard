@@ -1,7 +1,7 @@
 "use server";
 
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
-import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
+import { requirePinVerification, requireAuth, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { notifyDeploySuccess, notifyDeployFailed, sendDiscordNotification } from "@/server/notifications";
 import {
@@ -14,6 +14,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
+import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 
 // ========================================
 // Validation Schemas
@@ -282,7 +283,6 @@ export async function safeSelfDeploy(
   }
 
   const projectServices = await services.getServicesByProjectId(id);
-  const primaryService = projectServices.find((s) => s.type === "docker") || projectServices[0];
 
   // Determine repo path
   let repoPath: string | null = customRepoPath?.trim() || null;
@@ -779,7 +779,7 @@ export async function internalDeployProject(
             Authorization: `Bearer ${RUNNER_TOKEN}`,
           },
           body: JSON.stringify({
-            command: `test -d "${path}" && echo "EXISTS" || echo "NOT_FOUND"`,
+            command: `test -d ${shellQuote(path)} && echo "EXISTS" || echo "NOT_FOUND"`,
           }),
         });
 
@@ -807,6 +807,16 @@ export async function internalDeployProject(
     };
   }
 
+  if (branch && (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith("-") || branch.includes(".."))) {
+    return { success: false, error: "Invalid branch name" };
+  }
+
+  try {
+    repoPath = validateRepoPath(repoPath);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Invalid repository path" };
+  }
+
   console.log(`[Deploy] Using path: ${repoPath}`);
   let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\nMode: Background build (to avoid Cloudflare timeout)\nTriggered by: ${triggeredBy}\n\n`;
 
@@ -820,7 +830,7 @@ export async function internalDeployProject(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `ls -la "${repoPath}" 2>&1 | head -20`,
+        command: `ls -la ${shellQuote(repoPath)} 2>&1 | head -20`,
       }),
     });
 
@@ -841,7 +851,7 @@ export async function internalDeployProject(
       Authorization: `Bearer ${RUNNER_TOKEN}`,
     },
     body: JSON.stringify({
-      command: `test -f "${repoPath}/docker-compose.yml" && echo "FOUND" || (test -f "${repoPath}/docker-compose.yaml" && echo "FOUND" || echo "NOT_FOUND")`,
+      command: `test -f ${shellQuote(`${repoPath}/docker-compose.yml`)} && echo "FOUND" || (test -f ${shellQuote(`${repoPath}/docker-compose.yaml`)} && echo "FOUND" || echo "NOT_FOUND")`,
     }),
   });
 
@@ -874,7 +884,7 @@ export async function internalDeployProject(
       Authorization: `Bearer ${RUNNER_TOKEN}`,
     },
     body: JSON.stringify({
-      command: `cd "${repoPath}" && git fetch --all 2>&1`,
+      command: `cd ${shellQuote(repoPath)} && git fetch --all 2>&1`,
     }),
   });
 
@@ -882,6 +892,11 @@ export async function internalDeployProject(
     const fetchResult = await fetchResponse.json();
     output += `=== Git Fetch ===\n${fetchResult.stdout || fetchResult.stderr || "No output"}\n\n`;
     console.log(`[Deploy] Git fetch result: ${fetchResult.stdout?.substring(0, 200)}`);
+    if (!fetchResult.success) {
+      return { success: false, error: `Git fetch failed: ${fetchResult.stderr || fetchResult.stdout || "unknown error"}` };
+    }
+  } else {
+    return { success: false, error: `Git fetch request failed (${fetchResponse.status})` };
   }
 
   // Step 1b: Git Checkout (if branch specified)
@@ -894,7 +909,7 @@ export async function internalDeployProject(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${repoPath}" && git checkout ${branch} 2>&1`,
+        command: `cd ${shellQuote(repoPath)} && git checkout ${shellQuote(branch)} 2>&1`,
       }),
     });
 
@@ -918,7 +933,7 @@ export async function internalDeployProject(
       Authorization: `Bearer ${RUNNER_TOKEN}`,
     },
     body: JSON.stringify({
-      command: `cd "${repoPath}" && git pull 2>&1`,
+      command: `cd ${shellQuote(repoPath)} && git pull 2>&1`,
     }),
   });
 
@@ -931,6 +946,9 @@ export async function internalDeployProject(
   const pullResult = await pullResponse.json();
   output += `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
   console.log(`[Deploy] Git pull result: ${pullResult.stdout?.substring(0, 200)}`);
+  if (!pullResult.success) {
+    return { success: false, error: `Git pull failed: ${pullResult.stderr || pullResult.stdout || "unknown error"}` };
+  }
 
   // Step 2: Check what services and profiles exist in compose file
   console.log(`[Deploy] Checking compose services and profiles...`);
@@ -1032,7 +1050,14 @@ export async function internalDeployProject(
   }
 
   // We don't wait for the build to complete - it runs in background
-  await composeResponse.json(); // consume the response
+  const composeResult = await composeResponse.json();
+  if (!composeResult.success) {
+    const error = composeResult.stderr || composeResult.stdout || "Failed to start background deployment";
+    if (deployRecord) {
+      await deploys.completeDeploy(deployRecord.id, false, { error_message: error });
+    }
+    return { success: false, error };
+  }
 
   output += `=== Docker Compose ===\nBuild started in background.\nLog file: ${logFile}\n\n`;
   output += `The build is running in the background. Check container status in a few minutes.\n`;
@@ -1091,17 +1116,14 @@ export async function checkDeployLogAction(
   deployId?: string
 ): Promise<ActionResult<{ log: string; isComplete: boolean }>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
+    await requireAuth();
 
     if (!RUNNER_TOKEN) {
       return { success: false, error: "Runner not configured" };
     }
 
     // Validate log file path (must be in /tmp and match our pattern)
-    if (!logFile.startsWith("/tmp/deploy-") || !logFile.endsWith(".log")) {
+    if (!/^\/tmp\/deploy-[A-Za-z0-9_.-]+\.log$/.test(logFile)) {
       return { success: false, error: "Invalid log file path" };
     }
 
@@ -1113,7 +1135,7 @@ export async function checkDeployLogAction(
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `tail -300 "${logFile}" 2>&1 || echo "Log file not found or empty"`,
+        command: `tail -300 ${shellQuote(logFile)} 2>&1 || echo "Log file not found or empty"`,
       }),
     });
 
@@ -1149,7 +1171,7 @@ export async function checkDeployLogAction(
         },
         body: JSON.stringify({
           // Check if file was modified in the last 30 seconds
-          command: `find "${logFile}" -mmin -0.5 2>/dev/null | grep -q . && echo "RECENT" || echo "STALE"`,
+          command: `find ${shellQuote(logFile)} -mmin -0.5 2>/dev/null | grep -q . && echo "RECENT" || echo "STALE"`,
         }),
       });
 
@@ -1215,10 +1237,7 @@ export async function checkDeployLogAction(
  */
 export async function refreshRunningDeploysAction(): Promise<ActionResult<{ updated: number }>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
+    await requireAuth();
 
     if (!RUNNER_TOKEN) {
       return { success: false, error: "Runner not configured" };
@@ -1233,57 +1252,33 @@ export async function refreshRunningDeploysAction(): Promise<ActionResult<{ upda
       return { success: true, data: { updated: 0 } };
     }
 
-    // Check if any docker compose build is still running
-    const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        command: `pgrep -f "docker compose.*up.*build" > /dev/null && echo "RUNNING" || echo "COMPLETE"`,
-      }),
-    });
-
-    let anyBuildRunning = false;
-    if (checkResponse.ok) {
-      const checkResult = await checkResponse.json();
-      anyBuildRunning = checkResult.stdout?.includes("RUNNING") ?? false;
-    }
-
     let updated = 0;
 
     for (const deploy of runningDeploys) {
-      // If no build is running, mark as complete
-      if (!anyBuildRunning) {
-        // Try to check the log file for errors if we have a path
-        let hasError = false;
-        if (deploy.logs_object_key) {
-          try {
-            const logResponse = await fetch(`${RUNNER_URL}/shell`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RUNNER_TOKEN}`,
-              },
-              body: JSON.stringify({
-                command: `tail -100 "${deploy.logs_object_key}" 2>/dev/null || echo ""`,
-              }),
-            });
-            if (logResponse.ok) {
-              const logResult = await logResponse.json();
-              const log = logResult.stdout || "";
-              hasError = log.toLowerCase().includes("error") && !log.includes("0 errors");
-            }
-          } catch {
-            // Ignore log read errors
-          }
-        }
+      if (!deploy.logs_object_key || !/^\/tmp\/deploy-[A-Za-z0-9_.-]+\.log$/.test(deploy.logs_object_key)) continue;
 
+      try {
+        const logResponse = await fetch(`${RUNNER_URL}/shell`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RUNNER_TOKEN}`,
+          },
+          body: JSON.stringify({ command: `tail -300 ${shellQuote(deploy.logs_object_key)} 2>/dev/null || true` }),
+        });
+        if (!logResponse.ok) continue;
+
+        const logResult = await logResponse.json();
+        const log = String(logResult.stdout || "");
+        if (!log.includes("===[DEPLOY_COMPLETE]===") && !log.includes("DEPLOY_FAILED")) continue;
+
+        const hasError = log.includes("STATUS: FAILED") || log.includes("DEPLOY_FAILED") || (log.toLowerCase().includes("error") && !log.includes("0 errors"));
         await deploys.completeDeploy(deploy.id, !hasError, {
-          error_message: hasError ? "Build completed with errors" : undefined,
+          error_message: hasError ? "Deployment log reported failure" : undefined,
         });
         updated++;
+      } catch {
+        // A transient runner failure must not turn a still-running deployment into a false success.
       }
     }
 

@@ -34,27 +34,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     };
   }
 
-  const headersList = await headers();
-  const email = headersList.get(CF_ACCESS_EMAIL_HEADER);
-
-  if (!email) {
-    // Allow bypass with DEV_USER_EMAIL for self-hosted setups without Cloudflare Access
-    // This works in both development and production (for Docker deployments)
-    if (process.env.DEV_USER_EMAIL) {
-      return {
-        email: process.env.DEV_USER_EMAIL,
-        isAuthenticated: true,
-        isPinVerified: await isPinSessionValid(),
-      };
-    }
-    return null;
-  }
+  const identity = await getAuthenticatedIdentity();
+  if (!identity) return null;
 
   return {
-    email,
+    email: identity.email,
     isAuthenticated: true,
     isPinVerified: await isPinSessionValid(),
-    country: headersList.get(CF_ACCESS_COUNTRY_HEADER) || undefined,
+    country: identity.country,
   };
 }
 
@@ -163,9 +150,10 @@ export async function isPinSessionValid(): Promise<boolean> {
     const expectedHmac = await createHmac(payload, sessionSecret);
     if (hmac !== expectedHmac) return false;
 
-    // Verify email matches current user
-    const user = await getCurrentUser();
-    if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
+    // Verify the current identity without calling getCurrentUser(), which
+    // would recursively validate this same PIN session.
+    const identity = await getAuthenticatedIdentity();
+    if (!identity || identity.email.toLowerCase() !== email.toLowerCase()) {
       return false;
     }
 
@@ -235,6 +223,18 @@ async function createHmac(data: string, secret: string): Promise<string> {
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
 
   return Buffer.from(signature).toString("hex");
+}
+
+async function getAuthenticatedIdentity(): Promise<{ email: string; country?: string } | null> {
+  const headersList = await headers();
+  const email = headersList.get(CF_ACCESS_EMAIL_HEADER) || process.env.DEV_USER_EMAIL;
+
+  if (!email) return null;
+
+  return {
+    email,
+    country: headersList.get(CF_ACCESS_COUNTRY_HEADER) || undefined,
+  };
 }
 
 // ========================================

@@ -90,7 +90,7 @@ export class RunnerError extends Error {
 export async function gitPull(repoPath: string): Promise<RunnerResponse> {
   return runnerRequest({
     operation: "git_pull",
-    target: { repo_path: repoPath },
+    target: { repo_path: mapHostToContainerPath(repoPath) },
   });
 }
 
@@ -226,6 +226,10 @@ export async function deploy(
   const steps: RunnerResponse[] = [];
 
   try {
+    if (!["pull_restart", "pull_rebuild", "compose_up"].includes(strategy)) {
+      return { success: false, steps, error: `Unsupported deploy strategy: ${strategy}` };
+    }
+
     // Step 1: Git pull
     const pullResult = await gitPull(repoPath);
     steps.push(pullResult);

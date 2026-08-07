@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 // GET - Get runner blocklist
 export async function GET() {
+  try { await requireAuth(); } catch { return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 }); }
   const runnerUrl = process.env.RUNNER_URL || "http://127.0.0.1:8787";
   const runnerToken = process.env.RUNNER_TOKEN;
 
@@ -49,6 +51,7 @@ export async function GET() {
 
 // PUT - Update runner blocklist
 export async function PUT(request: NextRequest) {
+  try { await requirePinVerification(); } catch { return NextResponse.json({ success: false, error: "PIN verification required" }, { status: 401 }); }
   const runnerUrl = process.env.RUNNER_URL || "http://127.0.0.1:8787";
   const runnerToken = process.env.RUNNER_TOKEN;
 

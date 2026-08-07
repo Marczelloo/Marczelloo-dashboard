@@ -5,9 +5,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isGitHubConfigured, listRepositories, GitHubError } from "@/server/github";
+import { requireAuth } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAuth();
     if (!isGitHubConfigured()) {
       return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
     }

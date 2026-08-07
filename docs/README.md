@@ -134,6 +134,23 @@ CREATE TABLE projects (
 );
 ```
 
+#### `settings`
+
+```sql
+CREATE TABLE settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key VARCHAR(255) NOT NULL UNIQUE,
+  value TEXT NOT NULL,
+  encrypted BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+The dashboard also writes an encrypted local fallback for the Portainer token
+(`PORTAINER_TOKEN_FILE`) so token refresh remains available if this table is
+temporarily missing or AtlasHub is unavailable.
+
 #### `services`
 
 ```sql

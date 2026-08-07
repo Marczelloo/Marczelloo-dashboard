@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { envVars, auditLogs } from "@/server/atlashub";
-import { getCurrentUser, requirePinVerification, AuthError } from "@/server/lib/auth";
+import { requirePinVerification, AuthError } from "@/server/lib/auth";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requirePinVerification();
     const body = await request.json();
     const { key, value, is_secret } = body;
 
@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requirePinVerification();
 
     const deleted = await envVars.deleteEnvVar(id);
 
@@ -124,6 +124,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[ENV Vars] Error:", error);
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { success: false, error: error.message, requirePin: error.code === "PIN_REQUIRED" },
+        { status: error.code === "NOT_AUTHORIZED" ? 403 : 401 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

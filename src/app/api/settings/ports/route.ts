@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/server/lib/auth";
 
 interface PortInfo {
   port: number;
@@ -13,6 +14,12 @@ const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 
 // GET - Scan host ports via runner (not container ports)
 export async function GET(request: NextRequest) {
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const rangeStart = parseInt(searchParams.get("start") || "3000", 10);
   const rangeEnd = parseInt(searchParams.get("end") || "9999", 10);

@@ -29,6 +29,8 @@ services:
       # Portainer Configuration (internal Docker network)
       - PORTAINER_URL=${PORTAINER_URL:-http://portainer:9000}
       - PORTAINER_TOKEN=${PORTAINER_TOKEN}
+      - PORTAINER_USERNAME=${PORTAINER_USERNAME}
+      - PORTAINER_PASSWORD=${PORTAINER_PASSWORD}
 
       # Runner Configuration (internal Docker network)
       - RUNNER_URL=http://runner:8787
@@ -40,6 +42,7 @@ services:
       - OWNER_EMAILS=${OWNER_EMAILS:-${DEV_USER_EMAIL:-admin@marczelloo.local}}
       - PIN_HASH=${PIN_HASH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - PORTAINER_TOKEN_FILE=/app/data/portainer-token.json
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3100}
 
       # Monitoring Configuration
@@ -62,6 +65,8 @@ services:
     volumes:
       # Mount for deployment status file (shared with runner)
       - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:/projects:ro
+      # Persistent encrypted fallback for dynamic secrets such as Portainer token
+      - dashboard_data:/app/data
     depends_on:
       - runner
       - portainer
@@ -113,7 +118,9 @@ services:
     container_name: marczelloo-runner
     restart: unless-stopped
     ports:
-      - "8787:8787"
+      # The dashboard reaches runner through the internal Docker network.
+      # Keep the privileged shell endpoint off the public interfaces.
+      - "127.0.0.1:8787:8787"
     environment:
       - RUNNER_PORT=8787
       - RUNNER_TOKEN=${RUNNER_TOKEN}
@@ -158,6 +165,7 @@ services:
       - marczelloo
 
 volumes:
+  dashboard_data:
   runner_data:
   portainer_data:
 

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/server/lib/auth";
+import { shellQuote } from "@/server/runner/safe-paths";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
@@ -7,6 +9,7 @@ const DASHBOARD_REPO_PATH = process.env.DASHBOARD_REPO_PATH || "/home/Marczelloo
 
 export async function GET() {
   try {
+    await requireAuth();
     if (!RUNNER_TOKEN) {
       return NextResponse.json({ error: "Runner not configured" }, { status: 500 });
     }
@@ -19,7 +22,7 @@ export async function GET() {
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${DASHBOARD_REPO_PATH}" && git log -1 --format="%H|%an|%ar|%s" && git rev-parse --abbrev-ref HEAD`,
+        command: `cd ${shellQuote(DASHBOARD_REPO_PATH)} && git log -1 --format="%H|%an|%ar|%s" && git rev-parse --abbrev-ref HEAD`,
       }),
     });
 
@@ -44,7 +47,7 @@ export async function GET() {
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${DASHBOARD_REPO_PATH}" && grep -oP '"version": "\\K[^"]+' package.json || echo "unknown"`,
+        command: `cd ${shellQuote(DASHBOARD_REPO_PATH)} && grep -oP '"version": "\\K[^"]+' package.json || echo "unknown"`,
       }),
     });
 
@@ -64,7 +67,7 @@ export async function GET() {
         Authorization: `Bearer ${RUNNER_TOKEN}`,
       },
       body: JSON.stringify({
-        command: `cd "${DASHBOARD_REPO_PATH}" && git fetch --quiet origin 2>/dev/null; git status --porcelain && git rev-parse HEAD && git rev-parse @{u} 2>/dev/null || echo "no-upstream"`,
+        command: `cd ${shellQuote(DASHBOARD_REPO_PATH)} && git fetch --quiet origin 2>/dev/null; git status --porcelain && git rev-parse HEAD && git rev-parse @{u} 2>/dev/null || echo "no-upstream"`,
       }),
     });
 

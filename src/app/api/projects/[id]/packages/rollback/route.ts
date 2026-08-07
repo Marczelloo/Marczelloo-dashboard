@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { projects, packageUpdates } from "@/server/atlashub";
 import { npmRestore, npmBackup } from "@/server/runner";
+import { requirePinVerification } from "@/server/lib/auth";
 
 /**
  * POST /api/projects/[id]/packages/rollback
@@ -15,6 +16,7 @@ export async function POST(
   const { id } = await params;
 
   try {
+    await requirePinVerification();
     const project = await projects.getProjectById(id);
 
     if (!project) {

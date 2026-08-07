@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 // Store interval in memory (in production, this would be in database or config file)
 // We'll also update the scheduler when this changes
@@ -7,6 +8,7 @@ let currentInterval = parseInt(process.env.MONITORING_INTERVAL_MS || "300000", 1
 
 // GET - Get current monitoring interval
 export async function GET() {
+  try { await requireAuth(); } catch { return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 }); }
   return NextResponse.json({
     success: true,
     interval_ms: currentInterval,
@@ -17,6 +19,7 @@ export async function GET() {
 // PUT - Update monitoring interval
 export async function PUT(request: NextRequest) {
   try {
+    await requirePinVerification();
     const body = await request.json();
     const newInterval = body.interval_ms;
 

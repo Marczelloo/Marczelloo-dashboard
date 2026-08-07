@@ -9,6 +9,7 @@ import {
   npmRestore,
 } from "@/server/runner";
 import type { PackageEcosystem } from "@/types";
+import { requirePinVerification } from "@/server/lib/auth";
 
 /**
  * POST /api/projects/[id]/packages/update
@@ -29,6 +30,7 @@ export async function POST(
   const { id } = await params;
 
   try {
+    await requirePinVerification();
     const project = await projects.getProjectById(id);
 
     if (!project) {

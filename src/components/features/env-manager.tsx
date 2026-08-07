@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PinDialog } from "@/components/pin-dialog";
 
 // Helper function for relative time
 function formatRelativeTime(date: Date): string {
@@ -148,6 +149,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [error, setError] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
   // Add form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -167,8 +169,8 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [revealEditValue, setRevealEditValue] = useState(false);
 
   // Load available .env files
-  const loadAvailableFiles = useCallback(async () => {
-    if (!repoPath) return;
+  const loadAvailableFiles = useCallback(async (): Promise<string[]> => {
+    if (!repoPath) return [];
 
     try {
       const response = await fetch("/api/env-vars/load-file", {
@@ -178,19 +180,20 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       });
       const result = await response.json();
 
-      if (result.success && result.files?.length > 0) {
-        setAvailableFiles(result.files);
-        if (!result.files.includes(selectedFile)) {
-          setSelectedFile(result.files[0]);
-        }
+      if (result.success && Array.isArray(result.files)) {
+        const files = result.files as string[];
+        setAvailableFiles(files);
+        return files;
       }
     } catch (err) {
       console.error("[EnvManager] Failed to list files:", err);
     }
-  }, [repoPath, selectedFile]);
+
+    return [];
+  }, [repoPath]);
 
   // Load env vars from both database and file
-  const loadFromBothSources = useCallback(async () => {
+  const loadFromBothSources = useCallback(async (fileOverride?: string) => {
     if (!repoPath) {
       setError("No repository path configured");
       setLoading(false);
@@ -212,10 +215,11 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         const dbResponse = await fetch(
           `/api/env-vars?serviceId=${serviceId}`
         );
-        const dbResult = await dbResponse.json();
-        if (dbResult.success) {
-          dbVars = dbResult.data || [];
+        const dbResult = await dbResponse.json().catch(() => ({}));
+        if (!dbResponse.ok || !dbResult.success) {
+          throw new Error(dbResult.error || `Database request failed (${dbResponse.status})`);
         }
+        dbVars = dbResult.data || [];
       } catch (dbErr) {
         console.error("[EnvManager] DB load error:", dbErr);
         // Continue with file-only if DB fails
@@ -227,14 +231,23 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         const fileResponse = await fetch("/api/env-vars/load-file", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repoPath, filename: selectedFile }),
+          body: JSON.stringify({ repoPath, filename: fileOverride ?? selectedFile }),
         });
-        const fileResult = await fileResponse.json();
-        if (fileResult.success) {
-          fileVars = fileResult.vars || [];
+        const fileResult = await fileResponse.json().catch(() => ({}));
+        if (fileResult.requirePin) {
+          setError("PIN verification is required to read the environment file.");
+          setShowPinDialog(true);
         }
+        if (!fileResponse.ok || !fileResult.success) {
+          throw new Error(fileResult.error || `File request failed (${fileResponse.status})`);
+        }
+        fileVars = fileResult.vars || [];
       } catch (fileErr) {
         console.error("[EnvManager] File load error:", fileErr);
+        if (fileErr instanceof Error && fileErr.message.toLowerCase().includes("pin")) {
+          setError("PIN verification is required to read the environment file.");
+          return;
+        }
       }
 
       // Merge both sources
@@ -265,12 +278,14 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         workingVars
       );
 
-      // 1. Database operations (parallel)
-      const dbOperations = [];
+      // Build database operations but execute them only after the runtime file
+      // has been written successfully. The file is the source of truth used by
+      // the service at runtime.
+      const dbOperations: Array<() => Promise<Response>> = [];
 
       for (const v of toCreate) {
         dbOperations.push(
-          fetch("/api/env-vars", {
+          () => fetch("/api/env-vars", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -285,7 +300,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
       for (const v of toUpdate) {
         dbOperations.push(
-          fetch(`/api/env-vars/${v.id}`, {
+          () => fetch(`/api/env-vars/${v.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -298,22 +313,10 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       }
 
       for (const id of toDelete) {
-        dbOperations.push(fetch(`/api/env-vars/${id}`, { method: "DELETE" }));
+        dbOperations.push(() => fetch(`/api/env-vars/${id}`, { method: "DELETE" }));
       }
 
-      const dbResults = await Promise.allSettled(dbOperations);
-
-      // Check for DB errors
-      const dbErrors = dbResults
-        .filter((r) => r.status === "rejected")
-        .map((r) => (r.status === "rejected" ? r.reason : "Unknown error"));
-
-      if (dbErrors.length > 0) {
-        console.error("[EnvManager] DB errors:", dbErrors);
-        // Continue to file save even if DB fails
-      }
-
-      // 2. Save to file
+      // 1. Save runtime file atomically first.
       const fileResponse = await fetch("/api/env-vars/save-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -324,11 +327,40 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           vars: workingVars.map((v) => ({ key: v.key, value: v.value })),
         }),
       });
-      const fileResult = await fileResponse.json();
+      const fileResult = await fileResponse.json().catch(() => ({}));
 
-      if (!fileResult.success) {
+      if (fileResult.requirePin) {
+        setShowPinDialog(true);
+      }
+
+      if (!fileResponse.ok || !fileResult.success) {
         setError(fileResult.error || "Failed to save to file");
         return false;
+      }
+
+      // 2. Synchronize database metadata after the runtime write. HTTP 4xx/5xx
+      // responses are failures too; fetch only rejects on network errors.
+      const dbResults = await Promise.allSettled(
+        dbOperations.map(async (operation) => {
+          const response = await operation();
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || `Database request failed (${response.status})`);
+          }
+          return result;
+        })
+      );
+      const dbErrors = dbResults
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r.status === "rejected" ? r.reason : "Unknown error"));
+
+      if (dbErrors.length > 0) {
+        console.error("[EnvManager] DB errors:", dbErrors);
+      }
+
+      if (dbErrors.length > 0) {
+        setError("File saved, but database metadata could not be synchronized. Please retry after verifying the PIN/session.");
+        toast.warning("Environment file saved, database sync failed");
       }
 
       // 3. Restart the service
@@ -396,12 +428,27 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
   // Initial load
   useEffect(() => {
-    if (repoPath) {
-      loadAvailableFiles().then(() => loadFromBothSources());
-    } else {
-      setLoading(false);
+    let cancelled = false;
+
+    async function initialize() {
+      if (!repoPath) {
+        setLoading(false);
+        return;
+      }
+
+      const files = await loadAvailableFiles();
+      if (cancelled) return;
+
+      const fileToLoad = files.includes(selectedFile) ? selectedFile : files[0] || ".env";
+      if (fileToLoad !== selectedFile) setSelectedFile(fileToLoad);
+      await loadFromBothSources(fileToLoad);
     }
-  }, [repoPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    void initialize();
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, selectedFile, loadAvailableFiles, loadFromBothSources]);
 
   // Warn on unsaved changes
   useEffect(() => {
@@ -907,6 +954,15 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             Configure a repository path in service settings to manage env files.
           </div>
         )}
+
+        <PinDialog
+          open={showPinDialog}
+          onSuccess={() => {
+            setShowPinDialog(false);
+            void loadFromBothSources();
+          }}
+          onCancel={() => setShowPinDialog(false)}
+        />
       </CardContent>
     </Card>
   );
