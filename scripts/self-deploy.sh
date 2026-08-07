@@ -158,14 +158,23 @@ health_check() {
 }
 
 start_containers() {
-  (
-    cd "$REPO_PATH"
-    # Compose v5 can briefly leave a replacement container behind when
-    # container_name is used. Remove only the two managed services before
-    # recreating them; volumes and unrelated project containers are untouched.
-    docker compose rm -sf dashboard runner >/dev/null 2>&1 || true
-    docker compose up -d --force-recreate dashboard runner
-  )
+  local attempt
+  for attempt in 1 2 3; do
+    if (
+      cd "$REPO_PATH"
+      # Compose v5 can briefly leave a replacement container behind when
+      # container_name is used. Remove only the two managed services before
+      # recreating them; volumes and unrelated project containers are untouched.
+      docker compose rm -sf dashboard runner >/dev/null 2>&1 || true
+      sleep 2
+      docker compose up -d --force-recreate dashboard runner
+    ); then
+      return 0
+    fi
+    echo "[$(date -u +%FT%TZ)] Container restart attempt $attempt/3 failed; retrying"
+    sleep 3
+  done
+  return 1
 }
 
 restore_previous() {
