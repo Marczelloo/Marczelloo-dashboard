@@ -71,7 +71,7 @@ services:
       - runner
       - portainer
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3100/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -103,7 +103,7 @@ services:
       - DEV_SKIP_PIN=true
       - NEXT_PUBLIC_APP_URL=${DEMO_APP_URL:-http://localhost:3101}
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3101/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3101/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -143,7 +143,7 @@ services:
       # Create with: ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
       - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8787/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8787/health"]
       interval: 30s
       timeout: 10s
       retries: 3

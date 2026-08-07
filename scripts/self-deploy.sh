@@ -143,24 +143,52 @@ if ! (cd "$REPO_PATH" && docker compose build dashboard runner); then
   fail "Docker image build failed"
 fi
 
-write_status "deploying" "Starting updated dashboard and runner" 65 "restart"
-if ! (cd "$REPO_PATH" && docker compose up -d --force-recreate dashboard runner); then
-  fail "Failed to start updated containers"
-fi
-
 health_check() {
   local attempt
   for attempt in $(seq 1 60); do
     if command -v curl >/dev/null 2>&1; then
       if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3100/api/health >/dev/null; then return 0; fi
     elif command -v wget >/dev/null 2>&1; then
-      if wget -q --timeout=5 --spider http://127.0.0.1:3100/api/health; then return 0; fi
+      if wget -q --timeout=5 -O /dev/null http://127.0.0.1:3100/api/health; then return 0; fi
     fi
     echo "[$(date -u +%FT%TZ)] Health check attempt $attempt/60 failed"
     sleep 2
   done
   return 1
 }
+
+start_containers() {
+  (
+    cd "$REPO_PATH"
+    # Compose v5 can briefly leave a replacement container behind when
+    # container_name is used. Remove only the two managed services before
+    # recreating them; volumes and unrelated project containers are untouched.
+    docker compose rm -sf dashboard runner >/dev/null 2>&1 || true
+    docker compose up -d --force-recreate dashboard runner
+  )
+}
+
+restore_previous() {
+  if [[ -n "$PREVIOUS_BRANCH" ]]; then
+    git -C "$REPO_PATH" checkout "$PREVIOUS_BRANCH"
+    git -C "$REPO_PATH" reset --hard "$PREVIOUS_REF"
+  else
+    git -C "$REPO_PATH" checkout --detach "$PREVIOUS_REF"
+  fi
+
+  docker compose build dashboard runner
+  start_containers
+}
+
+write_status "deploying" "Starting updated dashboard and runner" 65 "restart"
+if ! start_containers; then
+  echo "[$(date -u +%FT%TZ)] Updated containers failed to start; starting rollback to $PREVIOUS_REF"
+  write_status "deploying" "Updated containers failed to start; rolling back" 88 "rollback" "true"
+  if restore_previous && health_check; then
+    fail "Deployment failed; previous version was restored" "true"
+  fi
+  fail "Deployment and rollback failed; manual intervention is required" "true"
+fi
 
 write_status "deploying" "Waiting for dashboard health check" 82 "health"
 if health_check; then
@@ -172,14 +200,7 @@ fi
 echo "[$(date -u +%FT%TZ)] Health check failed; starting rollback to $PREVIOUS_REF"
 write_status "deploying" "New container is unhealthy; rolling back" 88 "rollback" "true"
 
-if [[ -n "$PREVIOUS_BRANCH" ]]; then
-  git -C "$REPO_PATH" checkout "$PREVIOUS_BRANCH"
-  git -C "$REPO_PATH" reset --hard "$PREVIOUS_REF"
-else
-  git -C "$REPO_PATH" checkout --detach "$PREVIOUS_REF"
-fi
-
-if ! (cd "$REPO_PATH" && docker compose build dashboard runner && docker compose up -d --force-recreate dashboard runner); then
+if ! restore_previous; then
   fail "Rollback failed; manual intervention is required" "true"
 fi
 
