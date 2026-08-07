@@ -658,6 +658,7 @@ const server = http.createServer(async (req, res) => {
         executableArgs = [
           "-o", "StrictHostKeyChecking=no",
           "-o", "UserKnownHostsFile=/dev/null",
+          "-o", "LogLevel=ERROR",
           "-o", "ConnectTimeout=5",
           "-i", SSH_KEY_PATH,
           `${SSH_USER}@${SSH_HOST}`,
