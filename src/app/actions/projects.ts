@@ -199,6 +199,16 @@ const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
 function detectDeploymentError(log: string): { hasError: boolean; errorMessage: string | null } {
   const normalizedLog = log.toLowerCase();
 
+  // The background deploy wrapper writes an explicit terminal marker. It is
+  // authoritative: build output can contain harmless words such as "error"
+  // in dependency notices or compiler summaries.
+  if (/STATUS:\s*SUCCESS/i.test(log)) {
+    return { hasError: false, errorMessage: null };
+  }
+  if (/STATUS:\s*FAILED/i.test(log)) {
+    return { hasError: true, errorMessage: "Docker compose exited with non-zero code" };
+  }
+
   // Docker/build error patterns
   const errorPatterns = [
     { pattern: /error[:\s]+.*build.*failed/i, message: "Build failed" },
@@ -1150,39 +1160,10 @@ export async function checkDeployLogAction(
     // The deploy command writes "===[DEPLOY_COMPLETE]===" when docker compose finishes
     const hasCompletionMarker = log.includes("===[DEPLOY_COMPLETE]===");
 
-    // Also check for docker compose success patterns as fallback for older deploys
-    const hasDockerSuccess =
-      /Container .+ Started/i.test(log) ||
-      /Container .+ Running/i.test(log) ||
-      /Creating .+ \.\.\. done/i.test(log) ||
-      /Started$/m.test(log);
-
-    // Deploy is complete if we have the marker OR if we see docker success patterns
-    // and no more output is being written (check if file was modified recently)
-    let isComplete = hasCompletionMarker;
-
-    // If no completion marker but has success patterns, check if file stopped updating
-    if (!isComplete && hasDockerSuccess) {
-      const checkStaleResponse = await fetch(`${RUNNER_URL}/shell`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RUNNER_TOKEN}`,
-        },
-        body: JSON.stringify({
-          // Check if file was modified in the last 30 seconds
-          command: `find ${shellQuote(logFile)} -mmin -0.5 2>/dev/null | grep -q . && echo "RECENT" || echo "STALE"`,
-        }),
-      });
-
-      if (checkStaleResponse.ok) {
-        const staleResult = await checkStaleResponse.json();
-        // If file is stale (not modified in 30s) and has success patterns, consider complete
-        if (staleResult.stdout?.includes("STALE")) {
-          isComplete = true;
-        }
-      }
-    }
+    // A deployment is complete only after the wrapper writes its terminal
+    // marker. A quiet build is still a running build, especially while pnpm
+    // or Docker is downloading dependencies.
+    const isComplete = hasCompletionMarker;
 
     // Check for explicit status in the completion marker
     let markerIndicatesSuccess = true;
@@ -1272,9 +1253,10 @@ export async function refreshRunningDeploysAction(): Promise<ActionResult<{ upda
         const log = String(logResult.stdout || "");
         if (!log.includes("===[DEPLOY_COMPLETE]===") && !log.includes("DEPLOY_FAILED")) continue;
 
-        const hasError = log.includes("STATUS: FAILED") || log.includes("DEPLOY_FAILED") || (log.toLowerCase().includes("error") && !log.includes("0 errors"));
-        await deploys.completeDeploy(deploy.id, !hasError, {
-          error_message: hasError ? "Deployment log reported failure" : undefined,
+        const failed = log.includes("STATUS: FAILED") || log.includes("DEPLOY_FAILED");
+        const succeeded = log.includes("STATUS: SUCCESS") && !failed;
+        await deploys.completeDeploy(deploy.id, succeeded, {
+          error_message: failed ? "Deployment log reported failure" : undefined,
         });
         updated++;
       } catch {
