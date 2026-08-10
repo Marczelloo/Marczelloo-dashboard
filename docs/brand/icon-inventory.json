@@ -1,0 +1,1240 @@
+{
+  "generatedAt": "2026-08-10T14:35:23.902Z",
+  "scope": "Every icon component imported or defined by the application source. Data visualizations such as the Raspberry Pi progress gauge are excluded.",
+  "totals": {
+    "all": 120,
+    "lucide": 117,
+    "local": 3
+  },
+  "libraries": {
+    "lucideReact": "0.563.0"
+  },
+  "rules": {
+    "grid": "24 × 24",
+    "defaultRenderedSize": "16px",
+    "strokeWidth": 2,
+    "color": "currentColor",
+    "defaultStyle": "outline"
+  },
+  "icons": [
+    {
+      "name": "Activity",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/monitoring/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "AlertCircle",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/components/features/deploy-all-button.tsx",
+        "src/components/layout/version-display.tsx"
+      ]
+    },
+    {
+      "name": "AlertTriangle",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/audit-log/page.tsx",
+        "src/app/(dashboard)/containers/page.tsx",
+        "src/app/(dashboard)/dashboard/_components/dashboard-stats.tsx",
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/monitoring/page.tsx",
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/features/live-deploy-logs.tsx",
+        "src/components/layout/demo-banner.tsx",
+        "src/components/layout/notifications-dropdown.tsx"
+      ]
+    },
+    {
+      "name": "ArrowDown",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx"
+      ]
+    },
+    {
+      "name": "ArrowLeft",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/projects/[id]/edit/page.tsx",
+        "src/app/(dashboard)/projects/[id]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/new/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/new/page.tsx"
+      ]
+    },
+    {
+      "name": "ArrowRight",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx"
+      ]
+    },
+    {
+      "name": "ArrowUp",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx"
+      ]
+    },
+    {
+      "name": "Bell",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/features/page.tsx",
+        "src/components/layout/notifications-dropdown.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "BookOpen",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Box",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Bug",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx"
+      ]
+    },
+    {
+      "name": "Calendar",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/todos/page.tsx"
+      ]
+    },
+    {
+      "name": "Check",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/deploy-all-button.tsx",
+        "src/components/ui/dropdown-menu.tsx",
+        "src/components/ui/select.tsx"
+      ]
+    },
+    {
+      "name": "CheckCircle",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/dashboard-stats.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/components/layout/deployment-status-banner.tsx",
+        "src/components/layout/notifications-dropdown.tsx",
+        "src/components/layout/version-display.tsx"
+      ]
+    },
+    {
+      "name": "CheckCircle2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/components/features/deploy-project-button.tsx"
+      ]
+    },
+    {
+      "name": "CheckSquare",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "ChevronDown",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/dependencies-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/readme-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/features/live-deploy-logs.tsx",
+        "src/components/layout/sidebar.tsx",
+        "src/components/ui/select.tsx"
+      ]
+    },
+    {
+      "name": "ChevronLeft",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx"
+      ]
+    },
+    {
+      "name": "ChevronRight",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/ui/dropdown-menu.tsx"
+      ]
+    },
+    {
+      "name": "ChevronUp",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/readme-viewer.tsx",
+        "src/components/features/live-deploy-logs.tsx",
+        "src/components/ui/select.tsx"
+      ]
+    },
+    {
+      "name": "Circle",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/components/ui/dropdown-menu.tsx"
+      ]
+    },
+    {
+      "name": "ClipboardList",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx"
+      ]
+    },
+    {
+      "name": "Clock",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Cloud",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/new/page.tsx"
+      ]
+    },
+    {
+      "name": "Code",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx"
+      ]
+    },
+    {
+      "name": "Code2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx"
+      ]
+    },
+    {
+      "name": "Container",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/page.tsx",
+        "src/app/(dashboard)/dashboard/_components/service-status.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Copy",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/terminal/page.tsx"
+      ]
+    },
+    {
+      "name": "Cpu",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Database",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Download",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Edit2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/env-manager.tsx"
+      ]
+    },
+    {
+      "name": "ExternalLink",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/service-status.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/monitoring/page.tsx",
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/dependencies-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/readme-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/app/(dashboard)/projects/[id]/page.tsx",
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/components/layout/demo-banner.tsx",
+        "src/components/layout/notifications-dropdown.tsx"
+      ]
+    },
+    {
+      "name": "Eye",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "File",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "FileArchive",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx"
+      ]
+    },
+    {
+      "name": "FileCode",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "FileImage",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "FileJson",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "FileText",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/deploy-logs-button.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-deploys.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/readme-viewer.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Filter",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Flag",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/todos/page.tsx"
+      ]
+    },
+    {
+      "name": "Folder",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "FolderGit2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/features/page.tsx"
+      ]
+    },
+    {
+      "name": "FolderKanban",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/dashboard-stats.tsx",
+        "src/app/(dashboard)/projects/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "FolderOpen",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/components/features/deploy-project-button.tsx"
+      ]
+    },
+    {
+      "name": "FolderPlus",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx"
+      ]
+    },
+    {
+      "name": "FolderTree",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx"
+      ]
+    },
+    {
+      "name": "Gauge",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "GitBranch",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "GitCommit",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/components/layout/version-display.tsx"
+      ]
+    },
+    {
+      "name": "GitFork",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx"
+      ]
+    },
+    {
+      "name": "Github",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/page.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx",
+        "src/app/(dashboard)/projects/new/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/layout/demo-banner.tsx"
+      ]
+    },
+    {
+      "name": "GitMerge",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx"
+      ]
+    },
+    {
+      "name": "GitPullRequest",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx"
+      ]
+    },
+    {
+      "name": "Globe",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/projects/[id]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/app/(dashboard)/services/new/page.tsx"
+      ]
+    },
+    {
+      "name": "GripVertical",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx"
+      ]
+    },
+    {
+      "name": "HardDrive",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "History",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/audit-log/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Home",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx"
+      ]
+    },
+    {
+      "name": "Info",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/layout/demo-banner.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Key",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/features/env-manager.tsx"
+      ]
+    },
+    {
+      "name": "Layers",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/dependencies-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "LayoutDashboard",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/page.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Lightbulb",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Link",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "List",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx"
+      ]
+    },
+    {
+      "name": "ListChecks",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Loader2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/deploy-logs-button.tsx",
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-deploys.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/new/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/deploy-all-button.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/features/live-deploy-logs.tsx",
+        "src/components/layout/deployment-status-banner.tsx"
+      ]
+    },
+    {
+      "name": "Lock",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/components/features/terminal.tsx",
+        "src/components/pin-dialog.tsx"
+      ]
+    },
+    {
+      "name": "LogOut",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Maximize2",
+      "library": "Lucide",
+      "sources": [
+        "src/components/features/terminal.tsx"
+      ]
+    },
+    {
+      "name": "MemoryStick",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/pi/page.tsx"
+      ]
+    },
+    {
+      "name": "MessageSquare",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx"
+      ]
+    },
+    {
+      "name": "Minimize2",
+      "library": "Lucide",
+      "sources": [
+        "src/components/features/terminal.tsx"
+      ]
+    },
+    {
+      "name": "MonitorCog",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "MoreHorizontal",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/_components/container-actions.tsx"
+      ]
+    },
+    {
+      "name": "Network",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx"
+      ]
+    },
+    {
+      "name": "Newspaper",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/news/page.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Package",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/dependencies-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx"
+      ]
+    },
+    {
+      "name": "Pencil",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "PenLine",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/new/page.tsx"
+      ]
+    },
+    {
+      "name": "Pin",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx"
+      ]
+    },
+    {
+      "name": "PinOff",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx"
+      ]
+    },
+    {
+      "name": "Play",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx"
+      ]
+    },
+    {
+      "name": "Plus",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/new/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/page.tsx",
+        "src/app/(dashboard)/projects/page.tsx",
+        "src/app/(dashboard)/services/new/page.tsx",
+        "src/app/(dashboard)/services/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "PlusCircle",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Power",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx"
+      ]
+    },
+    {
+      "name": "Radio",
+      "library": "Lucide",
+      "sources": [
+        "src/components/features/deploy-project-button.tsx"
+      ]
+    },
+    {
+      "name": "RefreshCw",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/audit-log/page.tsx",
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/containers/page.tsx",
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/monitoring/page.tsx",
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/dependencies-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/file-browser.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-deploys.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/readme-viewer.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/layout/deployment-status-banner.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Rocket",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-deploys.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/components/features/deploy-all-button.tsx",
+        "src/components/features/deploy-project-button.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "RotateCcw",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx"
+      ]
+    },
+    {
+      "name": "Save",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/edit/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/features/env-manager.tsx"
+      ]
+    },
+    {
+      "name": "ScrollText",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/changelog-viewer.tsx"
+      ]
+    },
+    {
+      "name": "Search",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Send",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/_components/container-actions.tsx"
+      ]
+    },
+    {
+      "name": "Server",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/page.tsx",
+        "src/app/(dashboard)/dashboard/_components/dashboard-stats.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/new/page.tsx",
+        "src/app/(dashboard)/projects/_components/projects-list-client.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/app/(dashboard)/services/new/page.tsx",
+        "src/app/(dashboard)/services/page.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Settings",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/services/_components/services-list.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Shield",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/news/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/branch-status.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-detail-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/security-dashboard.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "ShieldAlert",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx"
+      ]
+    },
+    {
+      "name": "Sparkles",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/features/page.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx",
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "Square",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx"
+      ]
+    },
+    {
+      "name": "Star",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/_components/github-repo-selector.tsx"
+      ]
+    },
+    {
+      "name": "Tag",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/release-creator.tsx"
+      ]
+    },
+    {
+      "name": "Terminal",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/docs/page.tsx",
+        "src/app/(dashboard)/features/page.tsx",
+        "src/components/features/terminal.tsx",
+        "src/components/layout/page-info-button.tsx",
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "TestTube",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/settings/page.tsx"
+      ]
+    },
+    {
+      "name": "Thermometer",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/pi/page.tsx"
+      ]
+    },
+    {
+      "name": "Trash2",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/containers/[endpointId]/[containerId]/page.tsx",
+        "src/app/(dashboard)/containers/_components/container-actions.tsx",
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/project-deploys.tsx",
+        "src/app/(dashboard)/projects/[id]/edit/page.tsx",
+        "src/app/(dashboard)/projects/[id]/services/[serviceId]/page.tsx",
+        "src/app/(dashboard)/projects/[id]/work-items/[itemId]/page.tsx",
+        "src/app/(dashboard)/services/[id]/page.tsx",
+        "src/app/(dashboard)/todos/page.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/features/terminal.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Upload",
+      "library": "Lucide",
+      "sources": [
+        "src/components/features/env-manager.tsx"
+      ]
+    },
+    {
+      "name": "User",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-commits.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-releases.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/components/layout/header.tsx"
+      ]
+    },
+    {
+      "name": "Users",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/github-info.tsx"
+      ]
+    },
+    {
+      "name": "Webhook",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/docs/page.tsx"
+      ]
+    },
+    {
+      "name": "Wifi",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/components/layout/page-info-button.tsx"
+      ]
+    },
+    {
+      "name": "Wrench",
+      "library": "Lucide",
+      "sources": [
+        "src/components/layout/sidebar.tsx"
+      ]
+    },
+    {
+      "name": "X",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/projects/[id]/_components/packages-tab.tsx",
+        "src/app/(dashboard)/settings/page.tsx",
+        "src/components/features/deploy-all-button.tsx",
+        "src/components/features/env-manager.tsx",
+        "src/components/layout/demo-banner.tsx",
+        "src/components/ui/dialog.tsx"
+      ]
+    },
+    {
+      "name": "XCircle",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/recent-deploys-client.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-pulls.tsx",
+        "src/app/(dashboard)/projects/[id]/_components/github-tabs.tsx",
+        "src/components/features/live-deploy-logs.tsx",
+        "src/components/layout/deployment-status-banner.tsx"
+      ]
+    },
+    {
+      "name": "Zap",
+      "library": "Lucide",
+      "sources": [
+        "src/app/(dashboard)/pi/page.tsx",
+        "src/app/(dashboard)/terminal/page.tsx"
+      ]
+    },
+    {
+      "name": "SiteIcon",
+      "library": "Local",
+      "sources": [
+        "src/app/icon.svg"
+      ]
+    },
+    {
+      "name": "ContainerGrid",
+      "library": "Local",
+      "sources": [
+        "src/app/(dashboard)/dashboard/_components/quick-actions.tsx"
+      ]
+    },
+    {
+      "name": "LoadingSpinner",
+      "library": "Local",
+      "sources": [
+        "src/components/ui/button.tsx"
+      ]
+    }
+  ]
+}

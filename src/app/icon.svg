@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Marczelloo Dashboard">
+  <rect width="64" height="64" rx="14" fill="#dc2626" />
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="1.5" />
+  <path fill="#fff" d="M15 45V19h8l9 12.5L41 19h8v26h-8V31.5l-9 12-9-12V45H15Z" />
+</svg>

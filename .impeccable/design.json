@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T00:00:00.000+02:00",
+  "title": "Design System: Marczelloo Dashboard",
+  "extensions": {
+    "colorMeta": {
+      "background": { "role": "neutral", "displayName": "Console Black", "canonical": "hsl(0 0% 4%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 15%)", "hsl(0 0% 24%)", "hsl(0 0% 38%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
+      "foreground": { "role": "neutral", "displayName": "Signal White", "canonical": "hsl(0 0% 95%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 25%)", "hsl(0 0% 38%)", "hsl(0 0% 52%)", "hsl(0 0% 66%)", "hsl(0 0% 78%)", "hsl(0 0% 88%)", "hsl(0 0% 95%)"] },
+      "card": { "role": "neutral", "displayName": "Panel Charcoal", "canonical": "hsl(0 0% 7%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 7%)", "hsl(0 0% 12%)", "hsl(0 0% 20%)", "hsl(0 0% 34%)", "hsl(0 0% 52%)", "hsl(0 0% 74%)", "hsl(0 0% 92%)"] },
+      "popover": { "role": "neutral", "displayName": "Raised Charcoal", "canonical": "hsl(0 0% 9%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 14%)", "hsl(0 0% 22%)", "hsl(0 0% 36%)", "hsl(0 0% 54%)", "hsl(0 0% 76%)", "hsl(0 0% 94%)"] },
+      "primary": { "role": "primary", "displayName": "Crimson Action", "canonical": "hsl(0 72% 51%)", "tonalRamp": ["hsl(0 72% 15%)", "hsl(0 72% 25%)", "hsl(0 72% 36%)", "hsl(0 72% 51%)", "hsl(0 72% 62%)", "hsl(0 72% 73%)", "hsl(0 72% 84%)", "hsl(0 72% 95%)"] },
+      "primary-foreground": { "role": "neutral", "displayName": "Action Foreground", "canonical": "hsl(0 0% 100%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 28%)", "hsl(0 0% 42%)", "hsl(0 0% 56%)", "hsl(0 0% 70%)", "hsl(0 0% 82%)", "hsl(0 0% 92%)", "hsl(0 0% 100%)"] },
+      "secondary": { "role": "neutral", "displayName": "Control Graphite", "canonical": "hsl(0 0% 12%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 8%)", "hsl(0 0% 12%)", "hsl(0 0% 22%)", "hsl(0 0% 38%)", "hsl(0 0% 56%)", "hsl(0 0% 76%)", "hsl(0 0% 95%)"] },
+      "muted": { "role": "neutral", "displayName": "Muted Graphite", "canonical": "hsl(0 0% 15%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 15%)", "hsl(0 0% 26%)", "hsl(0 0% 40%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
+      "muted-foreground": { "role": "neutral", "displayName": "Muted Silver", "canonical": "hsl(0 0% 60%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 25%)", "hsl(0 0% 36%)", "hsl(0 0% 48%)", "hsl(0 0% 60%)", "hsl(0 0% 72%)", "hsl(0 0% 84%)", "hsl(0 0% 95%)"] },
+      "border": { "role": "neutral", "displayName": "Hairline Graphite", "canonical": "hsl(0 0% 14%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 14%)", "hsl(0 0% 25%)", "hsl(0 0% 40%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
+      "success": { "role": "status", "displayName": "Operational Green", "canonical": "hsl(142 71% 45%)", "tonalRamp": ["hsl(142 71% 15%)", "hsl(142 71% 25%)", "hsl(142 71% 35%)", "hsl(142 71% 45%)", "hsl(142 71% 58%)", "hsl(142 71% 70%)", "hsl(142 71% 83%)", "hsl(142 71% 95%)"] },
+      "warning": { "role": "status", "displayName": "Attention Amber", "canonical": "hsl(38 92% 50%)", "tonalRamp": ["hsl(38 92% 15%)", "hsl(38 92% 25%)", "hsl(38 92% 37%)", "hsl(38 92% 50%)", "hsl(38 92% 62%)", "hsl(38 92% 73%)", "hsl(38 92% 84%)", "hsl(38 92% 95%)"] },
+      "danger": { "role": "status", "displayName": "Failure Crimson", "canonical": "hsl(0 72% 51%)", "tonalRamp": ["hsl(0 72% 15%)", "hsl(0 72% 25%)", "hsl(0 72% 36%)", "hsl(0 72% 51%)", "hsl(0 72% 62%)", "hsl(0 72% 73%)", "hsl(0 72% 84%)", "hsl(0 72% 95%)"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Page headline", "role": "headline" },
+      "title": { "displayName": "Card title", "role": "title" },
+      "body": { "displayName": "Interface body", "role": "body" },
+      "label": { "displayName": "Compact label", "role": "label" },
+      "mono": { "displayName": "Operational data", "role": "code" }
+    },
+    "shadows": {
+      "control": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      "surface": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+      "crimsonGlow": "0 0 20px hsl(0 72% 51% / 0.3)",
+      "crimsonGlowSmall": "0 0 10px hsl(0 72% 51% / 0.2)"
+    },
+    "motion": {
+      "fast": "200ms ease-in-out",
+      "enter": "300ms ease-out",
+      "loading": "2000ms linear infinite"
+    },
+    "breakpoints": {
+      "sm": "640px",
+      "md": "768px",
+      "lg": "1024px",
+      "xl": "1280px",
+      "2xl": "1536px"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "refersTo": "button-primary",
+      "description": "Główna akcja z karmazynowym wypełnieniem.",
+      "html": "<button class=\"ds-button ds-button-primary\"><span aria-hidden=\"true\">↗</span> Deploy</button>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{height:36px;padding:8px 16px;border:0;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;cursor:pointer;transition:all 150ms}.ds-button-primary{background:hsl(0 72% 51%);color:white;box-shadow:0 1px 3px rgb(0 0 0 / .1)}.ds-button-primary:hover{background:hsl(0 72% 46%)}.ds-button-primary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Outline button",
+      "refersTo": "button-outline",
+      "description": "Drugorzędna akcja bez stałego wypełnienia.",
+      "html": "<button class=\"ds-button\">Refresh</button>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{height:36px;padding:8px 16px;border:1px solid hsl(0 0% 14%);border-radius:6px;background:transparent;color:hsl(0 0% 95%);font-size:14px;font-weight:500;box-shadow:0 1px 2px rgb(0 0 0 / .05);cursor:pointer}.ds-button:hover{background:hsl(0 0% 12%)}"
+    },
+    {
+      "name": "Ghost icon button",
+      "refersTo": "button-ghost",
+      "description": "Kompaktowa akcja icon-only o wymiarach 36 × 36 px.",
+      "html": "<button class=\"ds-button\" aria-label=\"Notifications\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/></svg></button>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{width:36px;height:36px;border:0;border-radius:6px;display:grid;place-items:center;background:transparent;color:hsl(0 0% 95%);cursor:pointer}.ds-button:hover{background:hsl(0 0% 12%)}"
+    },
+    {
+      "name": "Input",
+      "refersTo": "input",
+      "description": "Pole danych z ciemnym tłem i ringiem fokusu.",
+      "html": "<input class=\"ds-input\" value=\"main\" aria-label=\"Branch\">",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-input{box-sizing:border-box;width:240px;height:36px;padding:4px 12px;border:1px solid hsl(0 0% 14%);border-radius:6px;background:hsl(0 0% 4%);color:hsl(0 0% 95%);font-size:14px;box-shadow:0 1px 2px rgb(0 0 0 / .05);outline:none}.ds-input:focus{box-shadow:0 0 0 2px hsl(0 0% 4%),0 0 0 4px hsl(0 72% 51%)}"
+    },
+    {
+      "name": "Success badge",
+      "refersTo": "badge",
+      "description": "Semantyczny status z subtelnym wypełnieniem.",
+      "html": "<span class=\"ds-badge\">Deployed</span>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:6px;background:hsl(142 71% 45% / .2);color:hsl(142 71% 45%);font-size:12px;line-height:16px;font-weight:600}"
+    },
+    {
+      "name": "Card",
+      "refersTo": "card",
+      "description": "Podstawowa powierzchnia danych z tonalnym tłem.",
+      "html": "<article class=\"ds-card\"><h3>Deployment status</h3><p>Operational summary and recent activity.</p></article>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-card{width:280px;padding:24px;border:1px solid hsl(0 0% 14%);border-radius:8px;background:hsl(0 0% 7%);color:hsl(0 0% 95%);box-shadow:0 1px 3px rgb(0 0 0 / .1)}h3{margin:0;font-size:18px;line-height:1;font-weight:600;letter-spacing:-.025em}p{margin:8px 0 0;color:hsl(0 0% 60%);font-size:14px;line-height:20px}"
+    },
+    {
+      "name": "Active navigation item",
+      "refersTo": "navigation-active",
+      "description": "Aktywna pozycja sidebaru z lewym sygnałem primary.",
+      "html": "<a class=\"ds-nav\" href=\"#\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg>Dashboard</a>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-nav{box-sizing:border-box;width:220px;display:flex;align-items:center;gap:12px;padding:10px 12px;border-left:2px solid hsl(0 72% 51%);border-radius:8px;background:hsl(0 72% 51% / .15);color:hsl(0 72% 51%);font-size:14px;font-weight:500;text-decoration:none}"
+    },
+    {
+      "name": "Online status dot",
+      "refersTo": "status-indicator",
+      "description": "Kompaktowy wskaźnik stanu wspierający etykietę tekstową.",
+      "html": "<span class=\"ds-status\"><i aria-hidden=\"true\"></i>Online</span>",
+      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-status{display:inline-flex;align-items:center;gap:8px;color:hsl(0 0% 95%);font-size:14px}.ds-status i{width:8px;height:8px;border-radius:9999px;background:hsl(142 71% 45%);box-shadow:0 0 8px hsl(142 71% 45% / .5)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Crimson Control Room",
+    "overview": "Marczelloo Dashboard jest gęstym, ciemnym panelem operacyjnym. Jego charakter wynika z neutralnych, prawie czarnych powierzchni, oszczędnego karmazynowego akcentu i czytelnych stanów systemowych. Interfejs ma wyglądać jak narzędzie do pracy: spokojne w spoczynku, jednoznaczne podczas akcji i alarmujące tylko wtedy, gdy stan naprawdę tego wymaga. Warstwy budują głównie różnice tonalne i cienkie obramowania. Karmazyn prowadzi uwagę do aktywnej nawigacji, głównej akcji, fokusu i kluczowych sygnałów marki. Kompaktowa typografia i 4-pikselowy rytm pozwalają pokazywać dużo informacji bez wizualnego chaosu.",
+    "keyCharacteristics": [
+      "ciemne, neutralne powierzchnie o małych różnicach jasności",
+      "jeden karmazynowy akcent dla marki, akcji i fokusu",
+      "kompaktowy rytm, cienkie obramowania i promień bazowy 8 px",
+      "wyraźne semantyczne kolory sukcesu, ostrzeżenia i błędu",
+      "ikony konturowe Lucide o grubości linii 2 px"
+    ],
+    "rules": [
+      { "name": "The Signal Color Rule", "body": "Kolory nieneutralne oznaczają akcję albo rzeczywisty stan systemu; nie są dekoracyjnym wypełniaczem.", "section": "colors" },
+      { "name": "The Operational Mono Rule", "body": "Monospace służy danym maszynowym; nawigacja, opisy i akcje pozostają w sans-serif.", "section": "typography" },
+      { "name": "The Flat-at-Rest Rule", "body": "Każda powierzchnia zaczyna jako tonalna i obramowana; silniejszy cień albo glow musi wynikać ze stanu lub hierarchii.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do korzystaj z istniejących tokenów CSS i komponentów src/components/ui jako źródła prawdy.",
+      "Do używaj Lucide, currentColor, siatki 24 px i stroke 2 px; renderuj zwykle w rozmiarze 16 px.",
+      "Do zachowuj rytm odstępów będący wielokrotnością 4 px i promienie 4/6/8 px.",
+      "Do pokazuj status kolorem, ikoną i czytelną etykietą, zwłaszcza dla deployów i operacji destrukcyjnych.",
+      "Do respektuj prefers-reduced-motion przy dodawaniu nowych animacji."
+    ],
+    "donts": [
+      "Don't dodawaj drugiego koloru marki, gradientów niezwiązanych z istniejącym znakiem ani dekoracyjnych kolorów statusowych.",
+      "Don't mieszaj Lucide z inną rodziną ikon na tej samej powierzchni.",
+      "Don't używaj emoji jako ikon interfejsu ani ikon bez dostępnej nazwy w przyciskach icon-only.",
+      "Don't zwiększaj promieni do pill poza statusami, avatarami i innymi elementami, które już są kołowe.",
+      "Don't zastępuj tonalnej hierarchii ciężkimi cieniami lub stałym glowem."
+    ]
+  }
+}
