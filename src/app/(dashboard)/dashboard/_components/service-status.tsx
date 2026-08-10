@@ -39,7 +39,15 @@ function formatContainerUptime(startedAt: number | undefined): string {
 }
 
 async function getServiceStatuses(): Promise<ServiceStatusItem[]> {
-  const [allServices, allProjects] = await Promise.all([services.getServices({ limit: 10 }), projects.getProjects()]);
+  let allServices: Service[] = [];
+  let allProjects: Project[] = [];
+
+  try {
+    [allServices, allProjects] = await Promise.all([services.getServices({ limit: 10 }), projects.getProjects()]);
+  } catch (error) {
+    console.error("[ServiceStatus] Failed to load services:", error);
+    return [];
+  }
 
   const projectMap = new Map(allProjects.map((p: Project) => [p.id, p.name]));
 
@@ -115,19 +123,23 @@ async function getServiceStatuses(): Promise<ServiceStatusItem[]> {
       }
       // Website/URL monitoring
       else if (service.url) {
-        const stats = await uptimeChecks.getUptimeStats(service.id, 24);
-        const latest = await uptimeChecks.getLatestCheckByServiceId(service.id);
+        try {
+          const stats = await uptimeChecks.getUptimeStats(service.id, 24);
+          const latest = await uptimeChecks.getLatestCheckByServiceId(service.id);
 
-        if (stats.checks > 0) {
-          status = stats.lastOk ? "online" : "offline";
-          if (stats.uptime < 100 && stats.uptime > 0) {
-            status = "warning";
+          if (stats.checks > 0) {
+            status = stats.lastOk ? "online" : "offline";
+            if (stats.uptime < 100 && stats.uptime > 0) {
+              status = "warning";
+            }
+            latency = Math.round(stats.avgLatency);
           }
-          latency = Math.round(stats.avgLatency);
-        }
 
-        if (latest?.checked_at) {
-          lastCheck = formatRelativeTime(latest.checked_at);
+          if (latest?.checked_at) {
+            lastCheck = formatRelativeTime(latest.checked_at);
+          }
+        } catch (error) {
+          console.error(`[ServiceStatus] Failed to load uptime for ${service.id}:`, error);
         }
       }
 

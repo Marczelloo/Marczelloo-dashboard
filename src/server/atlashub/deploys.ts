@@ -103,18 +103,17 @@ export async function deleteDeployById(id: string): Promise<boolean> {
 }
 
 /**
- * Delete completed deploys (not running or pending)
- * Returns count of deleted deploys
+ * Delete deployment history while preserving currently running deploys.
+ * Pending records are included because stale queued deploys otherwise cannot
+ * be removed from the dashboard.
  */
 export async function clearCompletedDeploys(): Promise<number> {
-  // Get all completed deploys
+  // Keep active deploys so the runner can still finish and report them.
   const allDeploys = await getDeploys();
-  const completedDeploys = allDeploys.filter(
-    (d) => d.status === "success" || d.status === "failed" || d.status === "cancelled"
-  );
+  const historicalDeploys = allDeploys.filter((d) => d.status !== "running");
 
   let deleted = 0;
-  for (const deploy of completedDeploys) {
+  for (const deploy of historicalDeploys) {
     const result = await db.deleteById(TABLE, deploy.id);
     if (result.deletedCount > 0) deleted++;
   }

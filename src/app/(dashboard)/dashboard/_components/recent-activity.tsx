@@ -17,19 +17,24 @@ interface ActivityItem {
 }
 
 async function getRecentActivity(): Promise<ActivityItem[]> {
-  const logs = await auditLogs.getAuditLogs({ limit: 10 });
+  try {
+    const logs = await auditLogs.getAuditLogs({ limit: 10 });
 
-  return logs.map((log: AuditLog) => ({
-    id: log.id,
-    action: log.action,
-    actor: log.actor_email,
-    target: log.entity_type + (log.entity_id ? ` ${log.entity_id.slice(0, 8)}` : ""),
-    timestamp: log.at,
-    type: mapActionToType(log.action),
-    link: getLink(log.entity_type, log.entity_id),
-    entityType: log.entity_type,
-    entityId: log.entity_id,
-  }));
+    return logs.map((log: AuditLog) => ({
+      id: log.id,
+      action: log.action,
+      actor: log.actor_email,
+      target: log.entity_type + (log.entity_id ? ` ${log.entity_id.slice(0, 8)}` : ""),
+      timestamp: log.at,
+      type: mapActionToType(log.action),
+      link: getLink(log.entity_type, log.entity_id),
+      entityType: log.entity_type,
+      entityId: log.entity_id,
+    }));
+  } catch (error) {
+    console.error("[RecentActivity] Failed to load activity:", error);
+    return [];
+  }
 }
 
 function getLink(entityType: string, entityId?: string | null): string | undefined {

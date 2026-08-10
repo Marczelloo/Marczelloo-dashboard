@@ -4,7 +4,8 @@ import { requirePinVerification } from "@/server/lib/auth";
 
 /**
  * POST /api/deploys/clear
- * Clear all completed deployments (not running or pending)
+ * Clear deployment history, including stale pending records.
+ * Running deployments are preserved.
  */
 export async function POST() {
   try {

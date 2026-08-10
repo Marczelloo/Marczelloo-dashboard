@@ -64,9 +64,11 @@ function getStatusBadge(status: Deploy["status"]) {
   }
 }
 
-function getDuration(deploy: Deploy): string {
+function getDuration(deploy: Deploy, showLiveDuration: boolean): string {
   if (!deploy.finished_at) {
-    return formatDistanceToNow(new Date(deploy.started_at), { addSuffix: false, includeSeconds: true });
+    return showLiveDuration
+      ? formatDistanceToNow(new Date(deploy.started_at), { addSuffix: false, includeSeconds: true })
+      : "—";
   }
 
   const start = new Date(deploy.started_at).getTime();
@@ -83,6 +85,11 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isClearing, setIsClearing] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const serviceMap = new Map(services.map((s) => [s.id, s]));
   const hasRunningDeploys = deploys.some((d) => d.status === "running");
@@ -201,7 +208,7 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
               <AlertDialogHeader>
                 <AlertDialogTitle>Clear Deployment History?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will remove all completed deployments from history. Running deployments will not be affected.
+                  This will remove deployment history, including pending entries. Running deployments will not be affected.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -232,8 +239,9 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
                     <div>
                       <p className="font-medium text-sm">{service?.name || "Unknown Service"}</p>
                       <p className="text-xs text-muted-foreground">
-                        by {deploy.triggered_by} •{" "}
-                        {formatDistanceToNow(new Date(deploy.started_at), { addSuffix: true })}
+                        by {deploy.triggered_by} • {isHydrated
+                          ? formatDistanceToNow(new Date(deploy.started_at), { addSuffix: true })
+                          : "—"}
                       </p>
                     </div>
                   </div>
@@ -267,7 +275,7 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
                       hasLogFile={!!deploy.logs_object_key}
                     />
                     <div className="text-right">
-                      <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy)}</p>
+                      <p className="text-sm font-mono text-muted-foreground">{getDuration(deploy, isHydrated)}</p>
                       {deploy.commit_sha && (
                         <p className="text-xs font-mono text-muted-foreground">{deploy.commit_sha.substring(0, 7)}</p>
                       )}

@@ -5,9 +5,18 @@ import type { Project, Service, WorkItem } from "@/types";
 
 async function getStats() {
   const [allProjects, allServices, openWorkItems] = await Promise.all([
-    projects.getProjects(),
-    services.getServices(),
-    workItems.getOpenWorkItems(),
+    projects.getProjects().catch((error) => {
+      console.error("[DashboardStats] Failed to load projects:", error);
+      return [];
+    }),
+    services.getServices().catch((error) => {
+      console.error("[DashboardStats] Failed to load services:", error);
+      return [];
+    }),
+    workItems.getOpenWorkItems().catch((error) => {
+      console.error("[DashboardStats] Failed to load work items:", error);
+      return [];
+    }),
   ]);
 
   const activeProjects = allProjects.filter((p: Project) => p.status === "active");
