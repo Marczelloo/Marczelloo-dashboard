@@ -984,7 +984,13 @@ export async function internalDeployProject(
     const profiles = (profilesResult.stdout || "")
       .trim()
       .split("\n")
-      .filter((line: string) => line.trim() && validProfilePattern.test(line.trim()));
+      .map((line: string) => line.trim())
+      .filter((profile: string) => profile && validProfilePattern.test(profile))
+      // Some Compose files use `never` as a sentinel profile for services
+      // that must stay disabled (for example, a host-managed tunnel). It is
+      // not a deploy target: enabling it can activate an intentionally
+      // incomplete service and make the entire Compose project invalid.
+      .filter((profile: string) => profile.toLowerCase() !== "never");
     if (profiles.length > 0) {
       profileFlags = profiles.map((p: string) => `--profile ${p.trim()}`).join(" ");
       output += `=== Profiles ===\n${profiles.join(", ")}\n\n`;
