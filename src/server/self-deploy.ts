@@ -132,7 +132,10 @@ async function launchDetachedSelfDeploy(options: SelfDeployOptions): Promise<Sel
 
   const command =
     `cp ${shellQuote(scriptPath)} ${shellQuote(workerFile)} && chmod 700 ${shellQuote(workerFile)} && ` +
-    `nohup bash ${shellQuote(workerFile)} ` +
+    // setsid -f fully detaches the worker from the SSH session. A plain
+    // backgrounded nohup can keep the remote shell open until the Runner
+    // timeout, even though the deploy process has already started.
+    `nohup setsid -f bash ${shellQuote(workerFile)} ` +
     `--repo ${shellQuote(DASHBOARD_REPO_PATH)} ` +
     `--branch ${shellQuote(branch)} ` +
     `--status-file ${shellQuote(STATUS_FILE)} ` +
@@ -140,7 +143,7 @@ async function launchDetachedSelfDeploy(options: SelfDeployOptions): Promise<Sel
     `--commit ${shellQuote(options.commit || "")} ` +
     `--message ${shellQuote((options.commitMessage || "").slice(0, 500))} ` +
     `--job-id ${shellQuote(jobId)} ` +
-    `> ${shellQuote(logFile)} 2>&1 < /dev/null & echo $!`;
+    `> ${shellQuote(logFile)} 2>&1 < /dev/null; printf 'SELF_DEPLOY_QUEUED\\n'`;
   const result = await execShell(command);
 
   if (!result.success || result.ssh_enabled === false) {
