@@ -19,6 +19,7 @@ import { DependenciesViewer } from "./dependencies-viewer";
 import { SecurityDashboard } from "./security-dashboard";
 import { ChangelogViewer } from "./changelog-viewer";
 import { ReleaseCreator } from "./release-creator";
+import { ProjectCloudflareTunnel } from "./project-cloudflare-tunnel";
 import {
   Server,
   CheckSquare,
@@ -648,6 +649,8 @@ function SettingsTab({ project }: { project: Project }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <ProjectCloudflareTunnel projectId={project.id} />
+
       {/* Technologies */}
       <Card>
         <CardHeader>

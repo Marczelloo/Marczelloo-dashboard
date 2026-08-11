@@ -23,6 +23,7 @@ import {
   preflightDeployment,
   saveDeploymentConfig,
   startDeploymentJob,
+  updateCloudflareTunnelRoute,
   type DeploymentConfig,
   type DeploymentExposure,
   type DeploymentRuntime,
@@ -86,6 +87,20 @@ const deploymentSetupSchema = deploymentSetupFields.superRefine((value, context)
 });
 
 type DeploymentSetupInput = z.input<typeof deploymentSetupSchema>;
+
+const projectTunnelSchema = z.object({
+  enabled: z.boolean(),
+  hostname: z.string().max(253).optional(),
+  localPort: z.coerce.number().int().min(1).max(65535).optional(),
+}).superRefine((value, context) => {
+  if (!value.enabled) return;
+  if (!value.hostname || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value.hostname)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Podaj prawidłową domenę, np. app.marczelloo.dev.", path: ["hostname"] });
+  }
+  if (!value.localPort) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Podaj lokalny port aplikacji.", path: ["localPort"] });
+  }
+});
 
 async function ensureDeploymentService(projectId: string, projectName: string, config: DeploymentConfig) {
   const projectServices = await services.getServicesByProjectId(projectId);
@@ -445,6 +460,115 @@ export async function getManagedDeploymentConfigAction(id: string): Promise<Acti
     return { success: true, data: await getDeploymentConfig(id) };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to load deployment configuration" };
+  }
+}
+
+export async function getProjectTunnelStatusAction(id: string): Promise<ActionResult<{
+  supportsManagedDeployment: boolean;
+  configured: boolean;
+  error?: string;
+  tunnel: DeploymentConfig["tunnel"];
+  actualRoute: { hostname: string; service: string; localPort: number | null } | null;
+  status: "active" | "pending" | "not_configured" | "unavailable";
+}>> {
+  try {
+    await requireAuth();
+    const [project, config, ingress] = await Promise.all([
+      projects.getProjectById(id),
+      getDeploymentConfig(id),
+      listCloudflareTunnelRoutes(),
+    ]);
+    if (!project) return { success: false, error: "Project not found" };
+
+    const configuredHostname = config?.tunnel?.enabled ? config.tunnel.hostname.toLowerCase() : null;
+    const fallbackHostname = !configuredHostname && project.prod_url ? new URL(project.prod_url).hostname.toLowerCase() : null;
+    const hostname = configuredHostname || fallbackHostname;
+    const route = hostname ? ingress.routes.find((candidate) => candidate.hostname.toLowerCase() === hostname) : undefined;
+    const portMatch = route && /(?:127\.0\.0\.1|localhost):(\d+)$/.exec(route.service);
+    const actualRoute = route ? { hostname: route.hostname, service: route.service, localPort: portMatch ? Number(portMatch[1]) : null } : null;
+    const status = !ingress.configured || ingress.error
+      ? "unavailable"
+      : config?.tunnel?.enabled
+        ? actualRoute && actualRoute.localPort === config.tunnel.localPort ? "active" : "pending"
+        : "not_configured";
+
+    return {
+      success: true,
+      data: {
+        supportsManagedDeployment: Boolean(config),
+        configured: ingress.configured,
+        error: ingress.error,
+        tunnel: config?.tunnel || null,
+        actualRoute,
+        status,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Nie udało się odczytać statusu Cloudflare Tunnel." };
+  }
+}
+
+export async function updateProjectTunnelAction(
+  id: string,
+  input: z.input<typeof projectTunnelSchema>
+): Promise<ActionResult<{ hostname: string | null; localPort: number | null; changed: boolean; deployQueued: boolean }>> {
+  try {
+    const user = await requirePinVerification();
+    const parsed = projectTunnelSchema.parse(input);
+    const [project, existing] = await Promise.all([projects.getProjectById(id), getDeploymentConfig(id)]);
+    if (!project) return { success: false, error: "Project not found" };
+    if (!existing) return { success: false, error: "Ten projekt nie ma jeszcze zarządzanej konfiguracji GitHub/Docker." };
+
+    const hostname = parsed.enabled ? parsed.hostname!.trim().toLowerCase() : null;
+    const localPort = parsed.enabled
+      ? await allocateDeploymentPort(parsed.localPort!, existing.composeProject)
+      : null;
+    const previousTunnel = existing.tunnel?.enabled ? existing.tunnel : null;
+    await saveDeploymentConfig({
+      ...existing,
+      exposure: parsed.enabled ? "cloudflare" : "internal",
+      tunnel: hostname && localPort ? { enabled: true, hostname, localPort } : null,
+    });
+    const nextProdUrl = hostname ? `https://${hostname}` : null;
+
+    try {
+      await projects.updateProject(id, { prod_url: nextProdUrl });
+      // A new local port only becomes valid after Compose has republished it.
+      // Queue that deploy first; its final stage updates ingress after the
+      // container is reachable, avoiding a window where Cloudflare points to
+      // a port that does not exist yet.
+      const deployQueued = Boolean(parsed.enabled && (!previousTunnel || previousTunnel.localPort !== localPort));
+      let changed = false;
+      if (deployQueued) {
+        const deployment = await queueConfiguredDeployment(id, user.email);
+        if (!deployment.success) throw new Error(deployment.error || "Nie udało się zakolejkować wdrożenia z nowym portem.");
+      } else {
+        const result = await updateCloudflareTunnelRoute({
+          hostname,
+          localPort,
+          removeHostnames: previousTunnel && previousTunnel.hostname !== hostname ? [previousTunnel.hostname] : [],
+        });
+        changed = result.changed;
+      }
+      await auditLogs.logAction(user.email, "update", "project", id, {
+        managed_cloudflare_tunnel: parsed.enabled,
+        hostname,
+        local_port: localPort,
+        previous_hostname: previousTunnel?.hostname || null,
+        ingress_changed: changed,
+        deploy_queued_for_port_change: deployQueued,
+      });
+      revalidatePath(`/projects/${id}`);
+      revalidatePath("/projects");
+      revalidatePath("/settings");
+      return { success: true, data: { hostname, localPort, changed, deployQueued } };
+    } catch (error) {
+      await saveDeploymentConfig({ ...existing });
+      await projects.updateProject(id, { prod_url: project.prod_url });
+      throw error;
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Nie udało się zapisać ustawień Cloudflare Tunnel." };
   }
 }
 

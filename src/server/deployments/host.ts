@@ -32,6 +32,12 @@ export interface TunnelIngressRoute {
   service: string;
 }
 
+export interface CloudflareRouteUpdate {
+  hostname: string | null;
+  localPort: number | null;
+  removeHostnames?: string[];
+}
+
 export function isDeploymentLogPath(value: string): boolean {
   return new RegExp(`^${escapeRegExp(DEPLOY_LOG_DIR)}/[A-Za-z0-9_.-]+\\.log$`).test(value) ||
     /^\/tmp\/(?:deploy|safe-deploy|self)-[A-Za-z0-9_.-]+\.log$/.test(value);
@@ -198,21 +204,39 @@ ${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.gi
 
 async function cloudflareScript(config: DeploymentConfig): Promise<string> {
   if (!config.tunnel?.enabled) return "";
-  const settings = await getCloudflareTunnelSettings();
-  const configPath = settings.configPath;
-  if (!configPath) throw new Error("Brak CLOUDFLARED_CONFIG_PATH dla integracji Cloudflare Tunnel.");
-  const needsSudo = settings.useSudo;
-  const reloadCommand = getCloudflareReloadCommand(settings);
-  const tunnelName = settings.tunnelName;
-  const { hostname, localPort } = config.tunnel;
+  return buildCloudflareRouteScript({
+    hostname: config.tunnel.hostname,
+    localPort: config.tunnel.localPort,
+  });
+}
 
-return `
+function isSafeHostname(value: string): boolean {
+  return /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value);
+}
+
+async function buildCloudflareRouteScript(update: CloudflareRouteUpdate): Promise<string> {
+  const hostname = update.hostname?.trim().toLowerCase() || "";
+  const localPort = update.localPort || 0;
+  const removeHostnames = [...new Set((update.removeHostnames || []).map((value) => value.trim().toLowerCase()).filter(Boolean))];
+  if (hostname && !isSafeHostname(hostname)) throw new Error("Nieprawidłowa domena Cloudflare Tunnel.");
+  if (hostname && (!Number.isInteger(localPort) || localPort < 1 || localPort > 65535)) {
+    throw new Error("Port tunelu musi być liczbą od 1 do 65535.");
+  }
+  if (removeHostnames.some((value) => !isSafeHostname(value))) throw new Error("Nieprawidłowa domena do usunięcia z Cloudflare Tunnel.");
+
+  const settings = await getCloudflareTunnelSettings();
+  if (!settings.configPath) throw new Error("Brak pliku ingress Cloudflare Tunnel w Settings.");
+  const removeArguments = removeHostnames.map(shellQuote).join(" ");
+
+  return `
 echo "=== Cloudflare Tunnel ==="
-route_update="$(${needsSudo ? "sudo -n " : ""}python3 - ${shellQuote(configPath)} ${shellQuote(hostname)} ${shellQuote(String(localPort))} <<'PY'
+route_update="$(${settings.useSudo ? "sudo -n " : ""}python3 - ${shellQuote(settings.configPath)} ${shellQuote(hostname)} ${shellQuote(String(localPort))} ${removeArguments} <<'PY'
 import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
-hostname = sys.argv[2].lower()
+hostname = sys.argv[2].lower() or None
 port = int(sys.argv[3])
+remove = {value.lower() for value in sys.argv[4:]}
+if hostname: remove.add(hostname)
 if not path.is_file(): raise SystemExit(f"cloudflared config not found: {path}")
 text = path.read_text()
 if "ingress:" not in text: raise SystemExit("cloudflared config has no ingress section")
@@ -221,15 +245,15 @@ result, index = [], 0
 while index < len(lines):
     line = lines[index]
     match = re.match(r"^(\\s*)-\\s+hostname:\\s*(\\S+)\\s*$", line)
-    if match and match.group(2).lower() == hostname:
+    if match and match.group(2).lower() in remove:
         index += 1
         while index < len(lines) and not re.match(r"^\\s*-\\s+hostname:", lines[index]) and not re.match(r"^\\s*-\\s+service:\\s*http_status:404", lines[index]): index += 1
         continue
     result.append(line); index += 1
 insert_at = next((i for i, line in enumerate(result) if re.match(r"^\\s*-\\s+service:\\s*http_status:404", line)), None)
 if insert_at is None: raise SystemExit("cloudflared config needs a final http_status:404 ingress rule")
-rule = [f"  - hostname: {hostname}\\n", f"    service: http://127.0.0.1:{port}\\n"]
-result[insert_at:insert_at] = rule
+if hostname:
+    result[insert_at:insert_at] = [f"  - hostname: {hostname}\\n", f"    service: http://127.0.0.1:{port}\\n"]
 updated = "".join(result)
 if updated == text:
     print("CONFIG_CHANGED=0")
@@ -240,15 +264,21 @@ print("CONFIG_CHANGED=1")
 PY
  )"
 echo "$route_update"
-${needsSudo ? "sudo -n " : ""}cloudflared --config ${shellQuote(configPath)} tunnel ingress validate
-${tunnelName ? `cloudflared tunnel route dns ${shellQuote(tunnelName)} ${shellQuote(hostname)} || echo "DNS route already exists or requires Cloudflare credentials"` : ""}
+${settings.useSudo ? "sudo -n " : ""}cloudflared --config ${shellQuote(settings.configPath)} tunnel ingress validate
+${settings.tunnelName && hostname ? `cloudflared tunnel route dns ${shellQuote(settings.tunnelName)} ${shellQuote(hostname)} || echo "DNS route already exists or requires Cloudflare credentials"` : ""}
 if [ "$route_update" = "CONFIG_CHANGED=1" ]; then
-  ${reloadCommand}
+  ${getCloudflareReloadCommand(settings)}
 else
   echo "Cloudflare ingress route unchanged; tunnel restart skipped."
 fi
-echo "Cloudflare route active: https://${hostname} -> 127.0.0.1:${localPort}"
+${hostname ? `echo "Cloudflare route active: https://${hostname} -> 127.0.0.1:${localPort}"` : 'echo "Cloudflare route removed."'}
 `;
+}
+
+export async function updateCloudflareTunnelRoute(update: CloudflareRouteUpdate): Promise<{ changed: boolean }> {
+  const result = await runHostCommand(await buildCloudflareRouteScript(update), 30_000);
+  if (!result.success) throw new Error(result.stderr || result.stdout || "Nie udało się zaktualizować Cloudflare Tunnel.");
+  return { changed: /CONFIG_CHANGED=1/.test(result.stdout) };
 }
 
 export async function listCloudflareTunnelRoutes(): Promise<{ configured: boolean; routes: TunnelIngressRoute[]; error?: string }> {
