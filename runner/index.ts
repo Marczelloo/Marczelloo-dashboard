@@ -17,6 +17,7 @@ import { promisify } from "util";
 import "dotenv/config";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // Configuration
 const PORT = parseInt(process.env.RUNNER_PORT || "8787", 10);
@@ -93,6 +94,10 @@ function saveBlocklist(blocklist: Blocklist): void {
 }
 
 let BLOCKLIST = loadBlocklist();
+
+function isSafeProjectPath(value: string): boolean {
+  return /^\/projects\/[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value) && !value.includes("..") && value.length <= 300;
+}
 
 interface RunnerRequest {
   operation: string;
@@ -204,11 +209,16 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
     switch (operation) {
       case "git_pull": {
         if (!target.repo_path) throw new Error("repo_path required");
-        const result = await execAsync(`cd "${target.repo_path}" && git pull`);
+        if (!isSafeProjectPath(target.repo_path)) throw new Error("repo_path must be a safe path below /projects");
+        // The host projects directory is mounted into this container and can be
+        // owned by a different UID. Scope Git's ownership exception to this one
+        // validated repository instead of disabling the check globally.
+        const gitArgs = ["-C", target.repo_path, "-c", `safe.directory=${target.repo_path}`];
+        const result = await execFileAsync("git", [...gitArgs, "pull", "--ff-only"]);
         output = result.stdout + result.stderr;
 
         // Get current commit SHA
-        const shaResult = await execAsync(`cd "${target.repo_path}" && git rev-parse HEAD`);
+        const shaResult = await execFileAsync("git", [...gitArgs, "rev-parse", "HEAD"]);
         commit_sha = shaResult.stdout.trim();
         break;
       }
