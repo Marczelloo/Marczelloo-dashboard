@@ -178,6 +178,60 @@ async function getInstallationToken(): Promise<string> {
 }
 
 /**
+ * Create a short-lived installation token restricted to one repository.
+ *
+ * Deployment jobs run on the Raspberry Pi, so they must never receive the
+ * installation-wide token that the dashboard uses for API requests. A token
+ * minted here can only read the selected repository and expires automatically.
+ */
+export async function getRepositoryCloneToken(githubUrl: string): Promise<string | null> {
+  const parsed = parseGitHubUrl(githubUrl);
+  if (!parsed) return null;
+
+  const config = getConfig();
+  const installationToken = await getInstallationToken();
+  const repositoryResponse = await fetch(`${GITHUB_API_URL}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${installationToken}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    cache: "no-store",
+  });
+
+  if (!repositoryResponse.ok) {
+    throw new GitHubError(`GitHub App cannot access ${parsed.owner}/${parsed.repo}.`, repositoryResponse.status);
+  }
+
+  const repository = await repositoryResponse.json() as { id?: number };
+  const repositoryId = repository.id;
+  if (typeof repositoryId !== "number" || !Number.isInteger(repositoryId)) {
+    throw new GitHubError("GitHub did not return a repository ID for the deployment token.", 502);
+  }
+
+  const jwt = await createAppJWT();
+  const tokenResponse = await fetch(`${GITHUB_API_URL}/app/installations/${config.installationId}/access_tokens`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${jwt}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ repository_ids: [repositoryId], permissions: { contents: "read" } }),
+    cache: "no-store",
+  });
+
+  if (!tokenResponse.ok) {
+    throw new GitHubError(`Failed to create a repository-scoped clone token: ${tokenResponse.status}`, tokenResponse.status);
+  }
+
+  const tokenData = await tokenResponse.json() as { token?: string };
+  if (!tokenData.token) throw new GitHubError("GitHub did not return a clone token.", 502);
+  return tokenData.token;
+}
+
+/**
  * Clear cached tokens (call on auth errors)
  */
 export function clearTokenCache() {

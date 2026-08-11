@@ -1,6 +1,7 @@
 import "server-only";
 
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
+import { getRepositoryCloneToken, parseGitHubUrl } from "@/server/github/client";
 import type { DeploymentConfig } from "./config";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
@@ -87,6 +88,14 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
   const expectedCompose = config.composeFile ? `${repoPath}/${config.composeFile}` : "";
   const tunnelPort = config.tunnel?.enabled ? config.tunnel.localPort : 0;
 
+  let appCloneAccess = false;
+  let appCloneError: string | null = null;
+  try {
+    appCloneAccess = Boolean(await getRepositoryCloneToken(config.githubUrl));
+  } catch (error) {
+    appCloneError = error instanceof Error ? error.message : "GitHub App could not confirm repository access.";
+  }
+
   const probe = `set +e
 REPO=${shellQuote(repoPath)}
 echo "REPO_STATE=missing"
@@ -109,8 +118,7 @@ fi
 if [ ${tunnelPort} -gt 0 ]; then
   echo "PORT_IN_USE=$(docker ps --format '{{.Ports}}' | grep -Eq "[:.]${tunnelPort}->" && echo yes || echo no)"
 fi
-git ls-remote ${shellQuote(config.githubUrl)} HEAD >/dev/null 2>&1
-echo "GIT_REMOTE=$?"`;
+${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.githubUrl)} HEAD >/dev/null 2>&1\necho "GIT_REMOTE=$?"`}`;
   const result = await runHostCommand(probe, 20_000);
   const values = parseProbe(`${result.stdout}\n${result.stderr}`);
   const repoState = (values.get("REPO_STATE") || "invalid") as DeploymentPreflight["repoState"];
@@ -123,8 +131,8 @@ echo "GIT_REMOTE=$?"`;
   if (repoState === "missing") messages.push({ level: "success", text: "Katalog jeszcze nie istnieje — zostanie utworzony przez bezpieczny git clone." });
   if (repoState === "directory") messages.push({ level: "error", text: "Docelowy katalog istnieje, ale nie jest repozytorium Git. Wybierz inną ścieżkę albo zaimportuj go osobno." });
   if (repoState === "git") messages.push({ level: "success", text: "Znaleziono istniejące repozytorium Git." });
-  if (values.get("GIT_REMOTE") !== "0") messages.push({ level: "error", text: "Pi nie ma dostępu Git do tego repozytorium. Skonfiguruj klucz deploy/SSH dla GitHuba." });
-  else messages.push({ level: "success", text: "Dostęp Git z Raspberry Pi został potwierdzony." });
+  if (values.get("GIT_REMOTE") !== "0") messages.push({ level: "error", text: appCloneError || "Pi nie ma dostępu Git do tego repozytorium. Skonfiguruj klucz deploy/SSH dla GitHuba." });
+  else messages.push({ level: "success", text: appCloneAccess ? "GitHub App potwierdził ograniczony dostęp do repo dla tego wdrożenia." : "Dostęp Git z Raspberry Pi został potwierdzony." });
   if (composePath && values.get("COMPOSE_VALID") === "yes") messages.push({ level: "success", text: `Compose poprawny: ${composeFile}.` });
   if (composePath && values.get("COMPOSE_VALID") !== "yes") messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
   if (!composePath && repoState !== "missing") messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
@@ -195,9 +203,18 @@ export async function startDeploymentJob(config: DeploymentConfig): Promise<{ lo
   const scriptFile = `${DEPLOY_LOG_DIR}/${fileName}.sh`;
   const composeFile = config.composeFile ? `${repoPath}/${config.composeFile}` : "";
   const profileFlags = config.profiles.map((profile) => `--profile ${shellQuote(profile)}`).join(" ");
+  const cloneToken = await getRepositoryCloneToken(config.githubUrl).catch(() => null);
+  const parsedRepository = parseGitHubUrl(config.githubUrl);
+  const repositoryUrl = cloneToken && parsedRepository
+    ? `https://github.com/${parsedRepository.owner}/${parsedRepository.repo}.git`
+    : config.githubUrl;
+  const gitAuthentication = cloneToken
+    ? `# GitHub App token: repository-scoped and valid only for this job\nexport GIT_CONFIG_GLOBAL=/dev/null\nexport GIT_CONFIG_COUNT=1\nexport GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\nexport GIT_CONFIG_VALUE_0=${shellQuote(`Authorization: Basic ${Buffer.from(`x-access-token:${cloneToken}`, "utf8").toString("base64")}`)}`
+    : "";
 
   const script = `#!/bin/sh
 set -eu
+${cloneToken ? 'rm -f -- "$0"' : ""}
 echo "=== DEPLOY_START ==="
 echo "PROJECT: ${config.composeProject}"
 echo "STARTED_AT: $(date -Iseconds)"
@@ -210,6 +227,7 @@ finish() {
   exit $code
 }
 trap finish EXIT
+${gitAuthentication}
 mkdir -p ${shellQuote(parentPath)}
 if [ -d ${shellQuote(`${repoPath}/.git`)} ]; then
   echo "=== Git pull ==="
@@ -219,7 +237,7 @@ if [ -d ${shellQuote(`${repoPath}/.git`)} ]; then
 else
   if [ -e ${shellQuote(repoPath)} ]; then echo "Target exists but is not a Git checkout" >&2; exit 20; fi
   echo "=== Git clone ==="
-  git clone --branch ${shellQuote(config.branch)} --single-branch ${shellQuote(config.githubUrl)} ${shellQuote(repoPath)}
+  git clone --branch ${shellQuote(config.branch)} --single-branch ${shellQuote(repositoryUrl)} ${shellQuote(repoPath)}
 fi
 COMPOSE_FILE=${shellQuote(composeFile)}
 if [ -z "$COMPOSE_FILE" ]; then
