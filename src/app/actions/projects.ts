@@ -961,16 +961,49 @@ export async function internalDeployProject(
     return { success: false, error: "Project not found" };
   }
 
+  // Existing projects are adopted lazily on their first project-level deploy.
+  // We preserve the legacy service record and only add the new canonical
+  // configuration. A non-Git directory (for example the old Drive import)
+  // still fails preflight instead of being overwritten.
+  const projectServices = await services.getServicesByProjectId(id);
   // Managed projects use the durable GitHub → Compose job path. The legacy
   // implementation below remains available only for projects that have not
   // yet been migrated, so existing production stacks keep working.
-  const managedConfig = await getDeploymentConfig(id);
+  let managedConfig = await getDeploymentConfig(id);
+  if (!managedConfig && project.github_url) {
+    const legacyDockerService = projectServices.find(
+      (service) => service.type === "docker" && Boolean(service.repo_path) && Boolean(service.compose_project)
+    );
+    if (legacyDockerService?.repo_path && legacyDockerService.compose_project) {
+      try {
+        managedConfig = await saveDeploymentConfig({
+          projectId: project.id,
+          githubUrl: project.github_url,
+          branch: "main",
+          repoPath: legacyDockerService.repo_path,
+          composeFile: null,
+          composeProject: legacyDockerService.compose_project,
+          profiles: [],
+          runtime: legacyDockerService.url ? "web" : "stack",
+          exposure: "internal",
+          tunnel: null,
+        });
+        await auditLogs.logAction(triggeredBy, "sync", "project", project.id, {
+          mode: "legacy-deployment-adoption",
+          service_id: legacyDockerService.id,
+          repo_path: legacyDockerService.repo_path,
+        });
+      } catch (error) {
+        // Keep the old deploy route usable if persistence is temporarily down.
+        console.warn("[Deploy] Legacy configuration adoption skipped:", error);
+      }
+    }
+  }
   if (managedConfig && !customRepoPath) {
     return queueConfiguredDeployment(id, triggeredBy, branch);
   }
 
   // Get project services to link deploy record
-  const projectServices = await services.getServicesByProjectId(id);
   const primaryService = projectServices.find((s) => s.type === "docker") || projectServices[0];
 
   // Use custom path if provided
