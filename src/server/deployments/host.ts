@@ -367,7 +367,20 @@ if [ ${assignedTunnelPort} -gt 0 ]; then
   python3 - "$COMPOSE_FILE" ${shellQuote(composeOverrideFile)} ${shellQuote(String(assignedTunnelPort))} <<'PY'
 import json, pathlib, subprocess, sys
 compose_file, override_file, assigned_port = sys.argv[1], pathlib.Path(sys.argv[2]), int(sys.argv[3])
-raw = subprocess.check_output(["docker", "compose", "-f", compose_file, "config", "--format", "json"], text=True, stderr=subprocess.STDOUT)
+resolved = subprocess.run(
+    ["docker", "compose", "-f", compose_file, "config", "--format", "json"],
+    text=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+if resolved.returncode:
+    raise SystemExit(resolved.stderr.strip() or "docker compose config failed")
+# Compose writes compatibility warnings (for example an obsolete version
+# field) to stderr. Do not merge those diagnostics into JSON output: doing so
+# made a harmless warning abort automatic port assignment.
+raw = resolved.stdout.strip()
+if not raw:
+    raise SystemExit("docker compose config returned no JSON")
 services = json.loads(raw).get("services", {})
 candidates = []
 for service_name, service in services.items():
