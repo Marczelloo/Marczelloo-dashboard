@@ -3,6 +3,7 @@ import "server-only";
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 import { getRepositoryCloneToken, parseGitHubUrl } from "@/server/github/client";
 import type { DeploymentConfig } from "./config";
+import { getCloudflareReloadCommand, getCloudflareTunnelSettings } from "./tunnel";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
@@ -24,6 +25,11 @@ export interface DeploymentPreflight {
   profiles: string[];
   portInUse: boolean;
   messages: Array<{ level: "success" | "warning" | "error"; text: string }>;
+}
+
+export interface TunnelIngressRoute {
+  hostname: string;
+  service: string;
 }
 
 export function isDeploymentLogPath(value: string): boolean {
@@ -87,6 +93,7 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
   const repoPath = validateRepoPath(config.repoPath);
   const expectedCompose = config.composeFile ? `${repoPath}/${config.composeFile}` : "";
   const tunnelPort = config.tunnel?.enabled ? config.tunnel.localPort : 0;
+  const tunnelSettings = config.tunnel?.enabled ? await getCloudflareTunnelSettings() : null;
 
   let appCloneAccess = false;
   let appCloneError: string | null = null;
@@ -137,7 +144,7 @@ ${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.gi
   if (composePath && values.get("COMPOSE_VALID") !== "yes") messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
   if (!composePath && repoState !== "missing") messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
   if (repoState === "missing") messages.push({ level: "warning", text: "Compose zostanie wykryty po pierwszym klonowaniu; można wskazać jego ścieżkę ręcznie." });
-  if (config.tunnel?.enabled && !process.env.CLOUDFLARED_CONFIG_PATH) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale brak CLOUDFLARED_CONFIG_PATH w konfiguracji dashboardu." });
+  if (config.tunnel?.enabled && !tunnelSettings?.configPath) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale nie skonfigurowano jego pliku ingress w Settings." });
   if (config.tunnel?.enabled && portInUse) messages.push({ level: "warning", text: `Port ${config.tunnel.localPort} jest już używany; zostanie użyty jako źródło tunelu.` });
 
   return {
@@ -151,13 +158,14 @@ ${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.gi
   };
 }
 
-function cloudflareScript(config: DeploymentConfig): string {
+async function cloudflareScript(config: DeploymentConfig): Promise<string> {
   if (!config.tunnel?.enabled) return "";
-  const configPath = process.env.CLOUDFLARED_CONFIG_PATH;
+  const settings = await getCloudflareTunnelSettings();
+  const configPath = settings.configPath;
   if (!configPath) throw new Error("Brak CLOUDFLARED_CONFIG_PATH dla integracji Cloudflare Tunnel.");
-  const needsSudo = process.env.CLOUDFLARED_CONFIG_USE_SUDO === "true";
-  const reloadCommand = process.env.CLOUDFLARED_RELOAD_COMMAND || "sudo -n systemctl restart cloudflared";
-  const tunnelName = process.env.CLOUDFLARED_TUNNEL_NAME || "";
+  const needsSudo = settings.useSudo;
+  const reloadCommand = getCloudflareReloadCommand(settings);
+  const tunnelName = settings.tunnelName;
   const { hostname, localPort } = config.tunnel;
 
   return `
@@ -194,6 +202,31 @@ echo "Cloudflare route active: https://${hostname} -> 127.0.0.1:${localPort}"
 `;
 }
 
+export async function listCloudflareTunnelRoutes(): Promise<{ configured: boolean; routes: TunnelIngressRoute[]; error?: string }> {
+  const settings = await getCloudflareTunnelSettings();
+  if (!settings.configPath) return { configured: false, routes: [] };
+
+  const readCommand = `set -eu
+${settings.useSudo ? "sudo -n " : ""}cat ${shellQuote(settings.configPath)} | awk '
+  /^[[:space:]]*-[[:space:]]+hostname:[[:space:]]*/ { hostname=$3; gsub(/"/,"",hostname); next }
+  hostname != "" && /^[[:space:]]+service:[[:space:]]*/ { service=$2; gsub(/"/,"",service); print hostname "|" service; hostname="" }
+'`;
+  const result = await runHostCommand(readCommand, 10_000);
+  if (!result.success) return { configured: true, routes: [], error: result.stderr || "Nie udało się odczytać ingress Cloudflare Tunnel." };
+
+  const parsedRoutes = result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [hostname, service] = line.split("|", 2);
+      return hostname && service ? { hostname, service } : null;
+    })
+    .filter((route): route is TunnelIngressRoute => Boolean(route));
+  const routes = [...new Map(parsedRoutes.map((route) => [`${route.hostname}|${route.service}`, route])).values()];
+  return { configured: true, routes };
+}
+
 export async function startDeploymentJob(config: DeploymentConfig): Promise<{ logFile: string; pid: string }> {
   requireSafeConfig(config);
   const repoPath = validateRepoPath(config.repoPath);
@@ -211,6 +244,7 @@ export async function startDeploymentJob(config: DeploymentConfig): Promise<{ lo
   const gitAuthentication = cloneToken
     ? `# GitHub App token: repository-scoped and valid only for this job\nexport GIT_CONFIG_GLOBAL=/dev/null\nexport GIT_CONFIG_COUNT=1\nexport GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\nexport GIT_CONFIG_VALUE_0=${shellQuote(`Authorization: Basic ${Buffer.from(`x-access-token:${cloneToken}`, "utf8").toString("base64")}`)}`
     : "";
+  const tunnelScript = await cloudflareScript(config);
 
   const script = `#!/bin/sh
 set -eu
@@ -250,7 +284,7 @@ echo "=== Compose validation ==="
 docker compose -f "$COMPOSE_FILE" config -q
 echo "=== Docker Compose ==="
 docker compose -f "$COMPOSE_FILE" -p ${shellQuote(config.composeProject)} ${profileFlags} up -d --build
-${cloudflareScript(config)}
+${tunnelScript}
 `;
   const encodedScript = Buffer.from(script, "utf8").toString("base64");
   const launch = `mkdir -p ${shellQuote(DEPLOY_LOG_DIR)} && printf %s ${shellQuote(encodedScript)} | base64 -d > ${shellQuote(scriptFile)} && chmod 700 ${shellQuote(scriptFile)} && (nohup setsid sh ${shellQuote(scriptFile)} </dev/null > ${shellQuote(logFile)} 2>&1 & echo "PID=$!"; echo "LOG=${logFile}")`;

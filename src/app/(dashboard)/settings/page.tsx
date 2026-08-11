@@ -31,6 +31,7 @@ import {
   Settings,
 } from "lucide-react";
 import { PinDialog } from "@/components/pin-dialog";
+import { CloudflareTunnelSettings } from "./_components/cloudflare-tunnel-settings";
 
 interface ConnectionStatus {
   status: "unknown" | "loading" | "success" | "error";
@@ -73,6 +74,7 @@ export default function SettingsPage() {
       <div className="flex-1 p-6 space-y-6 max-w-4xl">
         <EnvironmentInfo />
         <GitHubSettings />
+        <CloudflareTunnelSettings />
         <MonitoringIntervalSettings />
         <PortainerSettings />
         <RunnerSettings />
