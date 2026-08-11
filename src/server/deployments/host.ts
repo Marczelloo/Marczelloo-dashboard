@@ -59,6 +59,44 @@ export async function runHostCommand(command: string, timeout = 30_000): Promise
   };
 }
 
+/**
+ * Reserve a predictable port for a managed Compose project. A port already
+ * published by the same Compose project is reusable during a redeploy; every
+ * other listener is treated as a collision and the next available port is
+ * selected.
+ */
+export async function allocateDeploymentPort(preferredPort: number, composeProject: string): Promise<number> {
+  if (!Number.isInteger(preferredPort) || preferredPort < 1 || preferredPort > 65535) {
+    throw new Error("Port wdrożenia musi być liczbą od 1 do 65535.");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(composeProject)) {
+    throw new Error("Nieprawidłowa nazwa projektu Docker Compose.");
+  }
+
+  const candidates = [preferredPort, ...Array.from({ length: 1000 }, (_, index) => 3000 + index)]
+    .filter((port, index, ports) => ports.indexOf(port) === index);
+  const command = `set -eu
+LISTENING_PORTS="$(ss -ltnH 2>/dev/null | awk '{ split($4, parts, ":"); print parts[length(parts)] }' | sort -u)"
+for candidate in ${candidates.join(" ")}; do
+  if docker ps --filter ${shellQuote(`label=com.docker.compose.project=${composeProject}`)} --format '{{.Ports}}' | grep -Eq "(^|[, ]).+:\${candidate}->"; then
+    echo "PORT=$candidate"
+    exit 0
+  fi
+  if ! printf '%s\\n' "$LISTENING_PORTS" | grep -qx "$candidate"; then
+    echo "PORT=$candidate"
+    exit 0
+  fi
+done
+echo "Nie znaleziono wolnego portu w zakresie 3000-3999." >&2
+exit 1`;
+  const result = await runHostCommand(command, 15_000);
+  const match = /^PORT=(\d+)$/m.exec(result.stdout);
+  if (!result.success || !match) {
+    throw new Error(result.stderr || result.stdout || "Nie udało się przydzielić wolnego portu.");
+  }
+  return Number(match[1]);
+}
+
 function requireSafeConfig(config: DeploymentConfig) {
   validateRepoPath(config.repoPath);
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(config.composeProject)) {
@@ -247,6 +285,8 @@ export async function startDeploymentJob(config: DeploymentConfig): Promise<{ lo
   const scriptFile = `${DEPLOY_LOG_DIR}/${fileName}.sh`;
   const composeFile = config.composeFile ? `${repoPath}/${config.composeFile}` : "";
   const profileFlags = config.profiles.map((profile) => `--profile ${shellQuote(profile)}`).join(" ");
+  const assignedTunnelPort = config.tunnel?.enabled ? config.tunnel.localPort : 0;
+  const composeOverrideFile = `${DEPLOY_LOG_DIR}/compose-overrides/${config.composeProject}.yaml`;
   const cloneToken = await getRepositoryCloneToken(config.githubUrl).catch(() => null);
   const parsedRepository = parseGitHubUrl(config.githubUrl);
   const repositoryUrl = cloneToken && parsedRepository
@@ -291,10 +331,46 @@ if [ -z "$COMPOSE_FILE" ]; then
   done
 fi
 if [ -z "$COMPOSE_FILE" ] || [ ! -f "$COMPOSE_FILE" ]; then echo "No Compose file found" >&2; exit 21; fi
+COMPOSE_OVERRIDE=""
+if [ ${assignedTunnelPort} -gt 0 ]; then
+  echo "=== Port assignment ==="
+  python3 - "$COMPOSE_FILE" ${shellQuote(composeOverrideFile)} ${shellQuote(String(assignedTunnelPort))} <<'PY'
+import json, pathlib, subprocess, sys
+compose_file, override_file, assigned_port = sys.argv[1], pathlib.Path(sys.argv[2]), int(sys.argv[3])
+raw = subprocess.check_output(["docker", "compose", "-f", compose_file, "config", "--format", "json"], text=True, stderr=subprocess.STDOUT)
+services = json.loads(raw).get("services", {})
+candidates = []
+for service_name, service in services.items():
+    for port in service.get("ports") or []:
+        if not isinstance(port, dict) or not port.get("published") or not port.get("target"): continue
+        if str(port.get("protocol") or "tcp") != "tcp": continue
+        candidates.append((service_name, str(port["published"]), int(port["target"])))
+matching = [candidate for candidate in candidates if candidate[1] == str(assigned_port)]
+if len(candidates) == 1:
+    service_name, published_port, target_port = candidates[0]
+elif len(matching) == 1:
+    service_name, published_port, target_port = matching[0]
+else:
+    raise SystemExit("Automatic port assignment needs one published TCP port (or one already mapped to the selected port).")
+if published_port == str(assigned_port):
+    override_file.unlink(missing_ok=True)
+    print("PORT_OVERRIDE=unchanged")
+    raise SystemExit(0)
+override_file.parent.mkdir(parents=True, exist_ok=True)
+override_file.write_text(
+    "services:\\n"
+    f"  {json.dumps(service_name)}:\\n"
+    "    ports: !override\\n"
+    f"      - {json.dumps(f'{assigned_port}:{target_port}/tcp')}\\n"
+)
+print(f"PORT_OVERRIDE={override_file}")
+PY
+  if [ -f ${shellQuote(composeOverrideFile)} ]; then COMPOSE_OVERRIDE=${shellQuote(composeOverrideFile)}; fi
+fi
 echo "=== Compose validation ==="
-docker compose -f "$COMPOSE_FILE" config -q
+if [ -n "$COMPOSE_OVERRIDE" ]; then docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE" config -q; else docker compose -f "$COMPOSE_FILE" config -q; fi
 echo "=== Docker Compose ==="
-docker compose -f "$COMPOSE_FILE" -p ${shellQuote(config.composeProject)} ${profileFlags} up -d --build
+if [ -n "$COMPOSE_OVERRIDE" ]; then docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_OVERRIDE" -p ${shellQuote(config.composeProject)} ${profileFlags} up -d --build; else docker compose -f "$COMPOSE_FILE" -p ${shellQuote(config.composeProject)} ${profileFlags} up -d --build; fi
 ${tunnelScript}
 `;
   const encodedScript = Buffer.from(script, "utf8").toString("base64");

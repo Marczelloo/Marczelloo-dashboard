@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 import {
+  allocateDeploymentPort,
   getDeploymentConfig,
   isDeploymentLogPath,
   preflightDeployment,
@@ -119,8 +120,23 @@ async function queueConfiguredDeployment(
 ): Promise<ActionResult<{ output: string; deployId: string; logFile: string; branch: string }>> {
   const project = await projects.getProjectById(projectId);
   if (!project) return { success: false, error: "Project not found" };
-  const stored = await getDeploymentConfig(projectId);
+  let stored = await getDeploymentConfig(projectId);
   if (!stored) return { success: false, error: "Projekt nie ma jeszcze konfiguracji Docker/GitHub." };
+  let reallocatedPort: number | null = null;
+  if (stored.tunnel?.enabled) {
+    try {
+      const assignedPort = await allocateDeploymentPort(stored.tunnel.localPort, stored.composeProject);
+      if (assignedPort !== stored.tunnel.localPort) {
+        reallocatedPort = assignedPort;
+        stored = await saveDeploymentConfig({
+          ...stored,
+          tunnel: { ...stored.tunnel, localPort: assignedPort },
+        });
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Nie udało się przydzielić portu wdrożenia." };
+    }
+  }
   const config: DeploymentConfig = branchOverride ? { ...stored, branch: branchOverride } : stored;
 
   const preflight = await preflightDeployment(config);
@@ -142,6 +158,8 @@ async function queueConfiguredDeployment(
     compose_file: config.composeFile || "auto-detect",
     compose_project: config.composeProject,
     branch: config.branch,
+    assigned_tunnel_port: config.tunnel?.localPort || null,
+    tunnel_port_reallocated: reallocatedPort !== null,
     deploy_id: deploy.id,
     log_file: job.logFile,
     pid: job.pid,
