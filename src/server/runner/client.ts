@@ -7,6 +7,7 @@
 
 import "server-only";
 import type { RunnerRequest, RunnerResponse, NpmOutdatedResult, BackupData } from "@/types";
+import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 
 // ========================================
 // Configuration
@@ -88,10 +89,54 @@ export class RunnerError extends Error {
  * Execute git pull in a repository
  */
 export async function gitPull(repoPath: string): Promise<RunnerResponse> {
-  return runnerRequest({
-    operation: "git_pull",
-    target: { repo_path: mapHostToContainerPath(repoPath) },
+  const safeRepoPath = validateRepoPath(repoPath);
+  const config = getConfig();
+  const startedAt = Date.now();
+  const marker = "__DASHBOARD_GIT_COMMIT__=";
+  const quotedRepoPath = shellQuote(safeRepoPath);
+
+  // Git credentials live on the Pi host (and are deliberately not mounted in
+  // the runner container). Execute the legacy pull through the runner's SSH
+  // channel, as managed deployments already do, so both flows use the same
+  // repository ownership and authentication context.
+  const command = [
+    "set -eu",
+    `git -C ${quotedRepoPath} fetch --prune origin`,
+    `git -C ${quotedRepoPath} pull --ff-only`,
+    `printf '${marker}'`,
+    `git -C ${quotedRepoPath} rev-parse HEAD`,
+  ].join("\n");
+
+  const response = await fetch(`${config.url}/shell`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: JSON.stringify({ command, timeout: 120_000 }),
+    cache: "no-store",
   });
+
+  if (!response.ok) {
+    const error = await response.text().catch(() => response.statusText);
+    throw new RunnerError(`Runner error: ${response.status} - ${error}`, response.status);
+  }
+
+  const result = await response.json();
+  const stdout = String(result.stdout || "");
+  const stderr = String(result.stderr || "");
+  const commitMatch = stdout.match(new RegExp(`${marker}([0-9a-f]{7,64})`));
+  const output = stdout.replace(new RegExp(`${marker}[0-9a-f]{7,64}\\s*`), "").trim();
+
+  return {
+    success: result.success === true,
+    operation: "git_pull",
+    output: [output, stderr.trim()].filter(Boolean).join("\n"),
+    commit_sha: commitMatch?.[1],
+    error: result.success === true ? undefined : (stderr || stdout || "Git pull failed"),
+    duration_ms: Number(result.duration_ms ?? Date.now() - startedAt),
+    timestamp: String(result.timestamp || new Date().toISOString()),
+  };
 }
 
 /**
