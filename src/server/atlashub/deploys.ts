@@ -71,6 +71,10 @@ export async function startDeploy(id: string): Promise<Deploy | null> {
   return updateDeployStatus(id, "running");
 }
 
+export async function setDeployLogFile(id: string, logsObjectKey: string): Promise<Deploy | null> {
+  return db.updateById<Deploy>(TABLE, id, { logs_object_key: logsObjectKey });
+}
+
 export async function completeDeploy(
   id: string,
   success: boolean,

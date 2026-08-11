@@ -15,6 +15,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
+import {
+  getDeploymentConfig,
+  isDeploymentLogPath,
+  preflightDeployment,
+  saveDeploymentConfig,
+  startDeploymentJob,
+  type DeploymentConfig,
+  type DeploymentExposure,
+  type DeploymentRuntime,
+} from "@/server/deployments";
 
 // ========================================
 // Validation Schemas
@@ -46,6 +56,200 @@ export interface ActionResult<T = void> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+const deploymentSetupFields = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
+  description: z.string().max(500).optional(),
+  tags: z.array(z.string()).max(20).default([]),
+  technologies: z.array(z.string()).max(20).default([]),
+  githubUrl: z.string().url().refine((value) => /^(https:\/\/github\.com\/|git@github\.com:)/i.test(value), "Repository must be hosted on GitHub"),
+  branch: z.string().min(1).max(120).regex(/^[A-Za-z0-9._/-]+$/),
+  repoPath: z.string().min(1).max(300),
+  composeFile: z.string().max(200).optional().nullable(),
+  composeProject: z.string().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/),
+  profiles: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)).max(20).default([]),
+  runtime: z.enum(["web", "worker", "bot", "stack"]),
+  exposure: z.enum(["internal", "cloudflare"]),
+  hostname: z.string().max(253).regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i, "Hostname must be a valid domain").optional(),
+  localPort: z.coerce.number().int().min(1).max(65535).optional(),
+  deployNow: z.boolean().default(true),
+});
+
+const deploymentSetupSchema = deploymentSetupFields.superRefine((value, context) => {
+  if (value.exposure === "cloudflare" && (!value.hostname || !value.localPort)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Cloudflare Tunnel requires hostname and local HTTP port", path: ["hostname"] });
+  }
+});
+
+type DeploymentSetupInput = z.input<typeof deploymentSetupSchema>;
+
+async function ensureDeploymentService(projectId: string, projectName: string, config: DeploymentConfig) {
+  const projectServices = await services.getServicesByProjectId(projectId);
+  const matchingService = projectServices.find(
+    (service) => service.type === "docker" && service.repo_path === config.repoPath && service.compose_project === config.composeProject
+  );
+  const publicUrl = config.tunnel?.enabled ? `https://${config.tunnel.hostname}` : null;
+
+  if (matchingService) {
+    return (await services.updateService(matchingService.id, {
+      repo_path: config.repoPath,
+      compose_project: config.composeProject,
+      deploy_strategy: "compose_up",
+      url: publicUrl,
+    })) || matchingService;
+  }
+
+  return services.createService({
+    project_id: projectId,
+    name: `${projectName} deployment`,
+    type: "docker",
+    repo_path: config.repoPath,
+    compose_project: config.composeProject,
+    deploy_strategy: "compose_up",
+    url: publicUrl || undefined,
+  });
+}
+
+async function queueConfiguredDeployment(
+  projectId: string,
+  triggeredBy: string,
+  branchOverride?: string
+): Promise<ActionResult<{ output: string; deployId: string; logFile: string; branch: string }>> {
+  const project = await projects.getProjectById(projectId);
+  if (!project) return { success: false, error: "Project not found" };
+  const stored = await getDeploymentConfig(projectId);
+  if (!stored) return { success: false, error: "Projekt nie ma jeszcze konfiguracji Docker/GitHub." };
+  const config: DeploymentConfig = branchOverride ? { ...stored, branch: branchOverride } : stored;
+
+  const preflight = await preflightDeployment(config);
+  if (!preflight.ok) {
+    return { success: false, error: preflight.messages.filter((message) => message.level === "error").map((message) => message.text).join(" ") };
+  }
+
+  const service = await ensureDeploymentService(projectId, project.name, config);
+  const job = await startDeploymentJob(config);
+  const deploy = await deploys.createDeploy({
+    service_id: service.id,
+    triggered_by: triggeredBy,
+    logs_object_key: job.logFile,
+  });
+  await deploys.startDeploy(deploy.id);
+  await auditLogs.logAction(triggeredBy, "deploy", "project", projectId, {
+    mode: "managed-job",
+    repo_path: config.repoPath,
+    compose_file: config.composeFile || "auto-detect",
+    compose_project: config.composeProject,
+    branch: config.branch,
+    deploy_id: deploy.id,
+    log_file: job.logFile,
+    pid: job.pid,
+  });
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/dashboard");
+
+  return {
+    success: true,
+    data: {
+      deployId: deploy.id,
+      logFile: job.logFile,
+      branch: config.branch,
+      output: `Job wdrożeniowy został zakolejkowany.\nLog file: ${job.logFile}\nPID: ${job.pid}\n\nEtapy: clone/pull → Compose validate → build → start → health/routing.`,
+    },
+  };
+}
+
+export async function preflightDeploymentAction(input: Omit<DeploymentSetupInput, "name" | "slug" | "description" | "tags" | "technologies" | "deployNow">): Promise<ActionResult<Awaited<ReturnType<typeof preflightDeployment>>>> {
+  try {
+    await requirePinVerification();
+    const parsed = deploymentSetupFields.omit({ name: true, slug: true, description: true, tags: true, technologies: true, deployNow: true }).parse(input);
+    if (parsed.exposure === "cloudflare" && (!parsed.hostname || !parsed.localPort)) {
+      return { success: false, error: "Cloudflare Tunnel requires hostname and local HTTP port" };
+    }
+    const config: DeploymentConfig = {
+      version: 1,
+      projectId: "preflight",
+      githubUrl: parsed.githubUrl,
+      branch: parsed.branch,
+      repoPath: parsed.repoPath,
+      composeFile: parsed.composeFile || null,
+      composeProject: parsed.composeProject,
+      profiles: parsed.profiles,
+      runtime: parsed.runtime as DeploymentRuntime,
+      exposure: parsed.exposure as DeploymentExposure,
+      tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort } : null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return { success: true, data: await preflightDeployment(config) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Preflight failed" };
+  }
+}
+
+export async function provisionGitHubProjectAction(input: DeploymentSetupInput): Promise<ActionResult<{ projectId: string; deployId?: string; logFile?: string; preflight: Awaited<ReturnType<typeof preflightDeployment>> }>> {
+  try {
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+    const user = await requirePinVerification();
+    const parsed = deploymentSetupSchema.parse(input);
+    validateRepoPath(parsed.repoPath);
+
+    const existing = await projects.getProjectBySlug(parsed.slug);
+    if (existing) return { success: false, error: `Projekt o slugu „${parsed.slug}” już istnieje.` };
+    const allProjects = await projects.getProjects();
+    if (allProjects.some((project) => project.github_url?.replace(/\.git$/, "").toLowerCase() === parsed.githubUrl.replace(/\.git$/, "").toLowerCase())) {
+      return { success: false, error: "To repozytorium GitHub jest już połączone z projektem." };
+    }
+
+    const project = await projects.createProject({
+      name: parsed.name,
+      slug: parsed.slug,
+      description: parsed.description || undefined,
+      status: "active",
+      tags: parsed.tags,
+      technologies: parsed.technologies,
+      github_url: parsed.githubUrl,
+      prod_url: parsed.exposure === "cloudflare" && parsed.hostname ? `https://${parsed.hostname}` : undefined,
+    });
+    const config = await saveDeploymentConfig({
+      projectId: project.id,
+      githubUrl: parsed.githubUrl,
+      branch: parsed.branch,
+      repoPath: parsed.repoPath,
+      composeFile: parsed.composeFile || null,
+      composeProject: parsed.composeProject,
+      profiles: parsed.profiles,
+      runtime: parsed.runtime,
+      exposure: parsed.exposure,
+      tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort
+        ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort }
+        : null,
+    });
+    await ensureDeploymentService(project.id, project.name, config);
+    const preflight = await preflightDeployment(config);
+    await auditLogs.logAction(user.email, "import", "github_repo", project.id, {
+      managed_deployment: true,
+      github_url: config.githubUrl,
+      repo_path: config.repoPath,
+      compose_project: config.composeProject,
+      preflight_ok: preflight.ok,
+    });
+
+    let queued: ActionResult<{ output: string; deployId: string; logFile: string; branch: string }> | null = null;
+    if (parsed.deployNow && preflight.ok) queued = await queueConfiguredDeployment(project.id, user.email);
+
+    revalidatePath("/projects");
+    revalidatePath("/dashboard");
+    return {
+      success: true,
+      data: { projectId: project.id, preflight, deployId: queued?.data?.deployId, logFile: queued?.data?.logFile },
+    };
+  } catch (error) {
+    console.error("provisionGitHubProjectAction error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Nie udało się przygotować projektu" };
+  }
 }
 
 // ========================================
@@ -186,6 +390,15 @@ export async function getProjectByIdAction(id: string) {
   }
 
   return { success: true as const, data };
+}
+
+export async function getManagedDeploymentConfigAction(id: string): Promise<ActionResult<DeploymentConfig | null>> {
+  try {
+    await requireAuth();
+    return { success: true, data: await getDeploymentConfig(id) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to load deployment configuration" };
+  }
 }
 
 // ========================================
@@ -729,7 +942,7 @@ export async function internalDeployProject(
     customRepoPath?: string;
     branch?: string;
   }
-): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; branch?: string }>> {
+): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; logFile?: string; branch?: string }>> {
   const customRepoPath = options?.customRepoPath;
   const branch = options?.branch;
 
@@ -746,6 +959,14 @@ export async function internalDeployProject(
   const project = await projects.getProjectById(id);
   if (!project) {
     return { success: false, error: "Project not found" };
+  }
+
+  // Managed projects use the durable GitHub → Compose job path. The legacy
+  // implementation below remains available only for projects that have not
+  // yet been migrated, so existing production stacks keep working.
+  const managedConfig = await getDeploymentConfig(id);
+  if (managedConfig && !customRepoPath) {
+    return queueConfiguredDeployment(id, triggeredBy, branch);
   }
 
   // Get project services to link deploy record
@@ -1108,7 +1329,7 @@ export async function deployProjectAction(
   id: string,
   customRepoPath?: string,
   branch?: string
-): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; branch?: string }>> {
+): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; logFile?: string; branch?: string }>> {
   try {
     // Check demo mode
     const demoCheck = checkDemoModeBlocked();
@@ -1138,8 +1359,9 @@ export async function checkDeployLogAction(
       return { success: false, error: "Runner not configured" };
     }
 
-    // Validate log file path (must be in /tmp and match our pattern)
-    if (!/^\/tmp\/deploy-[A-Za-z0-9_.-]+\.log$/.test(logFile)) {
+    // Deployment logs are persistent under PROJECTS_DIR. Older /tmp logs are
+    // still accepted while historical entries are being migrated.
+    if (!isDeploymentLogPath(logFile)) {
       return { success: false, error: "Invalid log file path" };
     }
 
@@ -1188,7 +1410,7 @@ export async function checkDeployLogAction(
 
         // Get the deploy record to check if we've already updated it
         const existingDeploy = await deploys.getDeployById(deployId);
-        if (existingDeploy && existingDeploy.status === "running") {
+        if (existingDeploy && existingDeploy.status !== "success" && existingDeploy.status !== "cancelled") {
           await deploys.completeDeploy(deployId, !deployFailed, {
             error_message: finalErrorMessage || undefined,
           });
@@ -1230,10 +1452,11 @@ export async function refreshRunningDeploysAction(): Promise<ActionResult<{ upda
       return { success: false, error: "Runner not configured" };
     }
 
-    // Get all running deploys
-    const runningDeploys = await deploys.getDeploys({
-      filters: [{ operator: "eq", column: "status", value: "running" }],
-    });
+    // Reconcile both active jobs and formerly false-failed records. An SSH
+    // request can time out after a detached job was successfully started.
+    const runningDeploys = (await deploys.getRecentDeploys(100)).filter(
+      (deploy) => deploy.status === "running" || (deploy.status === "failed" && Boolean(deploy.logs_object_key))
+    );
 
     if (runningDeploys.length === 0) {
       return { success: true, data: { updated: 0 } };
@@ -1242,7 +1465,7 @@ export async function refreshRunningDeploysAction(): Promise<ActionResult<{ upda
     let updated = 0;
 
     for (const deploy of runningDeploys) {
-      if (!deploy.logs_object_key || !/^\/tmp\/deploy-[A-Za-z0-9_.-]+\.log$/.test(deploy.logs_object_key)) continue;
+      if (!deploy.logs_object_key || !isDeploymentLogPath(deploy.logs_object_key)) continue;
 
       try {
         const logResponse = await fetch(`${RUNNER_URL}/shell`, {

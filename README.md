@@ -19,7 +19,7 @@ A private, self-hosted project manager panel for managing projects, Docker conta
 
 **Key highlights:**
 
-- 🚀 **One-click deploys** via git pull + Docker rebuild
+- 🚀 **Managed deploys from GitHub** with Docker Compose preflight and durable job logs
 - 📊 **GitHub integration** with commits, PRs, releases, and changelogs
 - 📡 **Uptime monitoring** with Discord/email alerts
 - 🔒 **Secure** with Cloudflare Access + PIN protection
@@ -129,6 +129,12 @@ GITHUB_APP_ID=123456
 GITHUB_APP_PRIVATE_KEY=base64_encoded_private_key
 GITHUB_APP_INSTALLATION_ID=12345678
 ```
+
+### Managed Docker Deployments
+
+Use **Projects → New Project → Import from GitHub** for deployable projects. The wizard stores one canonical repository path, branch, Compose project and explicitly selected production profiles. A deploy job clones a missing repository, validates Compose, builds, starts containers and writes a persistent log under `PROJECTS_DIR/.dashboard/deploy-logs`.
+
+For a web application, choose **Cloudflare Tunnel** exposure and provide the hostname plus local HTTP port. Enable it with `CLOUDFLARED_CONFIG_PATH` and a safe `CLOUDFLARED_RELOAD_COMMAND` in the dashboard environment. Set `CLOUDFLARED_CONFIG_USE_SUDO=true` when the system service owns `/etc/cloudflared/config.yml`. The Pi user must be permitted to update and reload cloudflared; no Cloudflare API token is stored in the dashboard.
 
 ---
 

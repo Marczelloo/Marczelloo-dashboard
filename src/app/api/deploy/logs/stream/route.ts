@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { AuthError, requireAuth } from "@/server/lib/auth";
 import { shellQuote } from "@/server/runner/safe-paths";
+import { isDeploymentLogPath } from "@/server/deployments";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
-const LOG_FILE_PATTERN = /^\/tmp\/(?:deploy|safe-deploy|self)-[A-Za-z0-9_.-]+\.log$/;
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   const logFile = request.nextUrl.searchParams.get("logFile");
   if (!logFile) return new Response("logFile parameter required", { status: 400 });
-  if (!LOG_FILE_PATTERN.test(logFile)) return new Response("Invalid log file path", { status: 400 });
+  if (!isDeploymentLogPath(logFile)) return new Response("Invalid log file path", { status: 400 });
   if (!RUNNER_TOKEN) return new Response("Runner not configured", { status: 500 });
 
   const encoder = new TextEncoder();

@@ -3,7 +3,6 @@ import { Header } from "@/components/layout";
 import { ProjectForm } from "../_components/project-form";
 import { GitHubRepoSelector } from "../_components/github-repo-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PenLine, Github } from "lucide-react";
 
 export default function NewProjectPage() {

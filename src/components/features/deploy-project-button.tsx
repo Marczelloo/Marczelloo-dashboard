@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deployProjectAction, checkDeployLogAction } from "@/app/actions/projects";
+import { deployProjectAction, checkDeployLogAction, getManagedDeploymentConfigAction } from "@/app/actions/projects";
 import { toast } from "sonner";
 
 interface DeployProjectButtonProps {
@@ -53,6 +53,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
   const [isChecking, setIsChecking] = useState(false);
   const [buildComplete, setBuildComplete] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [managedDeployment, setManagedDeployment] = useState<{ repoPath: string; composeProject: string; branch: string } | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Parse GitHub URL to get owner/repo
@@ -176,7 +177,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
     }
   }
 
-  function handleClick() {
+  async function handleClick() {
     // Show config dialog first
     setError(null);
     setOutput("");
@@ -185,6 +186,17 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
     setBuildComplete(false);
     setSelectedBranch("");
     stopStreaming();
+    const configResult = await getManagedDeploymentConfigAction(projectId);
+    if (configResult.success && configResult.data) {
+      setManagedDeployment({
+        repoPath: configResult.data.repoPath,
+        composeProject: configResult.data.composeProject,
+        branch: configResult.data.branch,
+      });
+      setSelectedBranch(configResult.data.branch);
+    } else {
+      setManagedDeployment(null);
+    }
     setShowConfigDialog(true);
     // Fetch branches if GitHub URL is available
     if (githubUrl) {
@@ -231,10 +243,11 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
           setDeployId(result.data.deployId);
         }
 
-        // Extract log file path from output
-        const logMatch = outputText.match(/Log file: (\/tmp\/deploy-[^\s]+\.log)/);
-        if (logMatch) {
-          setLogFile(logMatch[1]);
+        const managedLogFile = result.data.logFile;
+        const logMatch = outputText.match(/Log file: (\/[^\s]+\.log)/);
+        const nextLogFile = managedLogFile || logMatch?.[1];
+        if (nextLogFile) {
+          setLogFile(nextLogFile);
           toast.success("Build started in background", {
             description: "Use Check Status to monitor progress",
           });
@@ -306,7 +319,9 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
           <DialogHeader>
             <DialogTitle>Deploy: {projectName}</DialogTitle>
             <DialogDescription>
-              Configure deployment settings. Leave path empty to auto-detect from service repo_path.
+              {managedDeployment
+                ? `Managed deployment: ${managedDeployment.repoPath} · Compose ${managedDeployment.composeProject}`
+                : "Configure deployment settings. Leave path empty to auto-detect from service repo_path."}
             </DialogDescription>
           </DialogHeader>
 
@@ -366,7 +381,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               </div>
             )}
 
-            <div className="space-y-2">
+            {!managedDeployment && <div className="space-y-2">
               <Label htmlFor="repoPath" className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
                 Repository Path
@@ -380,7 +395,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               <p className="text-xs text-muted-foreground">
                 The path to the project directory on the Raspberry Pi. Must contain docker-compose.yml.
               </p>
-            </div>
+            </div>}
           </div>
 
           <DialogFooter>
