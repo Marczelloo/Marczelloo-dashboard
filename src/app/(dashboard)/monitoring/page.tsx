@@ -109,11 +109,19 @@ export default function MonitoringPage() {
 }
 
 async function MonitoringStats() {
-  const monitorableServices = await services.getMonitorableServices();
+  let monitorableServices: Service[] = [];
+  try {
+    monitorableServices = await services.getMonitorableServices();
+  } catch (error) {
+    console.error("[MonitoringStats] Failed to load monitorable services:", error);
+  }
 
   // Get latest check for each service
   const checksPromises = monitorableServices.map(async (service) => {
-    const stats = await uptimeChecks.getUptimeStats(service.id, 24);
+    const stats = await uptimeChecks.getUptimeStats(service.id, 24).catch((error) => {
+      console.error(`[MonitoringStats] Failed to load uptime for ${service.id}:`, error);
+      return { uptime: 0, avgLatency: 0, checks: 0, lastOk: false };
+    });
     return { service, stats };
   });
 
@@ -156,7 +164,12 @@ async function MonitoringStats() {
 }
 
 async function MonitoringList() {
-  const monitorableServices = await services.getMonitorableServices();
+  let monitorableServices: Service[] = [];
+  try {
+    monitorableServices = await services.getMonitorableServices();
+  } catch (error) {
+    console.error("[MonitoringList] Failed to load monitorable services:", error);
+  }
 
   if (monitorableServices.length === 0) {
     return (
@@ -173,8 +186,16 @@ async function MonitoringList() {
   // Get stats for each service
   const servicesWithStats = await Promise.all(
     monitorableServices.map(async (service: Service) => {
-      const stats = await uptimeChecks.getUptimeStats(service.id, 24);
-      const latestCheck = await uptimeChecks.getLatestCheckByServiceId(service.id);
+      const [stats, latestCheck] = await Promise.all([
+        uptimeChecks.getUptimeStats(service.id, 24).catch((error) => {
+          console.error(`[MonitoringList] Failed to load uptime for ${service.id}:`, error);
+          return { uptime: 0, avgLatency: 0, checks: 0, lastOk: false };
+        }),
+        uptimeChecks.getLatestCheckByServiceId(service.id).catch((error) => {
+          console.error(`[MonitoringList] Failed to load latest check for ${service.id}:`, error);
+          return null;
+        }),
+      ]);
       return { service, stats, latestCheck };
     })
   );

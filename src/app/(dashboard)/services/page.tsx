@@ -11,11 +11,19 @@ import { ServicesList } from "./_components/services-list";
 export const dynamic = "force-dynamic";
 
 async function ServicesContent() {
-  const [standaloneServices, projectBoundServices, allProjects] = await Promise.all([
-    services.getStandaloneServices(),
-    services.getProjectBoundServices(),
-    projects.getProjects(),
+  const [allServices, allProjects] = await Promise.all([
+    services.getServices().catch((error) => {
+      console.error("[ServicesPage] Failed to load services:", error);
+      return [];
+    }),
+    projects.getProjects().catch((error) => {
+      console.error("[ServicesPage] Failed to load projects:", error);
+      return [];
+    }),
   ]);
+
+  const standaloneServices = allServices.filter((service) => !service.project_id);
+  const projectBoundServices = allServices.filter((service) => !!service.project_id);
 
   return (
     <ServicesList

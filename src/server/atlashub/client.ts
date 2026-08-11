@@ -78,29 +78,97 @@ function buildFilterQueryString(filters: QueryFilter[]): string {
 // HTTP Client
 // ========================================
 
-async function atlasRequest<T>(path: string, options: RequestInit = {}, revalidate?: number): Promise<T> {
-  const config = getConfig();
+const GET_CACHE_TTL_MS = 3000;
+const MAX_RETRIES = 2;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-  const url = `${config.apiUrl}${path}`;
+type CachedGetRequest = {
+  expiresAt: number;
+  promise: Promise<unknown>;
+};
 
-  // Only set Content-Type for requests with body
+// The dashboard renders multiple server components at once. Keep one
+// in-flight GET per URL so parallel components do not multiply API traffic.
+const getRequestCache = new Map<string, CachedGetRequest>();
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryDelay(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) {
+      return Math.min(Math.max(seconds * 1000, 250), 3000);
+    }
+
+    const retryAt = Date.parse(retryAfter);
+    if (!Number.isNaN(retryAt)) {
+      return Math.min(Math.max(retryAt - Date.now(), 250), 3000);
+    }
+  }
+
+  return Math.min(250 * 2 ** attempt, 3000);
+}
+
+async function requestWithRetry<T>(
+  url: string,
+  options: RequestInit,
+  secretKey: string,
+  revalidate?: number
+): Promise<T> {
+  const method = (options.method || "GET").toUpperCase();
+  const canRetry = method === "GET" || method === "HEAD" || method === "OPTIONS";
   const headers: HeadersInit = {
-    "x-api-key": config.secretKey,
+    "x-api-key": secretKey,
     ...options.headers,
   };
 
-  // Add Content-Type only if there's a body (POST/PUT/PATCH)
   if (options.body) {
     (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    next: revalidate !== undefined ? { revalidate } : undefined,
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let response: Response;
 
-  if (!response.ok) {
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        next: revalidate !== undefined ? { revalidate } : undefined,
+      });
+    } catch (error) {
+      if (!canRetry || attempt === MAX_RETRIES || options.signal?.aborted) {
+        throw error;
+      }
+
+      console.warn(`[AtlasHub Retry] Network error, retrying request (${attempt + 1}/${MAX_RETRIES})`, {
+        url,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      await wait(250 * 2 ** attempt);
+      continue;
+    }
+
+    if (response.ok) {
+      if (response.status === 204) {
+        return {} as T;
+      }
+
+      return response.json();
+    }
+
+    if (canRetry && RETRYABLE_STATUS_CODES.has(response.status) && attempt < MAX_RETRIES) {
+      const delayMs = getRetryDelay(response, attempt);
+      console.warn(`[AtlasHub Retry] HTTP ${response.status}, retrying request (${attempt + 1}/${MAX_RETRIES})`, {
+        url,
+        delayMs,
+      });
+      await wait(delayMs);
+      continue;
+    }
+
     let errorBody: { error?: string; message?: string; details?: unknown } = {
       error: "UNKNOWN_ERROR",
       message: `HTTP ${response.status}: ${response.statusText}`,
@@ -116,7 +184,7 @@ async function atlasRequest<T>(path: string, options: RequestInit = {}, revalida
       url,
       status: response.status,
       error: errorBody,
-      method: options.method || "GET",
+      method,
     });
 
     throw new AtlasHubError(
@@ -126,12 +194,41 @@ async function atlasRequest<T>(path: string, options: RequestInit = {}, revalida
     );
   }
 
-  // Handle 204 No Content
-  if (response.status === 204) {
-    return {} as T;
+  throw new Error("AtlasHub request failed after retries");
+}
+
+async function atlasRequest<T>(path: string, options: RequestInit = {}, revalidate?: number): Promise<T> {
+  const config = getConfig();
+  const url = `${config.apiUrl}${path}`;
+  const method = (options.method || "GET").toUpperCase();
+  const cacheKey = method === "GET" ? `${method}:${url}:${revalidate ?? "dynamic"}` : null;
+
+  if (cacheKey) {
+    const cached = getRequestCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.promise as Promise<T>;
+    }
+    if (cached) getRequestCache.delete(cacheKey);
+  } else {
+    // Do not serve stale reads after a mutation.
+    getRequestCache.clear();
   }
 
-  return response.json();
+  const request = requestWithRetry<T>(url, options, config.secretKey, revalidate);
+
+  if (cacheKey) {
+    getRequestCache.set(cacheKey, {
+      expiresAt: Date.now() + GET_CACHE_TTL_MS,
+      promise: request,
+    });
+
+    request.catch(() => {
+      const cached = getRequestCache.get(cacheKey);
+      if (cached?.promise === request) getRequestCache.delete(cacheKey);
+    });
+  }
+
+  return request;
 }
 
 // ========================================

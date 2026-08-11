@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Header } from "@/components/layout";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Card, CardContent } from "@/components/ui";
 import { DeployProjectButton } from "@/components/features/deploy-project-button";
 import { ProjectDetailTabs } from "./_components/project-detail-tabs";
 import { projects, services, workItems, deploys } from "@/server/data";
-import { Github, ExternalLink, Globe, Settings, ArrowLeft } from "lucide-react";
+import { Github, ExternalLink, Globe, Settings, ArrowLeft, AlertTriangle } from "lucide-react";
 import type { Deploy } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -33,25 +33,42 @@ interface PageProps {
 
 export default async function ProjectDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const project = await projects.getProjectById(id);
+  let project;
+
+  try {
+    project = await projects.getProjectById(id);
+  } catch (error) {
+    console.error(`[ProjectDetail] Failed to load project ${id}:`, error);
+    return <ProjectLoadError />;
+  }
 
   if (!project) {
     notFound();
   }
 
   // Fetch all data in parallel
-  const [projectServices, openWorkItems, serviceIds] = await Promise.all([
-    services.getServicesByProjectId(id),
-    workItems.getOpenWorkItemsByProjectId(id),
-    services.getServicesByProjectId(id).then((s) => s.map((srv) => srv.id)),
+  const [projectServices, openWorkItems] = await Promise.all([
+    services.getServicesByProjectId(id).catch((error) => {
+      console.error(`[ProjectDetail] Failed to load services for ${id}:`, error);
+      return [];
+    }),
+    workItems.getOpenWorkItemsByProjectId(id).catch((error) => {
+      console.error(`[ProjectDetail] Failed to load work items for ${id}:`, error);
+      return [];
+    }),
   ]);
+  const serviceIds = projectServices.map((service) => service.id);
 
   // Get recent deploys for all services
-  let recentDeploys: Deploy[] = [];
-  for (const serviceId of serviceIds.slice(0, 5)) {
-    const serviceDeploys = await deploys.getDeploysByServiceId(serviceId);
-    recentDeploys = [...recentDeploys, ...serviceDeploys.slice(0, 3)];
-  }
+  const deployResults = await Promise.all(
+    serviceIds.slice(0, 5).map((serviceId) =>
+      deploys.getDeploysByServiceId(serviceId).catch((error) => {
+        console.error(`[ProjectDetail] Failed to load deploys for service ${serviceId}:`, error);
+        return [];
+      })
+    )
+  );
+  let recentDeploys: Deploy[] = deployResults.flatMap((serviceDeploys) => serviceDeploys.slice(0, 3));
 
   // Sort by date and take latest 10
   recentDeploys = recentDeploys
@@ -143,5 +160,23 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         />
       </div>
     </>
+  );
+}
+
+function ProjectLoadError() {
+  return (
+    <div className="p-6">
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
+          <AlertTriangle className="h-10 w-10 text-warning" />
+          <div>
+            <h1 className="text-lg font-semibold">Project temporarily unavailable</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              The project data source is temporarily unavailable. Try refreshing this page in a moment.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
