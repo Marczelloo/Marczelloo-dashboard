@@ -19,6 +19,7 @@ import {
   allocateDeploymentPort,
   getDeploymentConfig,
   isDeploymentLogPath,
+  listCloudflareTunnelRoutes,
   preflightDeployment,
   saveDeploymentConfig,
   startDeploymentJob,
@@ -122,6 +123,33 @@ async function queueConfiguredDeployment(
   if (!project) return { success: false, error: "Project not found" };
   let stored = await getDeploymentConfig(projectId);
   if (!stored) return { success: false, error: "Projekt nie ma jeszcze konfiguracji Docker/GitHub." };
+
+  // Older projects can already have a hostname in the shared cloudflared
+  // ingress file, while their deployment config predates managed routes.
+  // Adopt only an exact match of the project's public URL. This lets the
+  // next manual or webhook deployment transition that project safely without
+  // taking ownership of unrelated, manually maintained ingress entries.
+  let adoptedTunnelRoute: { hostname: string; localPort: number } | null = null;
+  if (!stored.tunnel?.enabled && project.prod_url) {
+    try {
+      const hostname = new URL(project.prod_url).hostname.toLowerCase();
+      const ingress = await listCloudflareTunnelRoutes();
+      const route = ingress.routes.find((candidate) => candidate.hostname.toLowerCase() === hostname);
+      const portMatch = route && /(?:127\\.0\\.0\\.1|localhost):(\\d+)$/.exec(route.service);
+      const localPort = portMatch ? Number(portMatch[1]) : 0;
+      if (Number.isInteger(localPort) && localPort > 0 && localPort <= 65535) {
+        stored = await saveDeploymentConfig({
+          ...stored,
+          exposure: "cloudflare",
+          tunnel: { enabled: true, hostname, localPort },
+        });
+        adoptedTunnelRoute = { hostname, localPort };
+      }
+    } catch {
+      // A malformed legacy URL or an unavailable ingress file must not block
+      // a deployment that was explicitly configured as internal.
+    }
+  }
   let reallocatedPort: number | null = null;
   if (stored.tunnel?.enabled) {
     try {
@@ -160,6 +188,7 @@ async function queueConfiguredDeployment(
     branch: config.branch,
     assigned_tunnel_port: config.tunnel?.localPort || null,
     tunnel_port_reallocated: reallocatedPort !== null,
+    adopted_existing_tunnel_route: adoptedTunnelRoute,
     deploy_id: deploy.id,
     log_file: job.logFile,
     pid: job.pid,
