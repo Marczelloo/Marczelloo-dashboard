@@ -29,8 +29,10 @@ type TunnelResponse = {
   error?: string;
 };
 
+const DEFAULT_CLOUDFLARED_CONFIG_PATH = "/etc/cloudflared/config.yml";
+
 export function CloudflareTunnelSettings() {
-  const [configPath, setConfigPath] = useState("");
+  const [configPath, setConfigPath] = useState(DEFAULT_CLOUDFLARED_CONFIG_PATH);
   const [useSudo, setUseSudo] = useState(true);
   const [tunnelName, setTunnelName] = useState("");
   const [source, setSource] = useState<TunnelConfig["source"]>("none");
@@ -48,7 +50,10 @@ export function CloudflareTunnelSettings() {
       const response = await fetch(`/api/settings/cloudflare-tunnel?ts=${Date.now()}`, { cache: "no-store" });
       const data = await response.json() as TunnelResponse;
       if (!response.ok || !data.success || !data.tunnel) throw new Error(data.error || "Nie udało się odczytać konfiguracji Tunnel.");
-      setConfigPath(data.tunnel.configPath || "");
+      // A missing stored setting is the normal first-run state. Keep the
+      // standard systemd location editable so the action is immediately
+      // available instead of presenting a disabled form.
+      setConfigPath(data.tunnel.configPath || DEFAULT_CLOUDFLARED_CONFIG_PATH);
       setUseSudo(data.tunnel.useSudo);
       setTunnelName(data.tunnel.tunnelName);
       setSource(data.tunnel.source);
@@ -120,7 +125,7 @@ export function CloudflareTunnelSettings() {
               placeholder="/etc/cloudflared/config.yml"
               value={configPath}
               onChange={(event) => setConfigPath(event.target.value)}
-              disabled={loading || saving}
+              disabled={saving}
             />
             <p className="text-xs text-muted-foreground">Absolutna ścieżka pliku cloudflared na Raspberry Pi.</p>
           </div>
@@ -132,7 +137,7 @@ export function CloudflareTunnelSettings() {
               placeholder="marczelloo-pi"
               value={tunnelName}
               onChange={(event) => setTunnelName(event.target.value)}
-              disabled={loading || saving}
+              disabled={saving}
             />
             <p className="text-xs text-muted-foreground">Potrzebna tylko, gdy dashboard ma również tworzyć DNS route w Cloudflare.</p>
           </div>
@@ -143,7 +148,7 @@ export function CloudflareTunnelSettings() {
             type="checkbox"
             checked={useSudo}
             onChange={(event) => setUseSudo(event.target.checked)}
-            disabled={loading || saving}
+            disabled={saving}
             className="mt-0.5 h-4 w-4 accent-primary"
           />
           <span className="space-y-1">
@@ -153,7 +158,7 @@ export function CloudflareTunnelSettings() {
         </label>
 
         <div className="flex flex-wrap items-center gap-3 border-b border-border/60 pb-6">
-          <Button onClick={() => void save()} disabled={loading || saving || !configPath.trim()}>
+          <Button onClick={() => void save()} disabled={saving || !configPath.trim()}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Tunnel settings
           </Button>
