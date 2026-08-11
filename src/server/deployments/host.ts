@@ -168,9 +168,9 @@ async function cloudflareScript(config: DeploymentConfig): Promise<string> {
   const tunnelName = settings.tunnelName;
   const { hostname, localPort } = config.tunnel;
 
-  return `
+return `
 echo "=== Cloudflare Tunnel ==="
-${needsSudo ? "sudo -n " : ""}python3 - ${shellQuote(configPath)} ${shellQuote(hostname)} ${shellQuote(String(localPort))} <<'PY'
+route_update="$(${needsSudo ? "sudo -n " : ""}python3 - ${shellQuote(configPath)} ${shellQuote(hostname)} ${shellQuote(String(localPort))} <<'PY'
 import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
 hostname = sys.argv[2].lower()
@@ -192,12 +192,23 @@ insert_at = next((i for i, line in enumerate(result) if re.match(r"^\\s*-\\s+ser
 if insert_at is None: raise SystemExit("cloudflared config needs a final http_status:404 ingress rule")
 rule = [f"  - hostname: {hostname}\\n", f"    service: http://127.0.0.1:{port}\\n"]
 result[insert_at:insert_at] = rule
+updated = "".join(result)
+if updated == text:
+    print("CONFIG_CHANGED=0")
+    raise SystemExit(0)
 temp = path.with_suffix(path.suffix + ".dashboard-tmp")
-temp.write_text("".join(result)); temp.replace(path)
+temp.write_text(updated); temp.replace(path)
+print("CONFIG_CHANGED=1")
 PY
-cloudflared tunnel ingress validate --config ${shellQuote(configPath)}
+ )"
+echo "$route_update"
+${needsSudo ? "sudo -n " : ""}cloudflared --config ${shellQuote(configPath)} tunnel ingress validate
 ${tunnelName ? `cloudflared tunnel route dns ${shellQuote(tunnelName)} ${shellQuote(hostname)} || echo "DNS route already exists or requires Cloudflare credentials"` : ""}
-${reloadCommand}
+if [ "$route_update" = "CONFIG_CHANGED=1" ]; then
+  ${reloadCommand}
+else
+  echo "Cloudflare ingress route unchanged; tunnel restart skipped."
+fi
 echo "Cloudflare route active: https://${hostname} -> 127.0.0.1:${localPort}"
 `;
 }
