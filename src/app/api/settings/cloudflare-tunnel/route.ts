@@ -9,6 +9,9 @@ import {
 } from "@/server/deployments";
 import { requireAuth, requirePinVerification } from "@/server/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const settingsSchema = z.object({
   configPath: z.string().min(1).max(240),
   useSudo: z.boolean(),
@@ -69,7 +72,10 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ success: true, tunnel, configured: ingress.configured, routes, error: ingress.error });
+    return NextResponse.json(
+      { success: true, tunnel, configured: ingress.configured, routes, error: ingress.error },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Unable to load Tunnel settings" }, { status: 500 });
   }

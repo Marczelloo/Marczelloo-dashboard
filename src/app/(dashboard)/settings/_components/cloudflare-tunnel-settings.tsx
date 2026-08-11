@@ -45,7 +45,7 @@ export function CloudflareTunnelSettings() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/settings/cloudflare-tunnel");
+      const response = await fetch(`/api/settings/cloudflare-tunnel?ts=${Date.now()}`, { cache: "no-store" });
       const data = await response.json() as TunnelResponse;
       if (!response.ok || !data.success || !data.tunnel) throw new Error(data.error || "Nie udało się odczytać konfiguracji Tunnel.");
       setConfigPath(data.tunnel.configPath || "");
