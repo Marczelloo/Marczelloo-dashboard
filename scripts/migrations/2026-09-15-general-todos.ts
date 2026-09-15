@@ -2,6 +2,8 @@
  * Creates the general_todos table used by /todos. Idempotent.
  * Run with the dashboard env: npx tsx scripts/migrations/2026-09-15-general-todos.ts
  */
+export {};
+
 async function main() {
   const apiUrl = process.env.ATLASHUB_API_URL;
   const secretKey = process.env.ATLASHUB_SECRET_KEY;
