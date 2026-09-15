@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/server/lib/auth";
+import { getCurrentUser, isAllowedUser } from "@/server/lib/auth";
 import { setSetting } from "@/server/atlashub/settings";
 
 const READ_NOTIFICATIONS_KEY = "notifications_last_read_at";
@@ -7,7 +7,7 @@ const READ_NOTIFICATIONS_KEY = "notifications_last_read_at";
 export async function POST() {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || !(await isAllowedUser())) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 

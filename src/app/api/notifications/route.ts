@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDemoMode } from "@/lib/demo-mode";
 import { auditLogs } from "@/server/atlashub";
-import { getCurrentUser } from "@/server/lib/auth";
+import { getCurrentUser, isAllowedUser } from "@/server/lib/auth";
 import { getSetting } from "@/server/atlashub/settings";
 
 const READ_NOTIFICATIONS_KEY = "notifications_last_read_at";
@@ -53,7 +53,7 @@ const QUICK_NOTIFICATIONS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || !(await isAllowedUser())) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 

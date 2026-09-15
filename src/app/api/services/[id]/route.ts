@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { services } from "@/server/atlashub";
-import { getCurrentUser } from "@/server/lib/auth";
+import { getCurrentUser, isAllowedUser } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || !(await isAllowedUser())) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 

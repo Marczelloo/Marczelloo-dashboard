@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { services } from "@/server/data";
 import { dockerRestart } from "@/server/runner/client";
-import { getCurrentUser } from "@/server/lib/auth";
+import { AuthError, requirePinVerification } from "@/server/lib/auth";
 
 // Container name pattern for detecting self-restart
 const DASHBOARD_CONTAINER_PATTERNS = ["marczelloo-dashboard", "dashboard"];
@@ -11,10 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    await requirePinVerification();
 
     const { id } = await params;
 
@@ -70,6 +67,12 @@ export async function POST(
       message: `Container ${service.container_id} restarted`,
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { success: false, error: error.message, requirePin: error.code === "PIN_REQUIRED" },
+        { status: error.code === "NOT_AUTHENTICATED" ? 401 : 403 }
+      );
+    }
     console.error("[Restart] Error:", error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Unknown error" },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/server/lib/auth";
+import { getCurrentUser, isAllowedUser } from "@/server/lib/auth";
 import { isDemoMode } from "@/lib/demo-mode";
 import { mockPiMetrics } from "@/lib/mock-data";
 
@@ -66,7 +66,7 @@ async function runCommand(command: string): Promise<string> {
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || !(await isAllowedUser())) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
