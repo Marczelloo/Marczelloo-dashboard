@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
 import { getEnvFilePath, shellQuote } from "@/server/runner/safe-paths";
+import { parseEnvEntries } from "@/server/env/dotenv";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
@@ -23,31 +24,6 @@ async function callRunner(command: string): Promise<{ response: Response; result
 
   const result = (await response.json().catch(() => ({}))) as RunnerResult;
   return { response, result };
-}
-
-function parseEnv(content: string): { key: string; value: string }[] {
-  const vars: { key: string; value: string }[] = [];
-
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex <= 0) continue;
-
-    const key = trimmed.slice(0, eqIndex).trim().replace(/^export\s+/, "");
-    let value = trimmed.slice(eqIndex + 1).trim();
-
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-      vars.push({ key, value });
-    }
-  }
-
-  return vars;
 }
 
 export async function POST(request: Request) {
@@ -97,7 +73,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      vars: parseEnv(String(result.stdout || "")),
+      vars: parseEnvEntries(String(result.stdout || "")),
       filePath,
     });
   } catch (error) {

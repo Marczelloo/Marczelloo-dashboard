@@ -2,6 +2,7 @@ import "server-only";
 
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 import { getRepositoryCloneToken, parseGitHubUrl } from "@/server/github/client";
+import { stackFromContainers, type ComposeContainerInfo, type ComposeStack } from "./compose-stack";
 import type { DeploymentConfig } from "./config";
 import { getCloudflareReloadCommand, getCloudflareTunnelSettings } from "./tunnel";
 
@@ -423,4 +424,36 @@ ${tunnelScript}
   const pid = /^PID=(.+)$/m.exec(result.stdout)?.[1]?.trim();
   if (!pid) throw new Error("Runner nie potwierdził uruchomienia procesu wdrożeniowego.");
   return { logFile, pid };
+}
+
+/**
+ * Resolve a Compose stack from the labels Docker stored when the containers
+ * were created. Labels are authoritative: service rows in the database can
+ * carry a wrong compose_project (for example "marczelloodashboard").
+ */
+export async function resolveComposeStack(hint: { containerName?: string | null; composeProject?: string | null }): Promise<ComposeStack> {
+  const container = hint.containerName && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(hint.containerName) ? hint.containerName : "";
+  const project = hint.composeProject && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(hint.composeProject) ? hint.composeProject : "";
+  const command = `set -eu
+project=""
+if [ -n ${shellQuote(container)} ]; then
+  project="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' ${shellQuote(container)} 2>/dev/null || true)"
+fi
+if [ -z "$project" ]; then project=${shellQuote(project)}; fi
+if [ -z "$project" ]; then echo "Serwis nie wskazuje kontenera ani projektu Compose." >&2; exit 3; fi
+ids="$(docker ps -aq --filter "label=com.docker.compose.project=$project")"
+if [ -z "$ids" ]; then echo "Brak kontenerów projektu Compose $project." >&2; exit 4; fi
+echo "PROJECT=$project"
+docker inspect $ids --format '{"name":{{json .Name}},"labels":{{json .Config.Labels}},"status":{{json .State.Status}}}'`;
+
+  const result = await runHostCommand(command, 20_000);
+  if (!result.success) throw new Error(result.stderr || "Nie udało się odczytać projektu Compose.");
+
+  const resolvedProject = /^PROJECT=(.+)$/m.exec(result.stdout)?.[1]?.trim();
+  if (!resolvedProject) throw new Error("Runner nie zwrócił nazwy projektu Compose.");
+  const containers = result.stdout
+    .split("\n")
+    .filter((line) => line.startsWith("{"))
+    .map((line) => JSON.parse(line) as ComposeContainerInfo);
+  return stackFromContainers(resolvedProject, containers, container || null);
 }

@@ -363,43 +363,31 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         toast.warning("Environment file saved, database sync failed");
       }
 
-      // 3. Restart the service
+      // 3. Apply by recreating the Compose containers (docker restart does not reload env files)
       if (serviceId) {
         try {
-          const restartResponse = await fetch(
-            `/api/services/${serviceId}/restart`,
-            {
-              method: "POST",
-            }
-          );
+          const applyResponse = await fetch(`/api/services/${serviceId}/apply-env`, { method: "POST" });
+          const applyResult = await applyResponse.json().catch(() => ({}));
 
-          // Handle successful responses (including 202 Accepted for self-restart)
-          if (restartResponse.ok || restartResponse.status === 202) {
-            const restartResult = await restartResponse.json().catch(() => ({ success: true, selfRestart: true }));
-
-            if (restartResult.selfRestart) {
-              toast.success("Environment variables saved - Dashboard is restarting...", {
-                duration: 5000,
-              });
-            } else {
-              toast.success("Environment variables saved and service restarted");
-            }
+          if (applyResponse.ok && applyResult.success) {
+            toast.success("Zmienne zapisane i zastosowane", {
+              description: `Odtworzono: ${(applyResult.services || []).join(", ")}`,
+            });
+          } else if (applyResponse.status === 409) {
+            toast.info(applyResult.error || "Plik zapisany; zmiany wejdą przy najbliższym wdrożeniu.");
           } else {
-            // Restart failed but file was saved - warn the user
-            console.error("[EnvManager] Restart failed with status:", restartResponse.status);
-            toast.warning("Saved successfully, but restart failed", {
-              description: `Status: ${restartResponse.status}`,
+            if (applyResult.requirePin) setShowPinDialog(true);
+            toast.warning("Plik zapisany, ale nie udało się zastosować zmian", {
+              description: applyResult.error || `Status: ${applyResponse.status}`,
             });
           }
-        } catch (restartErr) {
-          // Restart failed but file was saved - warn the user
-          console.error("[EnvManager] Restart error:", restartErr);
-          toast.warning("Environment variables saved, but restart request failed", {
-            description: restartErr instanceof Error ? restartErr.message : "Network error",
+        } catch (applyError) {
+          toast.warning("Plik zapisany, ale żądanie zastosowania zmian nie powiodło się", {
+            description: applyError instanceof Error ? applyError.message : "Błąd sieci",
           });
         }
       } else {
-        toast.success("Environment variables saved");
+        toast.success("Zmienne zapisane");
       }
 
       // 4. Update server state
