@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, parseGitHubUrl } from "@/server/github";
 import { projects, auditLogs } from "@/server/atlashub";
 import { internalDeployProject } from "@/app/actions/projects";
+import { getDeploymentConfig, resolveAutoDeployBranch } from "@/server/deployments";
 import { startBackgroundSelfDeploy } from "@/server/self-deploy";
 import { sendDiscordNotification } from "@/server/notifications";
 import type { GitHubPushPayload, GitHubReleasePayload, GitHubDependabotAlertPayload } from "@/types/github";
@@ -140,17 +141,11 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
   }> = [];
 
   for (const project of projectsWithGitHub) {
-    // Check if this branch should trigger deploy
-    // For now, deploy on push to default branch (main/master)
-    const shouldDeploy = branch === "main" || branch === "master";
+    const deploymentConfig = await getDeploymentConfig(project.id);
+    const decision = resolveAutoDeployBranch(branch, deploymentConfig?.branch ?? null);
 
-    if (!shouldDeploy) {
-      results.push({
-        projectId: project.id,
-        projectName: project.name,
-        deployed: false,
-        reason: `Branch ${branch} not configured for auto-deploy`,
-      });
+    if (!decision.deploy) {
+      results.push({ projectId: project.id, projectName: project.name, deployed: false, reason: decision.reason });
       continue;
     }
 
@@ -234,7 +229,8 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
 
       // Normal deployment for other projects (synchronous)
       console.log(`[GitHub Webhook] Triggering deploy for ${project.name}`);
-      const deployResult = await internalDeployProject(project.id, "github-webhook", { branch });
+      // Managed projects deploy their configured branch; legacy ones the pushed branch.
+      const deployResult = await internalDeployProject(project.id, "github-webhook", deploymentConfig ? {} : { branch: decision.branch });
 
       // Log the deploy action
       await auditLogs.createAuditLog({

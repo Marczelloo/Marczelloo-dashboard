@@ -831,8 +831,8 @@ export async function listWebhooks(owner: string, repo: string): Promise<GitHubW
 export async function verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
   const config = getConfig();
   if (!config.webhookSecret) {
-    console.warn("[GitHub] No webhook secret configured, skipping signature verification");
-    return true;
+    console.error("[GitHub] GITHUB_WEBHOOK_SECRET is not configured; rejecting webhook");
+    return false;
   }
 
   // Extract algorithm and hash from signature header

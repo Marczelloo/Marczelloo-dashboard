@@ -20,6 +20,7 @@ import {
   getDeploymentConfig,
   isDeploymentLogPath,
   listCloudflareTunnelRoutes,
+  parseLocalPortFromService,
   preflightDeployment,
   saveDeploymentConfig,
   startDeploymentJob,
@@ -150,8 +151,7 @@ async function queueConfiguredDeployment(
       const hostname = new URL(project.prod_url).hostname.toLowerCase();
       const ingress = await listCloudflareTunnelRoutes();
       const route = ingress.routes.find((candidate) => candidate.hostname.toLowerCase() === hostname);
-      const portMatch = route && /(?:127\\.0\\.0\\.1|localhost):(\\d+)$/.exec(route.service);
-      const localPort = portMatch ? Number(portMatch[1]) : 0;
+      const localPort = route ? parseLocalPortFromService(route.service) ?? 0 : 0;
       if (Number.isInteger(localPort) && localPort > 0 && localPort <= 65535) {
         stored = await saveDeploymentConfig({
           ...stored,
@@ -484,8 +484,7 @@ export async function getProjectTunnelStatusAction(id: string): Promise<ActionRe
     const fallbackHostname = !configuredHostname && project.prod_url ? new URL(project.prod_url).hostname.toLowerCase() : null;
     const hostname = configuredHostname || fallbackHostname;
     const route = hostname ? ingress.routes.find((candidate) => candidate.hostname.toLowerCase() === hostname) : undefined;
-    const portMatch = route && /(?:127\.0\.0\.1|localhost):(\d+)$/.exec(route.service);
-    const actualRoute = route ? { hostname: route.hostname, service: route.service, localPort: portMatch ? Number(portMatch[1]) : null } : null;
+    const actualRoute = route ? { hostname: route.hostname, service: route.service, localPort: parseLocalPortFromService(route.service) } : null;
     const status = !ingress.configured || ingress.error
       ? "unavailable"
       : config?.tunnel?.enabled
