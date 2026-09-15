@@ -6,9 +6,10 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { isDemoMode, DEMO_USER } from "@/lib/demo-mode";
+import { isOwnerEmail, isPinBypassAllowed } from "./auth-policy";
+import { resolveIdentity } from "./cloudflare-access";
 
 // Cloudflare Access headers
-const CF_ACCESS_EMAIL_HEADER = "cf-access-authenticated-user-email";
 const CF_ACCESS_COUNTRY_HEADER = "cf-ipcountry";
 
 // Session cookie name
@@ -50,14 +51,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function isAllowedUser(): Promise<boolean> {
   const user = await getCurrentUser();
-  if (!user) return false;
-
-  const allowedEmails = (process.env.OWNER_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-  return allowedEmails.includes(user.email.toLowerCase());
+  return Boolean(user && isOwnerEmail(user.email));
 }
 
 /**
@@ -198,8 +192,8 @@ export async function requirePinVerification(): Promise<AuthUser> {
 
   const user = await requireAuth();
 
-  // Allow bypass with DEV_SKIP_PIN for self-hosted setups
-  if (process.env.DEV_SKIP_PIN === "true") {
+  // DEV_SKIP_PIN works only outside production
+  if (isPinBypassAllowed()) {
     return { ...user, isPinVerified: true };
   }
 
@@ -227,12 +221,11 @@ async function createHmac(data: string, secret: string): Promise<string> {
 
 async function getAuthenticatedIdentity(): Promise<{ email: string; country?: string } | null> {
   const headersList = await headers();
-  const email = headersList.get(CF_ACCESS_EMAIL_HEADER) || process.env.DEV_USER_EMAIL;
-
-  if (!email) return null;
+  const identity = await resolveIdentity(headersList);
+  if (!identity) return null;
 
   return {
-    email,
+    email: identity.email,
     country: headersList.get(CF_ACCESS_COUNTRY_HEADER) || undefined,
   };
 }

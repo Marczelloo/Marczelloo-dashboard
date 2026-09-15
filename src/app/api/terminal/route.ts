@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyPinAction } from "@/app/actions/auth";
 import { AuthError, requireAuth } from "@/server/lib/auth";
+import { isPinBypassAllowed } from "@/server/lib/auth-policy";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
 const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
@@ -18,8 +19,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid working directory" }, { status: 400 });
     }
 
-    // Skip PIN check in development if DEV_SKIP_PIN is set
-    const skipPin = process.env.DEV_SKIP_PIN === "true";
+    // DEV_SKIP_PIN works only outside production
+    const skipPin = isPinBypassAllowed();
 
     if (!skipPin && !user.isPinVerified) {
       if (!pin) {
