@@ -15,6 +15,7 @@ import path from "path";
 import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import "dotenv/config";
+import { isTrustedRemote } from "./trusted-remote";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -434,27 +435,11 @@ async function executeOperation(req: RunnerRequest): Promise<RunnerResponse> {
 
 // HTTP Server
 const server = http.createServer(async (req, res) => {
-  // CORS and content type
+  // Content type (no CORS: only the dashboard server calls the runner)
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
 
   // Only accept from localhost (or Docker network)
-  const remoteIp = req.socket.remoteAddress;
-  const isLocal =
-    remoteIp?.includes("127.0.0.1") ||
-    remoteIp?.includes("::1") ||
-    remoteIp?.includes("172.") ||
-    remoteIp?.includes("::ffff:172.");
-  if (!isLocal) {
+  if (!isTrustedRemote(req.socket.remoteAddress)) {
     res.writeHead(403);
     res.end(JSON.stringify({ error: "Forbidden: localhost only" }));
     return;
@@ -475,7 +460,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Status endpoint (no auth required)
+  // Check auth for protected endpoints
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ") || authHeader.slice(7) !== TOKEN) {
+    res.writeHead(401);
+    res.end(JSON.stringify({ error: "Unauthorized" }));
+    return;
+  }
+
+  // Status endpoint (auth required)
   if (req.method === "GET" && url === "/status") {
     const sshKeyExists = fs.existsSync(SSH_KEY_PATH);
     res.writeHead(200);
@@ -498,14 +491,6 @@ const server = http.createServer(async (req, res) => {
         timestamp: new Date().toISOString(),
       })
     );
-    return;
-  }
-
-  // Check auth for protected endpoints
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ") || authHeader.slice(7) !== TOKEN) {
-    res.writeHead(401);
-    res.end(JSON.stringify({ error: "Unauthorized" }));
     return;
   }
 
