@@ -388,15 +388,15 @@ for service_name, service in services.items():
     for port in service.get("ports") or []:
         if not isinstance(port, dict) or not port.get("published") or not port.get("target"): continue
         if str(port.get("protocol") or "tcp") != "tcp": continue
-        candidates.append((service_name, str(port["published"]), int(port["target"])))
+        candidates.append((service_name, str(port["published"]), int(port["target"]), str(port.get("host_ip") or "")))
 matching = [candidate for candidate in candidates if candidate[1] == str(assigned_port)]
 if len(candidates) == 1:
-    service_name, published_port, target_port = candidates[0]
+    service_name, published_port, target_port, host_ip = candidates[0]
 elif len(matching) == 1:
-    service_name, published_port, target_port = matching[0]
+    service_name, published_port, target_port, host_ip = matching[0]
 else:
     raise SystemExit("Automatic port assignment needs one published TCP port (or one already mapped to the selected port).")
-if published_port == str(assigned_port):
+if published_port == str(assigned_port) and host_ip == "127.0.0.1":
     override_file.unlink(missing_ok=True)
     print("PORT_OVERRIDE=unchanged")
     raise SystemExit(0)
@@ -405,7 +405,7 @@ override_file.write_text(
     "services:\\n"
     f"  {json.dumps(service_name)}:\\n"
     "    ports: !override\\n"
-    f"      - {json.dumps(f'{assigned_port}:{target_port}/tcp')}\\n"
+    f"      - {json.dumps(f'127.0.0.1:{assigned_port}:{target_port}/tcp')}\\n"
 )
 print(f"PORT_OVERRIDE={override_file}")
 PY

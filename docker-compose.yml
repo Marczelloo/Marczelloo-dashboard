@@ -17,7 +17,7 @@ services:
     container_name: marczelloo-dashboard
     restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     environment:
       # App port (changed from 3000 to avoid conflict with AtlasHub)
       - PORT=3100
@@ -37,9 +37,15 @@ services:
       - RUNNER_TOKEN=${RUNNER_TOKEN}
 
       # App Configuration
-      - DEV_USER_EMAIL=${DEV_USER_EMAIL:-admin@marczelloo.local}
-      - DEV_SKIP_PIN=${DEV_SKIP_PIN:-false}
-      - OWNER_EMAILS=${OWNER_EMAILS:-${DEV_USER_EMAIL:-admin@marczelloo.local}}
+      - OWNER_EMAILS=${OWNER_EMAILS}
+      # Cloudflare Access application: Zero Trust → Access → Applications → Overview
+      - CF_ACCESS_TEAM_DOMAIN=${CF_ACCESS_TEAM_DOMAIN}
+      - CF_ACCESS_AUD=${CF_ACCESS_AUD}
+      - UPTIME_RETENTION_DAYS=${UPTIME_RETENTION_DAYS:-30}
+      # PIN sessions: createPinSession() throws without SESSION_SECRET
+      - SESSION_SECRET=${SESSION_SECRET}
+      - PIN_SESSION_TTL=${PIN_SESSION_TTL:-1800}
+      - DASHBOARD_GITHUB_URL=${DASHBOARD_GITHUB_URL}
       - PIN_HASH=${PIN_HASH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - PORTAINER_TOKEN_FILE=/app/data/portainer-token.json
@@ -92,7 +98,7 @@ services:
     container_name: marczelloo-dashboard-demo
     restart: unless-stopped
     ports:
-      - "3101:3101"
+      - "127.0.0.1:3101:3101"
     environment:
       - PORT=3101
       - DEMO_MODE=true
@@ -157,7 +163,7 @@ services:
     container_name: marczelloo-portainer
     restart: unless-stopped
     ports:
-      - "9201:9000"
+      - "127.0.0.1:9201:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
