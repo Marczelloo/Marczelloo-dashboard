@@ -1,12 +1,10 @@
 "use server";
 
-import { services, auditLogs, deploys } from "@/server/atlashub";
+import { services, auditLogs } from "@/server/atlashub";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import * as runner from "@/server/runner";
-import * as notifications from "@/server/notifications";
 import type { CreateServiceInput, UpdateServiceInput } from "@/types";
 
 // ========================================
@@ -127,84 +125,6 @@ export async function deleteServiceAction(id: string) {
   } catch (error) {
     console.error("deleteServiceAction error:", error);
     return { success: false as const, error: "Failed to delete service" };
-  }
-}
-
-// ========================================
-// Deploy Actions
-// ========================================
-
-export async function deployServiceAction(serviceId: string) {
-  try {
-    // Check demo mode
-    const demoCheck = checkDemoModeBlocked();
-    if (demoCheck.blocked) return demoCheck.result;
-
-    const user = await requirePinVerification();
-
-    const service = await services.getServiceById(serviceId);
-    if (!service) {
-      return { success: false as const, error: "Service not found" };
-    }
-
-    if (service.type !== "docker") {
-      return { success: false as const, error: "Only Docker services can be deployed" };
-    }
-
-    if (!service.repo_path || !service.compose_project) {
-      return { success: false as const, error: "Service is not configured for deployment" };
-    }
-
-    if (service.deploy_strategy === "manual") {
-      return { success: false as const, error: "This service requires manual deployment" };
-    }
-
-    // Create deploy record
-    const deploy = await deploys.createDeploy({
-      service_id: serviceId,
-      triggered_by: user.email,
-    });
-
-    // Notify deploy started
-    await notifications.notifyDeployStarted(service.name, user.email);
-
-    // Start deploy
-    await deploys.startDeploy(deploy.id);
-
-    await auditLogs.logAction(user.email, "deploy", "service", serviceId, {
-      deploy_id: deploy.id,
-    });
-
-    // Execute deployment
-    const result = await runner.deploy(service.repo_path, service.compose_project, service.deploy_strategy);
-
-    // Complete deploy record
-    await deploys.completeDeploy(deploy.id, result.success, {
-      commit_sha: result.commit_sha,
-      error_message: result.error,
-    });
-
-    // Send notification
-    if (result.success) {
-      await notifications.notifyDeploySuccess(service.name, result.commit_sha);
-    } else {
-      await notifications.notifyDeployFailed(service.name, result.error || "Unknown error");
-    }
-
-    revalidatePath(`/services/${serviceId}`);
-    revalidatePath("/dashboard");
-
-    return {
-      success: result.success as true,
-      data: {
-        deploy_id: deploy.id,
-        commit_sha: result.commit_sha,
-      },
-      error: result.error,
-    };
-  } catch (error) {
-    console.error("deployServiceAction error:", error);
-    return { success: false as const, error: "Deployment failed" };
   }
 }
 

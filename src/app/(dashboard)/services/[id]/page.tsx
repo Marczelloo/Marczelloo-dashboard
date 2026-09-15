@@ -21,12 +21,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
-import { updateServiceAction, deleteServiceAction, deployServiceAction } from "@/app/actions/services";
+import { updateServiceAction, deleteServiceAction } from "@/app/actions/services";
 import {
   ArrowLeft,
   Save,
   Trash2,
-  Rocket,
   RefreshCw,
   Server,
   Globe,
@@ -71,7 +70,6 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [service, setService] = useState<Service | null>(null);
@@ -270,30 +268,6 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
     }
   };
 
-  const handleDeploy = async () => {
-    if (!confirm("Deploy this service? This will pull changes and restart the container.")) {
-      return;
-    }
-
-    setIsDeploying(true);
-    setError(null);
-
-    try {
-      const result = await deployServiceAction(serviceId);
-
-      if (!result.success) {
-        setError(result.error || "Deployment failed");
-        return;
-      }
-
-      setSuccess(`Deployment successful! Commit: ${result.data?.commit_sha?.slice(0, 7) || "N/A"}`);
-    } catch {
-      setError("Deployment failed");
-    } finally {
-      setIsDeploying(false);
-    }
-  };
-
   const typeIcons = {
     docker: <Server className="h-5 w-5" />,
     vercel: <Cloud className="h-5 w-5" />,
@@ -358,12 +332,6 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
               Back
             </Button>
           </Link>
-          {formData.type === "docker" && (
-            <Button variant="default" size="sm" onClick={handleDeploy} disabled={isDeploying || isSaving || isDeleting}>
-              {isDeploying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-              {isDeploying ? "Deploying..." : "Deploy"}
-            </Button>
-          )}
         </div>
       </Header>
 
@@ -585,13 +553,13 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
                       type="button"
                       variant="destructive"
                       onClick={handleDelete}
-                      disabled={isDeleting || isSaving || isDeploying}
+                      disabled={isDeleting || isSaving}
                     >
                       <Trash2 className="h-4 w-4" />
                       {isDeleting ? "Deleting..." : "Delete"}
                     </Button>
 
-                    <Button type="submit" disabled={isSaving || isDeleting || isDeploying}>
+                    <Button type="submit" disabled={isSaving || isDeleting}>
                       <Save className="h-4 w-4" />
                       {isSaving ? "Saving..." : "Save Changes"}
                     </Button>

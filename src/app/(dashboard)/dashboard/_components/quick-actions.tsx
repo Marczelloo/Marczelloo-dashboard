@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
-import { Plus, RefreshCw, Rocket, Loader2, Power, AlertTriangle } from "lucide-react";
+import { Plus, RefreshCw, Loader2, Power, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import {
   Dialog,
@@ -17,50 +17,9 @@ import { toast } from "sonner";
 
 export function QuickActions() {
   const router = useRouter();
-  const [deploying, setDeploying] = useState(false);
   const [checking, setChecking] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
-  const [deployResult, setDeployResult] = useState<{ open: boolean; success: boolean; message: string }>({
-    open: false,
-    success: false,
-    message: "",
-  });
-
-  async function handleDeployAll() {
-    setDeploying(true);
-    toast.info("Starting deployment for all services...");
-
-    try {
-      const response = await fetch("/api/deploy/all", { method: "POST" });
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`Deployed ${result.deployed} service(s)`, {
-          description: result.failed > 0 ? `${result.failed} failed` : undefined,
-        });
-      } else {
-        toast.error("Deploy failed", { description: result.error });
-      }
-
-      setDeployResult({
-        open: true,
-        success: result.success,
-        message: result.success
-          ? `Successfully triggered deploy for ${result.deployed} service(s)${result.failed > 0 ? `, ${result.failed} failed` : ""}`
-          : result.error || "Deploy failed",
-      });
-    } catch {
-      toast.error("Failed to trigger deployments");
-      setDeployResult({
-        open: true,
-        success: false,
-        message: "Failed to trigger deployments",
-      });
-    } finally {
-      setDeploying(false);
-    }
-  }
 
   async function handleRunChecks() {
     setChecking(true);
@@ -128,19 +87,6 @@ export function QuickActions() {
           <Button
             variant="secondary"
             className="w-full justify-start gap-3 h-auto py-3"
-            onClick={handleDeployAll}
-            disabled={deploying}
-          >
-            {deploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-            <div className="text-left">
-              <div className="font-medium">Deploy All</div>
-              <div className="text-xs opacity-70">Update all services</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="secondary"
-            className="w-full justify-start gap-3 h-auto py-3"
             onClick={handleRunChecks}
             disabled={checking}
           >
@@ -201,18 +147,6 @@ export function QuickActions() {
             <Button variant="destructive" onClick={handleRestartPi}>
               Restart Now
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deployResult.open} onOpenChange={(open) => setDeployResult((prev) => ({ ...prev, open }))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{deployResult.success ? "Deploy Triggered" : "Deploy Failed"}</DialogTitle>
-            <DialogDescription>{deployResult.message}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setDeployResult((prev) => ({ ...prev, open: false }))}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

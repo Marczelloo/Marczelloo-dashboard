@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui";
-import { DeployAllButton } from "@/components/features/deploy-all-button";
 import { DeployLogsButton } from "@/app/(dashboard)/dashboard/_components/deploy-logs-button";
 import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 import { checkDeployLogAction } from "@/app/actions/projects";
@@ -329,15 +328,6 @@ function OverviewTab({
               Services ({services.length})
             </CardTitle>
             <div className="flex items-center gap-2">
-              <DeployAllButton
-                services={services.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  type: s.type,
-                  deploy_strategy: s.deploy_strategy,
-                }))}
-                projectId={project.id}
-              />
               <Link href={`/projects/${project.id}/services/new`}>
                 <Button variant="outline" size="sm">
                   <Plus className="h-4 w-4" />

@@ -150,31 +150,6 @@ export async function dockerRestart(containerName: string): Promise<RunnerRespon
 }
 
 /**
- * Rebuild a Docker service with compose
- */
-export async function dockerRebuild(composeProject: string, serviceName?: string): Promise<RunnerResponse> {
-  return runnerRequest({
-    operation: "docker_rebuild",
-    target: {
-      compose_project: composeProject,
-      service_name: serviceName,
-    },
-    options: { build: true },
-  });
-}
-
-/**
- * Run docker compose up
- */
-export async function composeUp(composeProject: string, build = true): Promise<RunnerResponse> {
-  return runnerRequest({
-    operation: "compose_up",
-    target: { compose_project: composeProject },
-    options: { build },
-  });
-}
-
-/**
  * Get Docker container logs
  */
 export async function dockerLogs(containerName: string, tail = 100): Promise<RunnerResponse> {
@@ -246,81 +221,6 @@ export async function dockerExec(
       success: false,
       stdout: "",
       stderr: "",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
-}
-
-// ========================================
-// Deployment Workflows
-// ========================================
-
-/**
- * Full deployment: git pull + rebuild + restart
- */
-export async function deploy(
-  repoPath: string,
-  composeProject: string,
-  strategy: "pull_restart" | "pull_rebuild" | "compose_up"
-): Promise<{
-  success: boolean;
-  steps: RunnerResponse[];
-  commit_sha?: string;
-  error?: string;
-}> {
-  const steps: RunnerResponse[] = [];
-
-  try {
-    if (!["pull_restart", "pull_rebuild", "compose_up"].includes(strategy)) {
-      return { success: false, steps, error: `Unsupported deploy strategy: ${strategy}` };
-    }
-
-    // Step 1: Git pull
-    const pullResult = await gitPull(repoPath);
-    steps.push(pullResult);
-
-    if (!pullResult.success) {
-      return {
-        success: false,
-        steps,
-        error: pullResult.error || "Git pull failed",
-      };
-    }
-
-    // Step 2: Based on strategy
-    let deployResult: RunnerResponse;
-
-    switch (strategy) {
-      case "pull_restart":
-        deployResult = await dockerRestart(composeProject);
-        break;
-      case "pull_rebuild":
-        deployResult = await dockerRebuild(composeProject);
-        break;
-      case "compose_up":
-        deployResult = await composeUp(composeProject);
-        break;
-    }
-
-    steps.push(deployResult);
-
-    if (!deployResult.success) {
-      return {
-        success: false,
-        steps,
-        error: deployResult.error || "Deploy failed",
-      };
-    }
-
-    return {
-      success: true,
-      steps,
-      commit_sha: pullResult.commit_sha,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      steps,
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
