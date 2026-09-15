@@ -2853,3 +2853,11 @@ git commit -m "docs: add stage 1 import runbook"
 - Widok w przeglądarce nie zawiera wartości zmiennych (sprawdzenie: DevTools → Network → odpowiedź akcji skanu nie zawiera wartości żadnego sekretu z `.env`).
 - `work_items` = 64, rekordy `projects` bez zmian.
 - Test na sucho dla każdego stacka jest „zgodny” albo każda różnica ma wyjaśnienie w runbooku przed etapem 4.
+
+## Zmiany względem planu (implementacja 15.09.2026)
+
+- Task 3: `Service.project_id` może być `null` (serwisy bez projektu) — takie wiersze są pomijane w dopasowaniu.
+- Task 7: `parseGit` usuwa dane logowania z adresu `remote` (np. `https://x-access-token:…@github.com/…`), żeby token z ręcznie sklonowanego repo nie trafił do przeglądarki ani do `app_configs`.
+- Task 8: skrypt migracji ma `export {}` (kolizja `main` w `tsc`).
+- Task 10: strona `/import` pobiera projekty przez `@/server/data` i w trybie demo pomija `requireAuth()` oraz `app_configs` (użytkownik demo nie jest na liście właścicieli).
+- Task 11: migracja w runbooku bierze `ATLASHUB_*` z działającego kontenera zamiast `--env-file .env`; dodany krok kontroli braku wartości w przeglądarce i wycofania.
