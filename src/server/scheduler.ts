@@ -95,6 +95,18 @@ async function runMonitoringChecks(): Promise<void> {
   }
 }
 
+let retentionInterval: NodeJS.Timeout | null = null;
+
+async function runRetention(): Promise<void> {
+  try {
+    const { pruneUptimeChecks } = await import("./monitoring/retention");
+    const deleted = await pruneUptimeChecks();
+    console.log(`[Scheduler] Uptime retention removed ${deleted} checks`);
+  } catch (error) {
+    console.error("[Scheduler] Uptime retention failed:", error);
+  }
+}
+
 /**
  * Start the monitoring scheduler
  */
@@ -118,6 +130,9 @@ export function startMonitoringScheduler(): void {
     runMonitoringChecks();
   }, MONITORING_INTERVAL);
 
+  setTimeout(runRetention, 60_000);
+  retentionInterval = setInterval(runRetention, 24 * 60 * 60 * 1000);
+
   // Clean up on process exit
   process.on("SIGTERM", () => {
     stopMonitoringScheduler();
@@ -135,6 +150,8 @@ export function stopMonitoringScheduler(): void {
   if (monitoringInterval) {
     clearInterval(monitoringInterval);
     monitoringInterval = null;
+    if (retentionInterval) clearInterval(retentionInterval);
+    retentionInterval = null;
     schedulerStarted = false;
     console.log("[Scheduler] Stopped");
   }
