@@ -2149,3 +2149,10 @@ git commit -m "docs: add stage 0 Raspberry Pi runbook"
 - W UI nie ma „Deploy All” ani przycisku Deploy na stronie serwisu.
 - `general_todos` istnieje; `uptime_checks` nie zawiera wpisów starszych niż 30 dni po pierwszej dobie działania.
 - Klucz Resend unieważniony i wymieniony.
+
+## Zmiany względem planu (implementacja 15.09.2026)
+
+- Task 3: `auth-policy.ts` przyjmuje `Record<string, string | undefined>` zamiast `NodeJS.ProcessEnv` (typy Next.js wymagają `NODE_ENV`). `src/app/api/terminal/route.ts` również korzysta z `isPinBypassAllowed()` — wcześniej sam czytał `DEV_SKIP_PIN`.
+- Task 9: realne etykiety z Pi pokazały, że w AtlasHub postgres i minio powstały z dodatkowym `docker-compose.override.yml`. `stackFromContainers` przyjmuje kontener docelowy i ogranicza odtwarzanie do usług z tego samego wywołania Compose; polecenie ma `--no-deps`. `save-file` nadal waliduje klucz przy `delete`.
+- Task 10: skrypt migracji ma `export {}` (inaczej `main` koliduje z `scripts/setup-database.ts` w `tsc`).
+- Task 13: runbook sprawdza też `OWNER_EMAILS` i `GITHUB_WEBHOOK_SECRET`, ma pełny rollback kodu i krok testu „Zastosuj env”.
