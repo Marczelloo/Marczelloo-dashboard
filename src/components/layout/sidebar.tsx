@@ -25,6 +25,7 @@ import {
   Wrench,
   MonitorCog,
   Gauge,
+  DatabaseZap,
   type LucideIcon,
 } from "lucide-react";
 import { VersionDisplay } from "./version-display";
@@ -69,6 +70,7 @@ const navCategories: NavCategory[] = [
     items: [
       { href: "/services", label: "Services", icon: Server },
       { href: "/containers", label: "Containers", icon: Container },
+      { href: "/import", label: "Import", icon: DatabaseZap },
     ],
   },
   {
