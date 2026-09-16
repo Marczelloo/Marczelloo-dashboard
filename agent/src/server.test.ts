@@ -6,6 +6,7 @@ import type { AgentState } from "./types";
 
 const TOKEN = "t".repeat(40);
 const JOB_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const SECOND_JOB_ID = "1f8fad5b-d9cb-469f-a165-70867728950e";
 const target = {
   projectId: "11111111-1111-4111-8111-111111111111",
   composeProject: "marczelloo-tools",
@@ -17,6 +18,7 @@ const target = {
   tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202 },
 };
 const deploy = { kind: "deploy", target, sha: "b".repeat(40), deployId: "22222222-2222-4222-8222-222222222222", triggeredBy: "tester", token: "ghs_x" };
+const applyEnv = { kind: "apply-env", target, deployId: deploy.deployId, triggeredBy: "tester", envFile: { name: ".env", content: "SECRET=value", previous: "SECRET=old" } };
 
 let stop: (() => void) | null = null;
 afterEach(() => {
@@ -27,6 +29,8 @@ afterEach(() => {
 async function start(initial: AgentState = emptyState()) {
   let state = initial;
   const tokens = new Map<string, string | null>();
+  const envFiles = new Map();
+  let ids = 0;
   const context: ServerContext = {
     token: TOKEN,
     allowedRoot: "/home/Marczelloo_pi/projects",
@@ -36,8 +40,9 @@ async function start(initial: AgentState = emptyState()) {
     },
     store: { readLog: () => ({ content: "log", nextOffset: 3 }) },
     tokens,
+    envFiles,
     now: () => "2026-09-16T10:00:00.000Z",
-    newId: () => JOB_ID,
+    newId: () => (ids++ === 0 ? JOB_ID : SECOND_JOB_ID),
   };
   const server = createAgentServer(context);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
@@ -45,7 +50,7 @@ async function start(initial: AgentState = emptyState()) {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const call = (path: string, init: RequestInit = {}, auth = true) =>
     fetch(`${base}${path}`, { ...init, headers: { "content-type": "application/json", ...(auth ? { authorization: `Bearer ${TOKEN}` } : {}) } });
-  return { call, tokens, state: () => state };
+  return { call, tokens, envFiles, state: () => state };
 }
 
 describe("agent HTTP API", () => {
@@ -84,6 +89,33 @@ describe("agent HTTP API", () => {
     const response = await withReleases.call("/jobs", { method: "POST", body: JSON.stringify(rollback) });
     expect(response.status).toBe(202);
     expect(await response.json()).toMatchObject({ kind: "rollback", sha: "a".repeat(40) });
+  });
+
+  it("rejects apply-env when the project has no agent release", async () => {
+    const { call } = await start();
+    const response = await call("/jobs", { method: "POST", body: JSON.stringify(applyEnv) });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "Projekt nie ma jeszcze wydania agenta — najpierw wykonaj deploy." });
+  });
+
+  it("keeps env contents in memory and does not supersede apply-env with a deploy", async () => {
+    const releases = [{ sha: "a".repeat(40), images: { app: "x:a" }, deployedAt: "t" }];
+    const { call, envFiles, state } = await start({ ...emptyState(), projects: { "marczelloo-tools": { releases } } });
+    const created = await call("/jobs", { method: "POST", body: JSON.stringify(applyEnv) });
+    expect(created.status).toBe(202);
+    const createdJob = await created.json();
+    expect(createdJob).toMatchObject({ id: JOB_ID, kind: "apply-env", sha: "a".repeat(40), status: "queued" });
+    expect(createdJob).not.toHaveProperty("envFile");
+    expect(JSON.stringify(state())).not.toContain("SECRET=value");
+    expect(JSON.stringify(state())).not.toContain("SECRET=old");
+    expect(envFiles.get(JOB_ID)).toEqual(applyEnv.envFile);
+
+    const deployResponse = await call("/jobs", { method: "POST", body: JSON.stringify(deploy) });
+    expect(deployResponse.status).toBe(202);
+    expect(state().jobs.map((job) => [job.kind, job.status])).toEqual([
+      ["apply-env", "queued"],
+      ["deploy", "queued"],
+    ]);
   });
 
   it("returns jobs, logs and project state", async () => {

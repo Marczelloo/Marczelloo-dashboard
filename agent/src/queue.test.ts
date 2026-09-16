@@ -26,7 +26,7 @@ const target = (composeProject = "marczelloo-tools"): DeployTarget => ({
 });
 const sha = (char: string) => char.repeat(40);
 const release = (char: string, image = `app:${char.repeat(12)}`): Release => ({ sha: sha(char), images: { app: image }, deployedAt: "2026-09-16T10:00:00.000Z" });
-const input = (id: string, commit: string, composeProject?: string, kind: "deploy" | "rollback" = "deploy") => ({
+const input = (id: string, commit: string, composeProject?: string, kind: "deploy" | "rollback" | "apply-env" = "deploy") => ({
   id,
   kind,
   target: target(composeProject),
@@ -111,7 +111,7 @@ describe("finishJob", () => {
 
 describe("recovery and helpers", () => {
   it("fails jobs that were running when the agent stopped", () => {
-    let state = startJob(enqueue(emptyState(), input("j1", "a"), "t1").state, "j1", "t2");
+    let state = startJob(enqueue(emptyState(), input("j1", "a", undefined, "apply-env"), "t1").state, "j1", "t2");
     state = recoverAfterRestart(state, "t3");
     expect(state.jobs[0]).toMatchObject({ status: "failed", finishedAt: "t3" });
     expect(state.jobs[0].error).toContain("zrestartowany");

@@ -1,4 +1,4 @@
-export type JobKind = "deploy" | "rollback";
+export type JobKind = "deploy" | "rollback" | "apply-env";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "rolled_back" | "superseded";
 
 export interface DeployTarget {
@@ -37,6 +37,13 @@ export interface Release {
   /** Compose service name → image reference built for this commit */
   images: Record<string, string>;
   deployedAt: string;
+}
+
+/** Kept in memory only; it must never become part of Job or AgentState. */
+export interface EnvFile {
+  name: string;
+  content: string;
+  previous: string | null;
 }
 
 export interface ProjectState {

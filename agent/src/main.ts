@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fetchCloneToken } from "./dashboard";
 import { probe, sampleContainers, serviceImages } from "./docker";
 import { runCommand } from "./exec";
 import { buildCacheLimit, collectableImages, imageRepository } from "./gc";
-import { runDeploy, runRollback, type PipelineDeps } from "./pipeline";
+import { runApplyEnv, runDeploy, runRollback, type PipelineDeps } from "./pipeline";
 import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, startJob, type JobOutcome } from "./queue";
 import { deliverEvents, httpEventSender } from "./reporter";
 import { createAgentServer } from "./server";
 import { FileStore } from "./store";
-import type { AgentState, Job } from "./types";
+import type { AgentState, EnvFile, Job } from "./types";
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -35,12 +35,13 @@ const iso = () => new Date().toISOString();
 let state: AgentState = recoverAfterRestart(store.load(), iso());
 store.save(state);
 const tokens = new Map<string, string | null>();
+const envFiles = new Map<string, EnvFile>();
 const mutate = (change: (current: AgentState) => AgentState) => {
   state = change(state);
   store.save(state);
 };
 
-createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, now: iso, newId: randomUUID }).listen(port, "0.0.0.0", () => {
+createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, envFiles, now: iso, newId: randomUUID }).listen(port, "0.0.0.0", () => {
   console.log(`[agent] listening on :${port}, data in ${dataDir}`);
 });
 
@@ -86,6 +87,20 @@ async function execute(job: Job): Promise<JobOutcome> {
     run: (step) => runCommand(step, (chunk) => store.appendLog(job.id, chunk)),
     exists: existsSync,
     writeFile: (file, content) => writeFileSync(file, content, { mode: 0o600 }),
+    replaceFile: (file, content) => {
+      mkdirSync(path.posix.dirname(file), { recursive: true, mode: 0o700 });
+      const temporary = path.posix.join(path.posix.dirname(file), `.${path.posix.basename(file)}.${randomUUID()}.tmp`);
+      try {
+        writeFileSync(temporary, content, { mode: 0o600 });
+        renameSync(temporary, file);
+      } catch (error) {
+        if (existsSync(temporary)) unlinkSync(temporary);
+        throw error;
+      }
+    },
+    removeFile: (file) => {
+      if (existsSync(file)) unlinkSync(file);
+    },
     sampleContainers,
     serviceImages,
     probe,
@@ -101,6 +116,15 @@ async function execute(job: Job): Promise<JobOutcome> {
     // Prefer a fresh token: the one sent with the request expires after an hour and is lost on restart.
     const token = (await fetchCloneToken(dashboardUrl, agentToken, job.target.projectId)) ?? tokens.get(job.id) ?? null;
     return runDeploy(job, token, releases[0] ?? null, deps);
+  }
+  if (job.kind === "apply-env") {
+    const envFile = envFiles.get(job.id);
+    if (!envFile) {
+      return { status: "failed", error: "Treść zmiennych została utracona po restarcie agenta — zapisz zmienne ponownie.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+    }
+    const release = releases.find((candidate) => candidate.sha === job.sha);
+    if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+    return runApplyEnv(job, release, envFile, deps);
   }
   const release = releases.find((candidate) => candidate.sha === job.sha);
   if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
@@ -124,6 +148,8 @@ async function work() {
     }
     store.appendLog(job.id, `[agent] Wynik: ${outcome.status}${outcome.error ? ` — ${outcome.error}` : ""}\n`);
     mutate((current) => finishJob(current, job.id, outcome, iso()));
+    tokens.delete(job.id);
+    envFiles.delete(job.id);
     try {
       store.pruneLogs(new Set(state.jobs.map((item) => item.id)));
     } catch {
@@ -133,6 +159,7 @@ async function work() {
     await cleanUp(job, before.flatMap((release) => Object.values(release.images)), after.flatMap((release) => Object.values(release.images)), outcome.orphanImages);
   } finally {
     tokens.delete(job.id);
+    envFiles.delete(job.id);
     working = false;
   }
 }

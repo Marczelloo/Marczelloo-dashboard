@@ -3,7 +3,7 @@ import http from "node:http";
 import { jobRequestSchema } from "./api";
 import { enqueue, rollbackRelease } from "./queue";
 import type { FileStore } from "./store";
-import type { AgentState, Job } from "./types";
+import type { AgentState, EnvFile, Job } from "./types";
 
 export interface ServerContext {
   token: string;
@@ -12,6 +12,7 @@ export interface ServerContext {
   mutate(change: (state: AgentState) => AgentState): void;
   store: Pick<FileStore, "readLog">;
   tokens: Map<string, string | null>;
+  envFiles: Map<string, EnvFile>;
   now(): string;
   newId(): string;
 }
@@ -27,7 +28,7 @@ function send(response: http.ServerResponse, status: number, body: unknown) {
   response.end(JSON.stringify(body));
 }
 
-function readBody(request: http.IncomingMessage, limit = 64_000): Promise<unknown> {
+function readBody(request: http.IncomingMessage, limit = 6_300_000): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -66,21 +67,28 @@ export function createAgentServer(context: ServerContext): http.Server {
           return send(response, 400, { error: "Katalog repozytorium musi leżeć w katalogu projektów." });
         }
 
-        let sha = body.sha;
-        if (body.kind === "rollback") {
+        let sha: string;
+        if (body.kind === "deploy") {
+          sha = body.sha;
+        } else if (body.kind === "rollback") {
           const release = rollbackRelease(context.getState(), body.target.composeProject, body.sha ?? undefined);
           if (!release) return send(response, 409, { error: "Brak wcześniejszej wersji do przywrócenia." });
+          sha = release.sha;
+        } else {
+          const release = context.getState().projects[body.target.composeProject]?.releases[0];
+          if (!release) return send(response, 409, { error: "Projekt nie ma jeszcze wydania agenta — najpierw wykonaj deploy." });
           sha = release.sha;
         }
 
         const id = context.newId();
         let created: Job | null = null;
         context.mutate((state) => {
-          const result = enqueue(state, { id, kind: body.kind, target: body.target, sha: sha!, deployId: body.deployId, triggeredBy: body.triggeredBy }, context.now());
+          const result = enqueue(state, { id, kind: body.kind, target: body.target, sha, deployId: body.deployId, triggeredBy: body.triggeredBy }, context.now());
           created = result.job;
           return result.state;
         });
-        context.tokens.set(id, body.kind === "deploy" ? body.token : null);
+        if (body.kind === "deploy") context.tokens.set(id, body.token);
+        if (body.kind === "apply-env") context.envFiles.set(id, body.envFile);
         return send(response, 202, created);
       }
 

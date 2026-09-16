@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const SHA = /^[0-9a-f]{40}$/;
+const ENV_FILE_NAME = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+const MAX_ENV_FILE_CONTENT = 512_000;
 
 export const deployTargetSchema = z.object({
   projectId: z.string().uuid(),
@@ -43,6 +45,21 @@ export const jobRequestSchema = z.discriminatedUnion("kind", [
     deployId: z.string().uuid(),
     triggeredBy: z.string().min(1).max(100),
   }),
+  z.object({
+    kind: z.literal("apply-env"),
+    target: deployTargetSchema,
+    deployId: z.string().uuid(),
+    triggeredBy: z.string().min(1).max(100),
+    envFile: z.object({
+      name: z
+        .string()
+        .max(200)
+        .regex(ENV_FILE_NAME)
+        .refine((value) => !value.split("/").some((segment) => segment === "." || segment === ".."), "Nieprawidłowa nazwa pliku zmiennych."),
+      content: z.string().max(MAX_ENV_FILE_CONTENT),
+      previous: z.string().max(MAX_ENV_FILE_CONTENT).nullable(),
+    }),
+  }),
 ]);
 
 export type AgentJobRequest = z.input<typeof jobRequestSchema>;
@@ -54,7 +71,7 @@ export const agentEventSchema = z.object({
   deployId: z.string().uuid(),
   projectId: z.string().uuid(),
   composeProject: z.string().regex(IDENTIFIER),
-  kind: z.enum(["deploy", "rollback"]),
+  kind: z.enum(["deploy", "rollback", "apply-env"]),
   sha: z.string().regex(SHA),
   status: z.enum(["queued", "running", "succeeded", "failed", "rolled_back", "superseded"]),
   error: z.string().nullable(),

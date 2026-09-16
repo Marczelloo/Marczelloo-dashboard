@@ -3,7 +3,7 @@ import { buildOverride, composeArgs, loopbackPortOverride, renderOverride, resol
 import { gitAuthEnv, gitCheckoutStep, gitSyncSteps, SHA, type CommandStep } from "./git";
 import { assessContainers, assessProbe, type ContainerSample } from "./health";
 import type { JobOutcome } from "./queue";
-import type { Job, Release } from "./types";
+import type { EnvFile, Job, Release } from "./types";
 
 export interface CommandResult {
   code: number;
@@ -22,6 +22,8 @@ export interface PipelineDeps {
   run(step: CommandStep): Promise<CommandResult>;
   exists(filePath: string): boolean;
   writeFile(filePath: string, content: string): void;
+  replaceFile(filePath: string, content: string): void;
+  removeFile(filePath: string): void;
   sampleContainers(composeProject: string): Promise<ContainerSample[]>;
   /** Compose service → image ID of the running container. */
   serviceImages(composeProject: string): Promise<Record<string, string>>;
@@ -108,6 +110,13 @@ async function restoreRelease(job: Job, release: Release, deps: PipelineDeps): P
   const file = overridePath(job, deps);
   deps.writeFile(file, renderOverride(release.images, port));
   return upAndCheck(job, [composeFile, file], deps);
+}
+
+function envFilePath(job: Job, name: string): string {
+  const repoPath = path.posix.resolve(job.target.repoPath);
+  const filePath = path.posix.resolve(repoPath, name);
+  if (!filePath.startsWith(`${repoPath}/`)) throw new StepError("Plik zmiennych musi leżeć w katalogu repozytorium.");
+  return filePath;
 }
 
 async function readHead(job: Job, deps: PipelineDeps): Promise<string | null> {
@@ -218,5 +227,38 @@ export async function runRollback(job: Job, release: Release, deps: PipelineDeps
     return { status: "succeeded", error: null, rolledBackTo: null, release: { ...release, deployedAt: new Date(deps.now()).toISOString() }, baseline: null, orphanImages: [] };
   } catch (error) {
     return failed(describeError(error));
+  }
+}
+
+export async function runApplyEnv(job: Job, release: Release, envFile: EnvFile, deps: PipelineDeps): Promise<JobOutcome> {
+  let filePath: string;
+  try {
+    filePath = envFilePath(job, envFile.name);
+  } catch (error) {
+    return failed(describeError(error));
+  }
+  let changed = false;
+  let failure: string;
+  try {
+    deps.log(`=== Zapis ${envFile.name} ===`);
+    deps.replaceFile(filePath, envFile.content);
+    changed = true;
+    const gateFailure = await restoreRelease(job, release, deps);
+    if (!gateFailure) return { status: "succeeded", error: null, rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+    failure = `Nowe zmienne nie przeszły bramki: ${gateFailure}`;
+  } catch (error) {
+    if (!changed) return failed(describeError(error));
+    failure = `Nowe zmienne nie przeszły bramki: ${describeError(error)}`;
+  }
+
+  deps.log(`=== Przywracanie poprzedniego ${envFile.name} ===`);
+  try {
+    if (envFile.previous === null) deps.removeFile(filePath);
+    else deps.replaceFile(filePath, envFile.previous);
+    const restoreFailure = await restoreRelease(job, release, deps);
+    if (restoreFailure) return failed(`${failure}; przywrócenie poprzednich zmiennych też się nie powiodło: ${restoreFailure}`);
+    return { status: "rolled_back", error: failure, rolledBackTo: release.sha, release: null, baseline: null, orphanImages: [] };
+  } catch (error) {
+    return failed(`${failure}; przywrócenie poprzednich zmiennych też się nie powiodło: ${describeError(error)}`);
   }
 }

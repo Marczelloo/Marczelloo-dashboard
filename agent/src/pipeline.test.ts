@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CommandStep } from "./git";
 import type { ContainerSample } from "./health";
-import { runDeploy, runRollback, type PipelineDeps } from "./pipeline";
+import { runApplyEnv, runDeploy, runRollback, type PipelineDeps } from "./pipeline";
 import type { Job, Release } from "./types";
 
 const NEW = "b".repeat(40);
@@ -11,7 +11,7 @@ const previous: Release = { sha: OLD, images: { app: "marczelloo-tools-app:aaaaa
 const healthy: ContainerSample = { name: "marczelloo-tools", service: "app", status: "running", exitCode: 0, restartCount: 0, health: null };
 const crashed: ContainerSample = { ...healthy, status: "exited", exitCode: 1 };
 
-function job(kind: "deploy" | "rollback", sha: string): Job {
+function job(kind: "deploy" | "rollback" | "apply-env", sha: string): Job {
   return {
     id: "0f8fad5b-d9cb-469f-a165-70867728950e",
     kind,
@@ -43,6 +43,8 @@ function harness(
   let clock = 0;
   const steps: CommandStep[] = [];
   const writes: Array<{ file: string; content: string }> = [];
+  const replacements: Array<{ file: string; content: string }> = [];
+  const removed: string[] = [];
   const logs: string[] = [];
   const samples = [...(options.samples ?? [])];
   const probes = [...(options.probes ?? [200])];
@@ -60,6 +62,12 @@ function harness(
     writeFile: (file, content) => {
       writes.push({ file, content });
     },
+    replaceFile: (file, content) => {
+      replacements.push({ file, content });
+    },
+    removeFile: (file) => {
+      removed.push(file);
+    },
     sampleContainers: async () => samples.shift() ?? [healthy],
     serviceImages: async () => options.running ?? {},
     probe: async () => (probes.length > 1 ? probes.shift()! : probes[0]),
@@ -73,7 +81,7 @@ function harness(
     overrideDir: "/data/overrides",
     gate: { stableMs: 10, timeoutMs: 30, intervalMs: 5, probeTimeoutMs: 15 },
   };
-  return { deps, steps, writes, logs };
+  return { deps, steps, writes, replacements, removed, logs };
 }
 
 const labels = (steps: CommandStep[]) => steps.map((step) => step.label);
@@ -166,5 +174,44 @@ describe("runRollback", () => {
     const outcome = await runRollback(job("rollback", OLD), previous, deps);
     expect(labels(steps)).toEqual(["Git checkout aaaaaaa", "Compose config", "Uruchomienie"]);
     expect(outcome).toMatchObject({ status: "succeeded", release: { sha: OLD, images: previous.images } });
+  });
+});
+
+describe("runApplyEnv", () => {
+  const envFile = { name: "env/prod.env", content: "NEW_TOKEN=secret", previous: "OLD_TOKEN=secret" };
+
+  it("writes the file and recreates the current release without changing releases", async () => {
+    const { deps, replacements, logs } = harness();
+    const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
+    expect(outcome).toEqual({ status: "succeeded", error: null, rolledBackTo: null, release: null, baseline: null, orphanImages: [] });
+    expect(replacements).toEqual([{ file: "/p/tools/env/prod.env", content: "NEW_TOKEN=secret" }]);
+    expect(logs).toContain("=== Zapis env/prod.env ===");
+    expect(logs.join("\n")).not.toContain("NEW_TOKEN=secret");
+  });
+
+  it("restores the previous content when the new variables fail the gate", async () => {
+    const { deps, replacements, logs } = harness({ samples: [[crashed]] });
+    const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
+    expect(outcome).toMatchObject({ status: "rolled_back", rolledBackTo: OLD, release: null, baseline: null, orphanImages: [] });
+    expect(outcome.error).toContain("Nowe zmienne nie przeszły bramki");
+    expect(replacements).toEqual([
+      { file: "/p/tools/env/prod.env", content: "NEW_TOKEN=secret" },
+      { file: "/p/tools/env/prod.env", content: "OLD_TOKEN=secret" },
+    ]);
+    expect(logs).toContain("=== Przywracanie poprzedniego env/prod.env ===");
+  });
+
+  it("removes a newly created file while restoring", async () => {
+    const { deps, removed } = harness({ samples: [[crashed]] });
+    const outcome = await runApplyEnv(job("apply-env", OLD), previous, { ...envFile, name: ".env", previous: null }, deps);
+    expect(outcome.status).toBe("rolled_back");
+    expect(removed).toEqual(["/p/tools/.env"]);
+  });
+
+  it("fails when the restored variables also fail the gate", async () => {
+    const { deps } = harness({ samples: [[crashed], [crashed]] });
+    const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
+    expect(outcome.status).toBe("failed");
+    expect(outcome.error).toContain("przywrócenie poprzednich zmiennych też się nie powiodło");
   });
 });
