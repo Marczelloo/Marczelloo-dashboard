@@ -36,7 +36,24 @@ Expected: 4 × `…: ready` (tabele) i 3 × `…: ready` (indeksy).
 2. Oczekiwane dopasowania „pewne” dla sześciu stacków: `atlas-hub`, `marczelloo-dashboard`, `marczelloo-drive`, `marczelloo-tools`, `neobeatbuddy`, `portfolio-redesign` — każdy do odpowiadającego projektu w dashboardzie. Stack z dopasowaniem „do potwierdzenia” lub „brak” przypisz ręcznie albo pomiń.
 3. Oczekiwane ostrzeżenia: neobeatbuddy „nie jest repozytorium Git” i „Pominięte pliki env … .env.live …”; marczelloo-tools „override z katalogu logów”.
 4. Trasy: 21 reguł, 19 domen; reguła `/api/github/webhook` i badge `originRequest` przy storage-atlashub; 9 domen „usługa hosta :8080” (Caddy).
-5. Przejrzyj konflikty env (szczególnie `ACTIVITY_ALLOWED_ORIGINS` w neobeatbuddy — kontener ma inną wartość niż plik) i różnice testu na sucho. Zapisz import.
+5. Przejrzyj konflikty env i różnice testu na sucho. Zapisz import.
+
+Wynik próbnego skanu z 16.09.2026 (tylko odczyt, wartości zastąpione skrótami
+na Pi; `NO_CONTAINER_CHANGES`) — tego należy się spodziewać:
+
+| Stack | Dopasowanie | Env (kluczy) | Test na sucho |
+|---|---|---|---|
+| atlas-hub | AtlasHub, pewne | 46; `POSTGRES_MAX_POOL_SIZE` różne w usługach; 4 nieużywane (`COMPOSE_PROFILES`, `COOKIE_DOMAIN`, `PORTAINER_*`) | zgodny |
+| marczelloo-dashboard | Marczelloo Dashboard, pewne | 46; 15 nowych kluczy etapu 0 jeszcze nie w kontenerze | `DEV_SKIP_PIN` — znika po wdrożeniu etapu 0 |
+| marczelloo-drive | marczelloo-drive, pewne | 12 | zgodny |
+| marczelloo-tools | Marczelloo-Tools, pewne | 0 (brak `.env`) | zgodny |
+| neobeatbuddy | NeoBeat Buddy, pewne | 84; `ACTIVITY_ALLOWED_ORIGINS` różne w usługach | `mewbit-lavalink` ma starą wartość (kontener nie odtworzony po zmianie pliku) |
+| portfolio-redesign | portfolio-redesign, pewne | 3 | zgodny |
+
+Trasy: 21 reguł, 19 domen (11 do kontenerów, 9 do Caddy :8080, 1 × 404).
+Projekty bez stacka: Bookhaven, Arcade Portfolio. Stara baza env: 45 z 89
+wartości nie daje się odszyfrować obecnym `ENCRYPTION_KEY` (podpowiedź i tak
+jest domyślnie wyłączona).
 6. Kontrola braku wartości w przeglądarce: DevTools → Network → odpowiedź akcji skanu nie zawiera wartości żadnego sekretu (np. wyszukaj fragment hasła z `.env` AtlasHuba).
 
 ## 4. Weryfikacja „po”
