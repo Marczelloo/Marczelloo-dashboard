@@ -2,7 +2,8 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { emptyState } from "./queue";
 import { createAgentServer, type ServerContext } from "./server";
-import type { AgentState } from "./types";
+import { assembleAgentStatus } from "./status";
+import type { AgentState, AgentStatus } from "./types";
 
 const TOKEN = "t".repeat(40);
 const JOB_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -15,7 +16,7 @@ const target = {
   branch: "main",
   composeFile: null,
   profiles: [],
-  tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202 },
+  tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false },
 };
 const deploy = { kind: "deploy", target, sha: "b".repeat(40), deployId: "22222222-2222-4222-8222-222222222222", triggeredBy: "tester", token: "ghs_x" };
 const applyEnv = { kind: "apply-env", target, deployId: deploy.deployId, triggeredBy: "tester", envFile: { name: ".env", content: "SECRET=value", previous: "SECRET=old" } };
@@ -26,7 +27,7 @@ afterEach(() => {
   stop = null;
 });
 
-async function start(initial: AgentState = emptyState()) {
+async function start(initial: AgentState = emptyState(), getStatus?: (state: AgentState) => Promise<AgentStatus>) {
   let state = initial;
   const tokens = new Map<string, string | null>();
   const envFiles = new Map();
@@ -43,6 +44,7 @@ async function start(initial: AgentState = emptyState()) {
     envFiles,
     now: () => "2026-09-16T10:00:00.000Z",
     newId: () => (ids++ === 0 ? JOB_ID : SECOND_JOB_ID),
+    getStatus: getStatus ?? (async (current) => assembleAgentStatus(current, {}, null, null, "2026-09-16T10:00:00.000Z")),
   };
   const server = createAgentServer(context);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
@@ -57,7 +59,51 @@ describe("agent HTTP API", () => {
   it("serves health without a token and rejects other calls without one", async () => {
     const { call } = await start();
     expect((await call("/health", {}, false)).status).toBe(200);
+    expect((await call("/status", {}, false)).status).toBe(401);
     expect((await call("/jobs", { method: "POST", body: JSON.stringify(deploy) }, false)).status).toBe(401);
+  });
+
+  it("returns monitoring status with active and latest finished jobs", async () => {
+    const finished = {
+      ...deploy,
+      id: SECOND_JOB_ID,
+      status: "succeeded" as const,
+      createdAt: "2026-09-16T08:00:00.000Z",
+      startedAt: "2026-09-16T08:01:00.000Z",
+      finishedAt: "2026-09-16T08:05:00.000Z",
+      error: null,
+      rolledBackTo: null,
+    };
+    const queued = {
+      ...deploy,
+      id: JOB_ID,
+      kind: "rollback" as const,
+      status: "queued" as const,
+      createdAt: "2026-09-16T09:00:00.000Z",
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+      rolledBackTo: null,
+    };
+    const initial: AgentState = { ...emptyState(), jobs: [finished, queued], projects: { stored: { releases: [] } } };
+    const containers = {
+      "marczelloo-tools": [{ name: "app", service: "app", status: "running", exitCode: 0, restartCount: 0, health: "healthy", oomKilled: false, startedAt: "2026-09-16T07:00:00Z", finishedAt: null }],
+    };
+    const { call } = await start(initial, async (state) =>
+      assembleAgentStatus(state, containers, { path: "/projects", totalBytes: 1000, freeBytes: 400 }, 512_000, "2026-09-16T10:00:00.000Z")
+    );
+
+    const response = await call("/status");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      generatedAt: "2026-09-16T10:00:00.000Z",
+      projects: {
+        "marczelloo-tools": { containers: containers["marczelloo-tools"], activeJob: { id: JOB_ID, kind: "rollback", status: "queued" }, lastFinishedAt: "2026-09-16T08:05:00.000Z" },
+        stored: { containers: [], activeJob: null, lastFinishedAt: null },
+      },
+      disk: { path: "/projects", totalBytes: 1000, freeBytes: 400 },
+      buildCacheBytes: 512_000,
+    });
   });
 
   it("queues a deploy and keeps the GitHub token only in memory", async () => {

@@ -3,7 +3,7 @@ import http from "node:http";
 import { jobRequestSchema } from "./api";
 import { enqueue, rollbackRelease } from "./queue";
 import type { FileStore } from "./store";
-import type { AgentState, EnvFile, Job } from "./types";
+import type { AgentState, AgentStatus, EnvFile, Job } from "./types";
 
 export interface ServerContext {
   token: string;
@@ -15,6 +15,7 @@ export interface ServerContext {
   envFiles: Map<string, EnvFile>;
   now(): string;
   newId(): string;
+  getStatus(state: AgentState): Promise<AgentStatus>;
 }
 
 function authorized(header: string | undefined, token: string): boolean {
@@ -58,6 +59,8 @@ export function createAgentServer(context: ServerContext): http.Server {
       const url = new URL(request.url ?? "/", "http://agent");
       if (request.method === "GET" && url.pathname === "/health") return send(response, 200, { ok: true });
       if (!authorized(request.headers.authorization, context.token)) return send(response, 401, { error: "Unauthorized" });
+
+      if (request.method === "GET" && url.pathname === "/status") return send(response, 200, await context.getStatus(context.getState()));
 
       if (request.method === "POST" && url.pathname === "/jobs") {
         const parsed = jobRequestSchema.safeParse(await readBody(request));

@@ -1,3 +1,5 @@
+import type { ContainerSample } from "./health";
+
 export type JobKind = "deploy" | "rollback" | "apply-env";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "rolled_back" | "superseded";
 
@@ -76,4 +78,23 @@ export interface AgentState {
   jobs: Job[];
   projects: Record<string, ProjectState>;
   outbox: AgentEvent[];
+}
+
+export interface ContainerStatus extends ContainerSample {
+  oomKilled: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface ProjectStatus {
+  containers: ContainerStatus[];
+  activeJob: { id: string; kind: string; status: string } | null;
+  lastFinishedAt: string | null;
+}
+
+export interface AgentStatus {
+  generatedAt: string;
+  projects: Record<string, ProjectStatus>;
+  disk: { path: string; totalBytes: number; freeBytes: number } | null;
+  buildCacheBytes: number | null;
 }

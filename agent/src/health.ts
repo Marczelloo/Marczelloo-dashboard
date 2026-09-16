@@ -1,3 +1,5 @@
+import type { ContainerStatus } from "./types";
+
 export interface ContainerSample {
   name: string;
   service: string;
@@ -12,22 +14,48 @@ export type GateState = { state: "pass" } | { state: "wait"; reason: string } | 
 interface RawInspect {
   Name: string;
   RestartCount?: number;
-  State?: { Status?: string; ExitCode?: number; Health?: { Status?: string } | null } | null;
+  State?: { Status?: string; ExitCode?: number; OOMKilled?: boolean; StartedAt?: string; FinishedAt?: string; Health?: { Status?: string } | null } | null;
   Config?: { Labels?: Record<string, string> | null } | null;
+}
+
+function sampleFromInspect(item: RawInspect): ContainerSample {
+  return {
+    name: item.Name.replace(/^\//, ""),
+    service: item.Config?.Labels?.["com.docker.compose.service"] ?? "",
+    status: item.State?.Status ?? "unknown",
+    exitCode: item.State?.ExitCode ?? 0,
+    restartCount: item.RestartCount ?? 0,
+    health: item.State?.Health?.Status ?? null,
+  };
+}
+
+function timestamp(value: string | undefined): string | null {
+  return !value || value === "0001-01-01T00:00:00Z" ? null : value;
 }
 
 export function parseInspectSamples(json: string): ContainerSample[] {
   return (JSON.parse(json) as RawInspect[])
     .filter((item) => item.Config?.Labels?.["com.docker.compose.oneoff"] !== "True")
-    .map((item) => ({
-      name: item.Name.replace(/^\//, ""),
-      service: item.Config?.Labels?.["com.docker.compose.service"] ?? "",
-      status: item.State?.Status ?? "unknown",
-      exitCode: item.State?.ExitCode ?? 0,
-      restartCount: item.RestartCount ?? 0,
-      health: item.State?.Health?.Status ?? null,
-    }))
+    .map(sampleFromInspect)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function parseProjectStatuses(json: string): Record<string, ContainerStatus[]> {
+  const projects: Record<string, ContainerStatus[]> = {};
+  for (const item of JSON.parse(json) as RawInspect[]) {
+    const labels = item.Config?.Labels ?? {};
+    const project = labels["com.docker.compose.project"];
+    if (!project || labels["com.docker.compose.oneoff"] === "True") continue;
+    const state = item.State;
+    (projects[project] ??= []).push({
+      ...sampleFromInspect(item),
+      oomKilled: state?.OOMKilled ?? false,
+      startedAt: timestamp(state?.StartedAt),
+      finishedAt: timestamp(state?.FinishedAt),
+    });
+  }
+  for (const containers of Object.values(projects)) containers.sort((a, b) => a.name.localeCompare(b.name));
+  return projects;
 }
 
 /** Compose service → image ID of its running container (one-off containers ignored). */
