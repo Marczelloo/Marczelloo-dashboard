@@ -243,6 +243,23 @@ if not path.is_file(): raise SystemExit(f"cloudflared config not found: {path}")
 text = path.read_text()
 if "ingress:" not in text: raise SystemExit("cloudflared config has no ingress section")
 lines = text.splitlines(keepends=True)
+# Rewriting moves the route to the end of the list, which changes the file and
+# restarts cloudflared (a ~30 s outage for every hostname). Leave a route that
+# already points at the right port untouched.
+if hostname and not (remove - {hostname}):
+    services = []
+    for i, line in enumerate(lines):
+        block = re.match(r"^\\s*-\\s+hostname:\\s*(\\S+)\\s*$", line)
+        if not block or block.group(1).lower() != hostname: continue
+        for follow in lines[i + 1:i + 4]:
+            found = re.match(r"^\\s+service:\\s*(\\S+)\\s*$", follow)
+            if found:
+                services.append(found.group(1))
+                break
+    wanted = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    if services and all(service in wanted for service in services):
+        print("CONFIG_CHANGED=0")
+        raise SystemExit(0)
 result, index = [], 0
 while index < len(lines):
     line = lines[index]
