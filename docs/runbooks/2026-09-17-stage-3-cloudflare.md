@@ -84,3 +84,25 @@ w konfiguracji wdrożenia, deploy, weryfikacja (kontenery zdrowe, domena odpowia
   z historii (200 ostatnich).
 - Agent nie tworzy kopii projektów: buduje z tego samego katalogu repozytorium.
 - Cotygodniowy cron: `docker builder prune -f --max-used-space 10GB`.
+
+## Wykonanie 16.09.2026
+
+- Kod: API Cloudflare (`977d227`), sprzątanie w agencie (`ed449a6`), limit „Zastosuj env” 10 min (`3f03366`),
+  stary skrypt tras nie restartuje cloudflared, gdy trasa jest aktualna (`14f1d74`). Wcześniej każdy
+  deploy przestawiał kolejność tras i restartował cloudflared: ok. 30 s bez wszystkich domen
+  (ostatnio 19:30:22–19:30:53).
+- Tunel `marczelloo-pi-managed` (`d45b634d-…`) działa w kontenerze `marczelloo-cloudflared`
+  (`~/.config/marczelloo-tunnel`), trasy = stary tunel (`INGRESS_EQUAL`). **DNS nieprzepięty:** token
+  nie ma uprawnienia Zone › DNS: Edit (`Authentication error`). Kroki 2–4 czekają na to uprawnienie.
+- Agent: portfolio `f40a457`, Drive `4de7154`, AtlasHub `bc9e5ea` (Postgres i MinIO nietknięte),
+  NeoBeat `f049e45`, dashboard `14f1d74` (konfiguracja wdrożenia utworzona; serwisy poprawione z
+  `marczelloodashboard` na `marczelloo-dashboard`). Wszystkie bramki zdrowia zaliczone, wpisy `success`.
+- NeoBeat: repozytorium przemianowane na `Marczelloo/MewBit` (URL w projekcie i remote na Pi
+  zaktualizowane). Katalog na Pi zamieniony w checkout Git (treść = `origin/main`, różnice tylko CRLF).
+  Compose dostał `build`, usunięty nieużywany plugin `youtube-plugin-1.18.2.jar`. Kopie `.env`,
+  compose i `.codex-backups` → `~/backups/neobeatbuddy-pre-agent-20260916.tar.gz` (600).
+- Sprzątanie: stare tagi obrazów (agent: 21 NeoBeat, 3 AtlasHub, `latest` portfolio/Drive/Tools),
+  obrazy migracji Drive z 11.08, 23 obrazy `mewbit-*:local` i `gradle`. Dysk: 58 GB → 48 GB zajęte.
+  Obrazy tar NeoBeat (1,2 GB) w `~/cleanup-pending-20260916` do decyzji właściciela.
+- Incydent: bot NeoBeat stał ok. 28 min po teście „Zastosuj env” (Compose przerwany limitem 180 s
+  przed startem bota, który czeka na zdrowy Lavalink); uruchomiony ręcznie, limit podniesiony.
