@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PinDialog } from "@/components/pin-dialog";
+import { EnvVersionHistory } from "./env-version-history";
 
 // Helper function for relative time
 function formatRelativeTime(date: Date): string {
@@ -167,6 +168,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   const [editValue, setEditValue] = useState("");
   const [editIsSecret, setEditIsSecret] = useState(true);
   const [revealEditValue, setRevealEditValue] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
 
   // Load available .env files
   const loadAvailableFiles = useCallback(async (): Promise<string[]> => {
@@ -324,6 +326,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           repoPath,
           filename: selectedFile,
           action: "write",
+          serviceId,
           vars: workingVars.map((v) => ({ key: v.key, value: v.value })),
         }),
       });
@@ -363,8 +366,16 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         toast.warning("Environment file saved, database sync failed");
       }
 
-      // 3. Apply by recreating the Compose containers (docker restart does not reload env files)
-      if (serviceId) {
+      // 3. Apply. Agent projects are already queued: the agent writes the file,
+      // recreates the services and restores the previous file if they do not come up healthy.
+      if (fileResult.agent) {
+        toast.success(fileResult.unchanged ? "Brak zmian w pliku" : `Zmienne w kolejce agenta (wersja ${fileResult.agent.version})`, {
+          description: "Agent zapisze plik, odtworzy usługi i sprawdzi ich zdrowie. Przy błędzie przywróci poprzedni plik — wynik w historii wdrożeń.",
+        });
+        setHistoryKey((value) => value + 1);
+      } else if (fileResult.unchanged) {
+        toast.info("Brak zmian w pliku");
+      } else if (serviceId) {
         try {
           const applyResponse = await fetch(`/api/services/${serviceId}/apply-env`, { method: "POST" });
           const applyResult = await applyResponse.json().catch(() => ({}));
@@ -935,6 +946,8 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             ))}
           </div>
         )}
+
+        {serviceId && <EnvVersionHistory serviceId={serviceId} refreshKey={historyKey} />}
 
         {/* No repo path warning */}
         {!repoPath && (

@@ -13,6 +13,9 @@ export function planDeployUpdate(event: AgentEvent): DeployUpdatePlan {
     case "succeeded":
       return { status: "success", errorMessage: null, notify: "success" };
     case "rolled_back":
+      if (event.kind === "apply-env") {
+        return { status: "failed", errorMessage: `Nowe zmienne nie przeszły bramki zdrowia — przywrócono poprzedni plik. ${event.error ?? ""}`.trim(), notify: "failed" };
+      }
       return {
         status: "failed",
         errorMessage: `Bramka zdrowia nie przeszła — przywrócono ${event.rolledBackTo?.slice(0, 7) ?? "poprzednią wersję"}. ${event.error ?? ""}`.trim(),

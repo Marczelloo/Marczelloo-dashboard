@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { AppConfigRowInput, AppRouteRowInput, EnvVersionPayload } from "@/server/apps/import/persist-rows";
-import { encrypt } from "@/server/lib/encryption";
+import type { EnvFileVersionPayload } from "@/server/env/file-versions";
+import { decrypt, encrypt } from "@/server/lib/encryption";
 import * as db from "./client";
 
 interface AppConfigRow extends AppConfigRowInput {
@@ -29,7 +30,7 @@ export async function getLatestEnvVersion(projectId: string): Promise<{ version:
   return response.data[0] ?? null;
 }
 
-export async function insertEnvVersion(input: { projectId: string; version: number; keys: unknown; payload: EnvVersionPayload; fingerprint: string; note: string; createdBy: string }): Promise<void> {
+export async function insertEnvVersion(input: { projectId: string; version: number; keys: unknown; payload: EnvVersionPayload | EnvFileVersionPayload; fingerprint: string; note: string; createdBy: string }): Promise<void> {
   await db.insert("app_env_versions", {
     project_id: input.projectId,
     version: input.version,
@@ -39,6 +40,39 @@ export async function insertEnvVersion(input: { projectId: string; version: numb
     note: input.note,
     created_by: input.createdBy,
   });
+}
+
+export interface EnvVersionRow {
+  version: number;
+  keys: unknown;
+  fingerprint: string;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+/** Metadata only, newest first; values stay encrypted. */
+export async function listEnvVersions(projectId: string, limit = 100): Promise<EnvVersionRow[]> {
+  const response = await db.select<EnvVersionRow>("app_env_versions", {
+    select: ["version", "keys", "fingerprint", "note", "created_by", "created_at"],
+    filters: [{ operator: "eq", column: "project_id", value: projectId }],
+    order: { column: "version", direction: "desc" },
+    limit,
+  });
+  return response.data;
+}
+
+export async function getEnvVersionPayload(projectId: string, version: number): Promise<EnvVersionPayload | EnvFileVersionPayload | null> {
+  const response = await db.select<{ payload_encrypted: string }>("app_env_versions", {
+    select: ["payload_encrypted"],
+    filters: [
+      { operator: "eq", column: "project_id", value: projectId },
+      { operator: "eq", column: "version", value: version },
+    ],
+    limit: 1,
+  });
+  const row = response.data[0];
+  return row ? (JSON.parse(await decrypt(row.payload_encrypted)) as EnvVersionPayload | EnvFileVersionPayload) : null;
 }
 
 export async function replaceImportedRoutes(rows: AppRouteRowInput[]): Promise<number> {

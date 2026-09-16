@@ -30,4 +30,9 @@ describe("planDeployUpdate", () => {
     expect(plan).toMatchObject({ status: "failed", notify: "failed" });
     expect(plan.errorMessage).toBe("Bramka zdrowia nie przeszła — przywrócono aaaaaaa. Kontener restartuje się.");
   });
+
+  it("explains restored env files", () => {
+    const plan = planDeployUpdate({ ...base, kind: "apply-env", status: "rolled_back", error: "Nowe zmienne nie przeszły bramki: unhealthy", rolledBackTo: "a".repeat(40) });
+    expect(plan.errorMessage).toBe("Nowe zmienne nie przeszły bramki zdrowia — przywrócono poprzedni plik. Nowe zmienne nie przeszły bramki: unhealthy");
+  });
 });

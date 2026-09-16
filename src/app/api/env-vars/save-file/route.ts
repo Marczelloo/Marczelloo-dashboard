@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { findAgentProjectByRepoPath, queueAgentEnvApply, recordEnvFileVersion } from "@/server/agent/env-apply";
+import { auditLogs } from "@/server/atlashub";
 import { AuthError, requirePinVerification } from "@/server/lib/auth";
 import { getEnvFilePath, shellQuote } from "@/server/runner/safe-paths";
 import { formatEnvValue, parseEnvEntries, updateEnvContent } from "@/server/env/dotenv";
@@ -70,10 +72,10 @@ function runnerError(response: Response, result: RunnerResult): NextResponse {
 
 export async function POST(request: Request) {
   try {
-    await requirePinVerification();
+    const user = await requirePinVerification();
 
     const body = await request.json();
-    const { repoPath, filename, vars, action } = body;
+    const { repoPath, filename, vars, action, serviceId } = body;
     const target = getEnvFilePath(repoPath, filename);
 
     if (!RUNNER_TOKEN) {
@@ -104,7 +106,29 @@ export async function POST(request: Request) {
             ? [...current.filter((entry) => entry.key !== single.key), single]
             : current.filter((entry) => entry.key !== single.key);
 
-      const { response, result } = await writeFileAtomic(target.filePath, updateEnvContent(original, next));
+      const content = updateEnvContent(original, next);
+
+      const agentProject = await findAgentProjectByRepoPath(target.repoPath);
+      if (agentProject) {
+        if (content === original) {
+          return NextResponse.json({ success: true, action, count: next.length, filePath: target.filePath, unchanged: true });
+        }
+        // History first: the previous file is kept as a version before the agent replaces it.
+        await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content: original, note: "Stan pliku przed zmianą", createdBy: user.email });
+        const version = await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content, note: "Zapis z edytora zmiennych", createdBy: user.email });
+        const queued = await queueAgentEnvApply({
+          config: agentProject,
+          serviceId: typeof serviceId === "string" ? serviceId : null,
+          triggeredBy: user.email,
+          fileName: target.filename,
+          content,
+          previous: original === "" ? null : original,
+        });
+        await auditLogs.logAction(user.email, "update", "project", agentProject.projectId, { env_file: target.filename, env_version: version, deploy_id: queued.deployId, job_id: queued.jobId, keys: next.length });
+        return NextResponse.json({ success: true, action, count: next.length, filePath: target.filePath, agent: { ...queued, version } });
+      }
+
+      const { response, result } = await writeFileAtomic(target.filePath, content);
       if (!response.ok || !result.success) return runnerError(response, result);
 
       return NextResponse.json({ success: true, action, count: next.length, filePath: target.filePath });

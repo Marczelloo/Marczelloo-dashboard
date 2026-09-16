@@ -17,7 +17,7 @@ const describeError = (error: unknown) => (error instanceof Error ? error.messag
  * it); the dashboard switches it after a successful job. A hostname without
  * any route gets one now, because nothing is served there yet.
  */
-async function prepareTunnelProbe(config: DeploymentConfig, createMissingRoute: boolean): Promise<boolean> {
+export async function prepareTunnelProbe(config: DeploymentConfig, createMissingRoute: boolean): Promise<boolean> {
   if (!config.tunnel?.enabled) return false;
   const ingress = await listCloudflareTunnelRoutes();
   if (!ingress.configured) return false;

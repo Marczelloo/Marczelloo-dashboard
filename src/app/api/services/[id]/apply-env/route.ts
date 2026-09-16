@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auditLogs } from "@/server/atlashub";
 import { services } from "@/server/data";
-import { buildComposeRecreateCommand, resolveComposeStack, runHostCommand, SELF_COMPOSE_PROJECT } from "@/server/deployments";
+import { queueAgentEnvApply } from "@/server/agent/env-apply";
+import { buildComposeRecreateCommand, getDeploymentConfig, resolveComposeStack, runHostCommand, SELF_COMPOSE_PROJECT } from "@/server/deployments";
+import { shellQuote } from "@/server/runner/safe-paths";
 import { AuthError, requirePinVerification } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
 
@@ -16,6 +18,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (!service) return NextResponse.json({ success: false, error: "Nie znaleziono serwisu." }, { status: 404 });
     if (service.type !== "docker") {
       return NextResponse.json({ success: false, error: "Zmienne można zastosować tylko dla serwisu Docker." }, { status: 400 });
+    }
+
+    // Agent projects: recreate on the current release with the health gate instead of a host command.
+    const config = service.project_id ? await getDeploymentConfig(service.project_id) : null;
+    if (config?.engine === "agent") {
+      const read = await runHostCommand(`if [ -f ${shellQuote(`${config.repoPath}/.env`)} ]; then cat ${shellQuote(`${config.repoPath}/.env`)}; fi`, 30_000);
+      if (!read.success) return NextResponse.json({ success: false, error: "Nie udało się odczytać pliku .env." }, { status: 502 });
+      if (!read.stdout) return NextResponse.json({ success: false, error: "Projekt nie ma pliku .env do zastosowania." }, { status: 404 });
+      const queued = await queueAgentEnvApply({ config, serviceId: id, triggeredBy: user.email, fileName: ".env", content: read.stdout, previous: read.stdout });
+      await auditLogs.logAction(user.email, "update", "service", id, { apply_env: true, engine: "agent", deploy_id: queued.deployId, job_id: queued.jobId });
+      return NextResponse.json({ success: true, agent: queued });
     }
 
     const stack = await resolveComposeStack({ containerName: service.container_id, composeProject: service.compose_project });
