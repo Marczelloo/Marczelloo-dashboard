@@ -100,7 +100,7 @@ function detectFramework(packageJson: PackageJson): string | null {
 function isRelativePath(value: string): boolean {
   return value.length > 0
     && !/^[\\/]/.test(value)
-    && !/^[A-Za-z]:[\\/]/.test(value)
+    && !/^[A-Za-z]:/.test(value)
     && !value.split(/[\\/]+/).includes("..");
 }
 
@@ -170,9 +170,13 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
     spec.packageManager = packageManager;
     spec.installCommand = installCommand(packageManager, files);
 
-    const serverFramework = ["next", "nuxt", "sveltekit", "remix", "express"].includes(framework ?? "");
-    const isViteStatic = framework === "vite" && !serverFramework && (!scripts.start || scripts.start.trim() === "vite preview");
     const dependencies = { ...stringRecord(packageJson.dependencies), ...stringRecord(packageJson.devDependencies) };
+    const hasServerFramework = "next" in dependencies
+      || "nuxt" in dependencies
+      || "@sveltejs/kit" in dependencies
+      || "express" in dependencies
+      || Object.keys(dependencies).some((name) => name.startsWith("@remix-run/"));
+    const isViteStatic = framework === "vite" && !hasServerFramework && (!scripts.start || scripts.start.trim() === "vite preview");
     const isAstroStatic = framework === "astro" && !("@astrojs/node" in dependencies);
 
     if (isViteStatic || isAstroStatic) {

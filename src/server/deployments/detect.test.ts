@@ -94,4 +94,13 @@ describe("validateBuildSpec", () => {
     const errors = validateBuildSpec({ ...baseSpec, port: 70000, outputDir: "../dist", startCommand: "node index.js\nrm -rf /" });
     expect(errors).toHaveLength(3);
   });
+
+  it("keeps a Vite frontend served by Express as a Node app", () => {
+    const { spec } = detectBuild(
+      { files: ["package.json", "package-lock.json"], packageJson: { scripts: { build: "vite build", start: "node server.js" }, dependencies: { express: "^4" }, devDependencies: { vite: "^5" } }, dockerfileContent: null, requirementsTxt: null, pyprojectToml: null },
+      "web"
+    );
+    expect(spec?.kind).toBe("node");
+    expect(spec?.startCommand).toBe("npm run start");
+  });
 });
