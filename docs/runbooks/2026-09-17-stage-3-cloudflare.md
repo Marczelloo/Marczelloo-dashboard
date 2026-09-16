@@ -106,3 +106,23 @@ w konfiguracji wdrożenia, deploy, weryfikacja (kontenery zdrowe, domena odpowia
   Obrazy tar NeoBeat (1,2 GB) w `~/cleanup-pending-20260916` do decyzji właściciela.
 - Incydent: bot NeoBeat stał ok. 28 min po teście „Zastosuj env” (Compose przerwany limitem 180 s
   przed startem bota, który czeka na zdrowy Lavalink); uruchomiony ręcznie, limit podniesiony.
+
+## Wykonanie 16.09.2026 (wieczór)
+
+- Token dostał Zone › DNS: Edit. `demo-dashboard` przepięty testowo (ruch w metrykach nowego konektora,
+  0 błędów), potem pozostałe 17 CNAME. Kody HTTP wszystkich 18 domen identyczne przed i po.
+- Dashboard w trybie API: `CLOUDFLARE_*` w `.env` (kopia `~/backups/dashboard-env/.env.backup-stage3-*`),
+  deploy przez agenta. Obsługa zdarzenia po deployu bez błędów, konfiguracja tunelu bez zbędnego zapisu.
+- Stary `cloudflared` (systemd) nadal działa jako zapas; krok 4 (wyłączenie) po dobie bez problemów.
+
+## Env v2 — zapis zmiennych przez agenta (`deca220`, `0d4a58b`)
+
+- Projekty z `engine: "agent"`: zapis w edytorze zmiennych zapisuje poprzedni i nowy plik jako
+  zaszyfrowane wersje (`app_env_versions`, w kolumnie `keys` tylko nazwy) i kolejkuje zadanie agenta
+  `apply-env`. Agent podmienia plik atomowo (600), odtwarza projekt na obrazach bieżącego wydania,
+  przechodzi bramkę zdrowia, a przy błędzie przywraca poprzedni plik (`rolled_back`).
+- Treść pliku jest tylko w pamięci agenta — nie trafia do `state.json`, logów ani zdarzeń; restart agenta
+  przed wykonaniem kończy zadanie błędem „zapisz zmienne ponownie”.
+- Edytor ma „Historię wersji” z „Przywróć” (PIN). Wersji z importu (etap 1) nie da się przywrócić jako plik.
+- Test 16.09: `apply-env` portfolio z niezmienionym `.env` → `succeeded`, skrót pliku bez zmian, brak
+  plików tymczasowych, kontener nieodtworzony, brak wartości w stanie i logu agenta.
