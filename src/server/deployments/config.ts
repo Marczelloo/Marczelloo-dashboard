@@ -2,6 +2,7 @@ import "server-only";
 
 import type { BuildSpec } from "./detect";
 import { settings } from "@/server/atlashub";
+import { select } from "@/server/atlashub/client";
 
 export type DeploymentRuntime = "web" | "worker" | "bot" | "stack";
 export type DeploymentExposure = "internal" | "cloudflare";
@@ -74,6 +75,18 @@ export async function getDeploymentConfig(projectId: string): Promise<Deployment
   } catch {
     return null;
   }
+}
+
+export async function listDeploymentConfigs(): Promise<DeploymentConfig[]> {
+  const response = await select<{ key: string; value: string }>("settings", { filters: [{ operator: "like", column: "key", value: `${KEY_PREFIX}%` }], limit: 1000 });
+  return response.data.flatMap((row) => {
+    try {
+      const parsed: unknown = JSON.parse(row.value);
+      return isDeploymentConfig(parsed) ? [parsed] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export async function saveDeploymentConfig(

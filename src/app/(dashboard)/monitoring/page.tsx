@@ -10,60 +10,22 @@ import { RefreshCw, ExternalLink, AlertTriangle, Activity } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { isDemoMode, checkDemoModeBlocked } from "@/lib/demo-mode";
 import { services, uptimeChecks } from "@/server/data";
+import { requireAuth } from "@/server/lib/auth";
+import { runMonitoring } from "@/server/monitoring";
+import { MonitorOverview } from "./_components/monitor-overview";
 import type { Service } from "@/types";
 
 async function runMonitoringChecks() {
   "use server";
 
-  // Skip in demo mode
-  const demoCheck = checkDemoModeBlocked();
-  if (demoCheck.blocked) {
-    revalidatePath("/monitoring");
-    return;
-  }
-
-  try {
-    // Get monitorable services and check them directly
-    const monitorableServices = await services.getMonitorableServices();
-
-    for (const service of monitorableServices) {
-      const url = service.health_url || service.url;
-      if (!url) continue;
-
-      const startTime = Date.now();
-      let ok = false;
-      let statusCode: number | null = null;
-      let latencyMs: number | null = null;
-      let error: string | null = null;
-
-      try {
-        const response = await fetch(url, {
-          method: "GET",
-          signal: AbortSignal.timeout(10000),
-          redirect: "follow",
-        });
-
-        latencyMs = Date.now() - startTime;
-        statusCode = response.status;
-        ok = response.ok;
-      } catch (e) {
-        latencyMs = Date.now() - startTime;
-        error = e instanceof Error ? e.message : "Unknown error";
-        ok = false;
-      }
-
-      await uptimeChecks.createUptimeCheck({
-        service_id: service.id,
-        status_code: statusCode ?? undefined,
-        latency_ms: latencyMs ?? undefined,
-        ok,
-        error: error ?? undefined,
-      });
+  if (!checkDemoModeBlocked().blocked) {
+    try {
+      await requireAuth();
+      await runMonitoring();
+    } catch (e) {
+      console.error("Failed to run monitoring checks:", e);
     }
-  } catch (e) {
-    console.error("Failed to run monitoring checks:", e);
   }
-
   revalidatePath("/monitoring");
 }
 
@@ -78,7 +40,7 @@ export default function MonitoringPage() {
             </div>
             <div>
               <h1 className="text-lg font-semibold">Monitoring</h1>
-              <p className="text-sm text-muted-foreground">Website uptime and SSL monitoring</p>
+              <p className="text-sm text-muted-foreground">Domeny, kontenery, certyfikaty i dysk Pi</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -94,9 +56,8 @@ export default function MonitoringPage() {
       </header>
 
       <div className="flex-1 p-6 space-y-6">
-        {/* Overview Stats */}
         <Suspense fallback={<StatsSkeleton />}>
-          <MonitoringStats />
+          {isDemoMode() ? <MonitoringStats /> : <MonitorOverview />}
         </Suspense>
 
         {/* Services List */}

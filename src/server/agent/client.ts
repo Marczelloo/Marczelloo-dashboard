@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { AgentJobRequest } from "@agent/api";
-import type { Job, Release } from "@agent/types";
+import type { AgentStatus, Job, Release } from "@agent/types";
 
 const AGENT_URL = (process.env.AGENT_URL || "http://mz-agent:8790").replace(/\/+$/, "");
 
@@ -50,4 +50,8 @@ export async function readAgentJobLogToEnd(jobId: string, offset: number, maxByt
 
 export function getAgentProject(composeProject: string): Promise<{ releases: Release[]; activeJob: Job | null }> {
   return agentFetch(`/projects/${encodeURIComponent(composeProject)}`);
+}
+
+export function getAgentStatus(): Promise<AgentStatus> {
+  return agentFetch<AgentStatus>("/status");
 }
