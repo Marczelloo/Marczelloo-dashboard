@@ -29,6 +29,8 @@ import {
   type DeploymentExposure,
   type DeploymentRuntime,
 } from "@/server/deployments";
+import { queueAgentDeployment, readAgentDeployLog } from "@/server/agent/deploy";
+import { agentLogRef, parseAgentLogRef } from "@/server/agent/refs";
 
 // ========================================
 // Validation Schemas
@@ -133,7 +135,8 @@ async function ensureDeploymentService(projectId: string, projectName: string, c
 async function queueConfiguredDeployment(
   projectId: string,
   triggeredBy: string,
-  branchOverride?: string
+  branchOverride?: string,
+  commitSha?: string
 ): Promise<ActionResult<{ output: string; deployId: string; logFile: string; branch: string }>> {
   const project = await projects.getProjectById(projectId);
   if (!project) return { success: false, error: "Project not found" };
@@ -188,6 +191,31 @@ async function queueConfiguredDeployment(
   }
 
   const service = await ensureDeploymentService(projectId, project.name, config);
+  if (config.engine === "agent") {
+    const queued = await queueAgentDeployment({ config, serviceId: service.id, triggeredBy, commitSha });
+    const logFile = agentLogRef(queued.jobId);
+    await auditLogs.logAction(triggeredBy, "deploy", "project", projectId, {
+      mode: "agent-job",
+      compose_project: config.composeProject,
+      branch: config.branch,
+      sha: queued.sha,
+      deploy_id: queued.deployId,
+      job_id: queued.jobId,
+      tunnel_port_reallocated: reallocatedPort !== null,
+      adopted_existing_tunnel_route: adoptedTunnelRoute,
+    });
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/dashboard");
+    return {
+      success: true,
+      data: {
+        deployId: queued.deployId,
+        logFile,
+        branch: config.branch,
+        output: `Wdrożenie ${queued.sha.slice(0, 7)} trafiło do kolejki agenta.\nLog file: ${logFile}\n\nEtapy: git fetch → Compose config → build → up → bramka zdrowia → rollback przy błędzie.`,
+      },
+    };
+  }
   const job = await startDeploymentJob(config);
   const deploy = await deploys.createDeploy({
     service_id: service.id,
@@ -649,6 +677,7 @@ export async function internalDeployProject(
   options?: {
     customRepoPath?: string;
     branch?: string;
+    commitSha?: string;
   }
 ): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; logFile?: string; branch?: string }>> {
   const customRepoPath = options?.customRepoPath;
@@ -708,7 +737,7 @@ export async function internalDeployProject(
     }
   }
   if (managedConfig && !customRepoPath) {
-    return queueConfiguredDeployment(id, triggeredBy, branch);
+    return queueConfiguredDeployment(id, triggeredBy, branch, options?.commitSha);
   }
 
   // Get project services to link deploy record
@@ -1095,6 +1124,12 @@ export async function checkDeployLogAction(
 ): Promise<ActionResult<{ log: string; isComplete: boolean }>> {
   try {
     await requireAuth();
+
+    const agentJobId = parseAgentLogRef(logFile);
+    if (agentJobId) {
+      const agentLog = await readAgentDeployLog(agentJobId);
+      return { success: true, data: { log: agentLog.log, isComplete: agentLog.isComplete } };
+    }
 
     if (!RUNNER_TOKEN) {
       return { success: false, error: "Runner not configured" };

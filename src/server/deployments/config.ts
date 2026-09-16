@@ -29,6 +29,8 @@ export interface DeploymentConfig {
   runtime: DeploymentRuntime;
   exposure: DeploymentExposure;
   tunnel: CloudflareTunnelRoute | null;
+  /** Deploy engine; missing means the legacy runner script. */
+  engine?: "script" | "agent";
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +52,7 @@ function isDeploymentConfig(value: unknown): value is DeploymentConfig {
     typeof config.repoPath === "string" &&
     typeof config.composeProject === "string" &&
     Array.isArray(config.profiles) &&
+    (config.engine === undefined || config.engine === "script" || config.engine === "agent") &&
     ["web", "worker", "bot", "stack"].includes(config.runtime || "") &&
     ["internal", "cloudflare"].includes(config.exposure || "")
   );

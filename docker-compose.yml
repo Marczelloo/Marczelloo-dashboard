@@ -36,6 +36,10 @@ services:
       - RUNNER_URL=http://runner:8787
       - RUNNER_TOKEN=${RUNNER_TOKEN}
 
+      # Deploy agent (separate marczelloo-agent stack on the same network)
+      - AGENT_URL=${AGENT_URL:-http://mz-agent:8790}
+      - AGENT_TOKEN=${AGENT_TOKEN}
+
       # App Configuration
       - OWNER_EMAILS=${OWNER_EMAILS}
       # Cloudflare Access application: Zero Trust → Access → Applications → Overview

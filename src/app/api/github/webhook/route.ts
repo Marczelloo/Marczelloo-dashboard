@@ -230,7 +230,11 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
       // Normal deployment for other projects (synchronous)
       console.log(`[GitHub Webhook] Triggering deploy for ${project.name}`);
       // Managed projects deploy their configured branch; legacy ones the pushed branch.
-      const deployResult = await internalDeployProject(project.id, "github-webhook", deploymentConfig ? {} : { branch: decision.branch });
+      const deployResult = await internalDeployProject(
+        project.id,
+        "github-webhook",
+        deploymentConfig ? { commitSha: head_commit?.id } : { branch: decision.branch }
+      );
 
       // Log the deploy action
       await auditLogs.createAuditLog({
