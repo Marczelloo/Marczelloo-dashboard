@@ -89,3 +89,10 @@ Expected: tag 12-znakowego SHA; kontener używa `marczelloo-tools-app:<sha12>`; 
 ## 7. Wycofanie pilotażu
 
 „Wróć do skryptu” w karcie projektu. Kolejny deploy użyje starego skryptu i jego override portu. Agent może dalej działać; `docker compose -f ~/projects/Marczelloo-dashboard/agent/docker-compose.yml down` zatrzymuje go bez wpływu na aplikacje.
+
+## Wykonanie 16.09.2026
+
+- Etap 0: trasy tunelu na `127.0.0.1`, self-deploy `3e734e6`, demo i Portainer odtworzone, porty AtlasHub (`bc9e5ea`), portfolio (`f40a457`) i Tools na loopback; migracja `general_todos`, profil AtlasHub `default`; cache builda przycięty, cron cotygodniowy, katalog-sierota w `~/backups/Marczelloo-tools-orphan-20260916`, gałąź `feature/env-manager-file-first-redesign` usunięta. Kopia `pre-migration-20260915-1744` skopiowana na komputer właściciela (`C:\Users\moskw\Backups\raspberrypi`, sumy zgodne; dwa pliki różniące się tylko wielkością liter zapisane pod osobnymi nazwami).
+- Etap 1: tabele importu utworzone (poprawka `db35795`: API schematu AtlasHub nie przyjmuje `'[]'::jsonb`).
+- Etap 2: agent zbudowany (`98bfc36` — binaria 0755, `de538ea` — buildx), Tools przełączony na agenta. Push `0865e4e` do Tools → webhook → agent: build, bramka zdrowia (sonda 200), `succeeded`, wpis wdrożenia `success` bez otwartej przeglądarki; wydania `0865e4e952de` i bazowe `ae8235d70ffc`.
+- Do zrobienia przez właściciela (PIN w UI): test „Zastosuj env” (etap 0, krok 9), skan i zapis importu (etap 1, krok 3), test „Przywróć” (etap 2, krok 6.2).
