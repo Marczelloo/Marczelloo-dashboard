@@ -16,7 +16,7 @@ async function runMonitoringChecks(): Promise<void> {
     const { runMonitoring } = await import("./monitoring");
     const result = await runMonitoring();
     if (result.transitions || result.errors.length) {
-      console.log(`[Scheduler] Monitoring: ${result.checked} checked, ${result.muted} muted, ${result.transitions} changes`);
+      console.log(`[Scheduler] Monitoring: ${result.checked} checked, ${result.muted} muted, ${result.transitions} changes, ${result.saved} saved`);
     }
     for (const error of result.errors) console.warn(`[Scheduler] Monitoring: ${error}`);
   } catch (error) {

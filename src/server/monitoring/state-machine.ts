@@ -42,6 +42,23 @@ export function advance(previous: TargetState | null, target: MonitorTarget, obs
   return { state, transition: { from: base.status, to: status, reason: lastError, previousSince: base.since } };
 }
 
+/** Values that move on every check; saving them each minute would exhaust the AtlasHub rate limit. */
+const VOLATILE_DETAIL = new Set(["latencyMs", "generatedAt", "freeBytes", "buildCacheBytes"]);
+const HEARTBEAT_MS = 15 * 60 * 1000;
+
+function stableDetail(detail: Record<string, unknown>): string {
+  return JSON.stringify(Object.entries(detail).filter(([key]) => !VOLATILE_DETAIL.has(key)).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/** Whether a checked state differs enough from the stored one to be written. */
+export function shouldPersist(stored: TargetState | null, next: TargetState, now: string): boolean {
+  if (!stored) return true;
+  if (stored.status !== next.status || stored.failCount !== next.failCount || stored.lastError !== next.lastError) return true;
+  if (stored.label !== next.label || stored.projectId !== next.projectId) return true;
+  if (stableDetail(stored.detail) !== stableDetail(next.detail)) return true;
+  return !stored.lastCheckedAt || Date.parse(now) - Date.parse(stored.lastCheckedAt) >= HEARTBEAT_MS;
+}
+
 const KIND_LABEL: Record<MonitorKind, string> = {
   agent: "Agent wdrożeń",
   disk: "Dysk Pi",

@@ -78,6 +78,12 @@ describe("runMonitorCycle", () => {
     expect(h.uptime).toEqual([{ service_id: "s1", ok: true }]);
   });
 
+  it("does not rewrite unchanged states on every cycle", async () => {
+    const h = harness();
+    expect((await h.cycle()).saved).toBe(5);
+    expect((await h.cycle()).saved).toBe(0);
+  });
+
   it("alerts once for a crashing bot and once when it recovers", async () => {
     const h = harness();
     await h.cycle();

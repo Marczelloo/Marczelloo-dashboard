@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, incidentAction, notificationFor } from "./state-machine";
+import { advance, incidentAction, notificationFor, shouldPersist } from "./state-machine";
 import type { MonitorTarget, Observation, TargetState } from "./types";
 
 const target: MonitorTarget = { key: "domain:a.dev", kind: "domain", label: "a.dev", projectId: "p1", composeProject: "a", host: "a.dev" };
@@ -101,5 +101,28 @@ describe("incidentAction", () => {
     expect(incidentAction(tr("warning", "down"))).toBe("update");
     expect(incidentAction(tr("down", "ok"))).toBe("close");
     expect(incidentAction(tr("unknown", "ok"))).toBeNull();
+  });
+});
+
+describe("shouldPersist", () => {
+  const base = run([ok]).state;
+  it("saves new targets, status changes and failure counts", () => {
+    expect(shouldPersist(null, base, t(1))).toBe(true);
+    expect(shouldPersist(base, { ...base, status: "down" }, t(1))).toBe(true);
+    expect(shouldPersist(base, { ...base, failCount: 1, lastError: "HTTP 502" }, t(1))).toBe(true);
+  });
+
+  it("skips checks that only changed latency or free bytes", () => {
+    expect(shouldPersist(base, { ...base, lastCheckedAt: t(1), detail: { latencyMs: 999 } }, t(1))).toBe(false);
+    expect(shouldPersist({ ...base, detail: { freeBytes: 1, freePercent: 70 } }, { ...base, detail: { freeBytes: 2, freePercent: 70 } }, t(1))).toBe(false);
+  });
+
+  it("saves meaningful detail such as restart counters", () => {
+    expect(shouldPersist({ ...base, detail: { restarts: { a: 1 } } }, { ...base, detail: { restarts: { a: 2 } } }, t(1))).toBe(true);
+  });
+
+  it("refreshes the stored check time every 15 minutes", () => {
+    expect(shouldPersist(base, { ...base, lastCheckedAt: t(14) }, t(14))).toBe(false);
+    expect(shouldPersist(base, { ...base, lastCheckedAt: t(15) }, t(15))).toBe(true);
   });
 });

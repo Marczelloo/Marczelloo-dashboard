@@ -13,16 +13,31 @@ import { runMonitorCycle, type CycleDependencies, type CycleResult } from "./cyc
 import { probeDomain, probeTls } from "./probes";
 
 const UPTIME_RECORD_INTERVAL_MS = 5 * 60 * 1000;
+const REFERENCE_TTL_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * AtlasHub allows 100 requests a minute for the whole dashboard. Lists that
+ * rarely change are read every few minutes; a failed read is not cached.
+ */
+function cached<T>(load: () => Promise<T>): () => Promise<T> {
+  let entry: { at: number; value: T } | null = null;
+  return async () => {
+    if (entry && Date.now() - entry.at < REFERENCE_TTL_MS) return entry.value;
+    const value = await load();
+    entry = { at: Date.now(), value };
+    return value;
+  };
+}
 
 const dependencies: CycleDependencies = {
   now: () => new Date(),
   getAgentStatus,
-  listIngress: async () => (getManagedTunnelSettings() ? listManagedRoutes() : null),
-  listConfigs: listDeploymentConfigs,
-  listServices: () => getServices({ limit: 1000 }),
-  listRoutes: async () => (await select<{ hostname: string | null; project_id: string | null }>("app_routes", { select: ["hostname", "project_id"], limit: 1000 })).data,
-  listProjectNames: async () => new Map((await getProjects({ limit: 1000 })).map((project) => [project.id, project.name])),
+  listIngress: cached(async () => (getManagedTunnelSettings() ? listManagedRoutes() : null)),
+  listConfigs: cached(listDeploymentConfigs),
+  listServices: cached(() => getServices({ limit: 1000 })),
+  listRoutes: cached(async () => (await select<{ hostname: string | null; project_id: string | null }>("app_routes", { select: ["hostname", "project_id"], limit: 1000 })).data),
+  listProjectNames: cached(async () => new Map((await getProjects({ limit: 1000 })).map((project) => [project.id, project.name]))),
   listStates: monitor.listStates,
   saveState: monitor.saveState,
   deleteState: monitor.deleteState,

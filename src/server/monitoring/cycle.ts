@@ -2,7 +2,7 @@ import type { AgentStatus } from "@agent/types";
 import type { TunnelIngressRule } from "@/server/cloudflare/ingress";
 import type { DeploymentConfig } from "@/server/deployments/config";
 import { evaluateContainers, evaluateDisk, evaluateDomain, evaluateTls } from "./evaluate";
-import { advance, incidentAction, notificationFor, type NotificationPayload } from "./state-machine";
+import { advance, incidentAction, notificationFor, shouldPersist, type NotificationPayload } from "./state-machine";
 import { buildTargets, isMuted } from "./targets";
 import type { MonitorTarget, Observation, TargetState } from "./types";
 
@@ -42,6 +42,7 @@ export interface CycleResult {
   checked: number;
   muted: number;
   transitions: number;
+  saved: number;
   errors: string[];
 }
 
@@ -118,7 +119,7 @@ export async function runMonitorCycle(deps: CycleDependencies, options: { record
     })
   );
 
-  const result: CycleResult = { checked: 0, muted: 0, transitions: 0, errors };
+  const result: CycleResult = { checked: 0, muted: 0, transitions: 0, saved: 0, errors };
   const incidentByKey = new Map(openIncidents.map((incident) => [incident.target_key, incident]));
   const domainResults = new Map<string, Observation>();
 
@@ -132,11 +133,14 @@ export async function runMonitorCycle(deps: CycleDependencies, options: { record
     result.checked += 1;
     if (muted) result.muted += 1;
 
-    try {
-      await deps.saveState(state, previous?.id ?? null, nowIso);
-    } catch (error) {
-      errors.push(`zapis ${target.key}: ${errorMessage(error)}`);
-      continue;
+    if (shouldPersist(previous ?? null, state, nowIso)) {
+      try {
+        await deps.saveState(state, previous?.id ?? null, nowIso);
+        result.saved += 1;
+      } catch (error) {
+        errors.push(`zapis ${target.key}: ${errorMessage(error)}`);
+        continue;
+      }
     }
     if (!transition) continue;
     result.transitions += 1;
