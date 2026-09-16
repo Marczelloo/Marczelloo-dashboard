@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchStackToProject, normalizeName, repoKey } from "./match-projects";
+import { matchStackToProject, normalizeName, repoKey, resolveDuplicateMatches } from "./match-projects";
 
 const projects = [
   { id: "atlas", name: "AtlasHub", slug: "atlashub", github_url: "https://github.com/Marczelloo/atlashub" },
@@ -60,5 +60,29 @@ describe("matchStackToProject", () => {
       confidence: "none",
       reasons: ["Brak dopasowania do projektu w dashboardzie."],
     });
+  });
+});
+
+describe("platform and duplicate stacks", () => {
+  it("never assigns the deploy agent or tunnel stack to a project", () => {
+    const match = matchStackToProject({ project: "marczelloo-agent", workingDir: "/p/Marczelloo-dashboard/agent", containerNames: ["marczelloo-agent"], gitRemote: "https://github.com/Marczelloo/Marczelloo-dashboard" }, projects, services, []);
+    expect(match).toMatchObject({ projectId: null, confidence: "none" });
+  });
+
+  it("keeps the configured stack when two stacks claim one project", () => {
+    const high = (projectId: string) => ({ projectId, confidence: "high" as const, reasons: [] });
+    const resolved = resolveDuplicateMatches(
+      [{ project: "marczelloo-dashboard", match: high("dash") }, { project: "dashboard-copy", match: high("dash") }, { project: "atlas-hub", match: high("atlas") }],
+      [{ projectId: "dash", composeProject: "marczelloo-dashboard" }],
+      projects
+    );
+    expect(resolved.map((stack) => stack.match.projectId)).toEqual(["dash", null, "atlas"]);
+    expect(resolved[1].match.reasons[0]).toContain("marczelloo-dashboard");
+  });
+
+  it("chooses nothing when no deployment config decides", () => {
+    const high = { projectId: "neo", confidence: "high" as const, reasons: [] };
+    const resolved = resolveDuplicateMatches([{ project: "a", match: high }, { project: "b", match: high }], [], projects);
+    expect(resolved.map((stack) => stack.match.projectId)).toEqual([null, null]);
   });
 });

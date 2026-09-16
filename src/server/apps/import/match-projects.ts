@@ -23,12 +23,18 @@ export function repoKey(url: string | null | undefined): string | null {
   return match ? `${normalizeName(match[1])}/${normalizeName(match[2])}` : null;
 }
 
+/** Compose projects that run the platform itself (deploy agent, tunnel connector), not a dashboard project. */
+export const PLATFORM_STACKS = new Set(["marczelloo-agent", "marczelloo-tunnel"]);
+
 export function matchStackToProject(
   stack: StackIdentity,
   projects: Array<Pick<Project, "id" | "name" | "slug" | "github_url">>,
   services: Array<Pick<Service, "project_id" | "compose_project" | "container_id">>,
   deploymentConfigs: Array<{ projectId: string; composeProject: string }>
 ): ProjectMatch {
+  if (PLATFORM_STACKS.has(stack.project)) {
+    return { projectId: null, confidence: "none", reasons: ["Infrastruktura dashboardu (agent wdrożeń lub konektor tunelu) — nie jest osobnym projektem."] };
+  }
   const known = new Map(projects.map((project) => [project.id, project]));
   const strong = new Map<string, string[]>();
   const weak = new Map<string, string[]>();
@@ -70,4 +76,35 @@ export function matchStackToProject(
     return { projectId, confidence: "medium", reasons };
   }
   return { projectId: null, confidence: "none", reasons: ["Brak dopasowania do projektu w dashboardzie."] };
+}
+
+/**
+ * One project can own only one stack. When several stacks match the same
+ * project, the stack named in its deployment config keeps the match; without
+ * such a config none of them is chosen automatically.
+ */
+export function resolveDuplicateMatches<T extends { project: string; match: ProjectMatch }>(
+  stacks: T[],
+  deploymentConfigs: Array<{ projectId: string; composeProject: string }>,
+  projects: Array<Pick<Project, "id" | "name">>
+): T[] {
+  const byProject = new Map<string, T[]>();
+  for (const stack of stacks) {
+    if (stack.match.projectId) byProject.set(stack.match.projectId, [...(byProject.get(stack.match.projectId) ?? []), stack]);
+  }
+  const names = new Map(projects.map((project) => [project.id, project.name]));
+  const replaced = new Map<T, ProjectMatch>();
+  for (const [projectId, claimants] of byProject) {
+    if (claimants.length < 2) continue;
+    const configured = deploymentConfigs.find((config) => config.projectId === projectId)?.composeProject;
+    const winner = claimants.find((stack) => stack.project === configured) ?? null;
+    for (const stack of claimants) {
+      if (stack === winner) continue;
+      const reason = winner
+        ? `Projekt „${names.get(projectId) ?? projectId}” należy do stacka ${winner.project} (konfiguracja wdrożenia).`
+        : `Projekt „${names.get(projectId) ?? projectId}” pasuje do kilku stacków: ${claimants.map((item) => item.project).join(", ")}. Wybierz ręcznie.`;
+      replaced.set(stack, { projectId: null, confidence: "none", reasons: [reason] });
+    }
+  }
+  return stacks.map((stack) => (replaced.has(stack) ? { ...stack, match: replaced.get(stack)! } : stack));
 }

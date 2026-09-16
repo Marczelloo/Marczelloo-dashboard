@@ -5,7 +5,7 @@ import { countHostnames } from "../inventory/ingress";
 import { dryRunAgainstContainers, renderImportedCompose, type DryRunReport } from "../render/compose-render";
 import type { GitFact, InventorySnapshot, MountFact, PortBinding } from "../types";
 import { buildEnvPlan, type EnvPlanEntry } from "./env-plan";
-import { matchStackToProject, type ProjectMatch } from "./match-projects";
+import { matchStackToProject, resolveDuplicateMatches, type ProjectMatch } from "./match-projects";
 import { matchIngressRoutes, type RouteMatch } from "./match-routes";
 
 export interface ImportInputs {
@@ -50,14 +50,23 @@ export type ImportProposalView = Omit<ImportProposal, "stacks"> & { stacks: Stac
 export function buildImportProposal(inputs: ImportInputs, id: string = randomUUID()): ImportProposal {
   const { snapshot } = inputs;
 
-  const stacks: StackProposal[] = snapshot.stacks.map((stack) => {
+  const matches = resolveDuplicateMatches(
+    snapshot.stacks.map((stack) => ({
+      project: stack.project,
+      match: matchStackToProject(
+        { project: stack.project, workingDir: stack.workingDir, containerNames: stack.containers.map((container) => container.name), gitRemote: stack.git?.remote ?? null },
+        inputs.projects,
+        inputs.services,
+        inputs.deploymentConfigs
+      ),
+    })),
+    inputs.deploymentConfigs,
+    inputs.projects
+  );
+
+  const stacks: StackProposal[] = snapshot.stacks.map((stack, index) => {
     const running = stack.containers.filter((container) => !container.oneOff && (container.status === "running" || container.status === "restarting"));
-    const match = matchStackToProject(
-      { project: stack.project, workingDir: stack.workingDir, containerNames: stack.containers.map((container) => container.name), gitRemote: stack.git?.remote ?? null },
-      inputs.projects,
-      inputs.services,
-      inputs.deploymentConfigs
-    );
+    const { match } = matches[index];
     const defaultEnvPath = stack.workingDir ? `${stack.workingDir}/.env` : null;
     const env = buildEnvPlan({
       containers: running,

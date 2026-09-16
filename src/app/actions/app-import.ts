@@ -95,11 +95,15 @@ export async function saveImportAction(input: z.input<typeof saveSchema>): Promi
     const stored = takeProposal(parsed.proposalId);
     if (!stored) return { success: false, error: "Skan wygasł albo serwer został zrestartowany — uruchom skanowanie ponownie." };
 
-    const knownProjects = new Set((await projects.getProjects({ limit: 1000 })).map((project) => project.id));
+    const allProjects = await projects.getProjects({ limit: 1000 });
+    const knownProjects = new Map(allProjects.map((project) => [project.id, project.name]));
     const unknown = parsed.decisions.find((decision) => decision.projectId && !knownProjects.has(decision.projectId));
     if (unknown) return { success: false, error: `Wybrany projekt dla ${unknown.composeProject} nie istnieje.` };
-    const duplicated = parsed.decisions.map((decision) => decision.projectId).filter((id, index, all) => id && all.indexOf(id) !== index);
-    if (duplicated.length) return { success: false, error: "Ten sam projekt przypisano do więcej niż jednego stacka." };
+    const duplicated = parsed.decisions.find((decision, index, all) => decision.projectId && all.findIndex((other) => other.projectId === decision.projectId) !== index);
+    if (duplicated) {
+      const stacks = parsed.decisions.filter((decision) => decision.projectId === duplicated.projectId).map((decision) => decision.composeProject).join(", ");
+      return { success: false, error: `Projekt „${knownProjects.get(duplicated.projectId!)}” przypisano do kilku stacków (${stacks}). Zostaw go przy jednym, pozostałe pomiń.` };
+    }
 
     const data = await saveImport(stored.proposal, stored.snapshot, parsed.decisions, user.email);
     revalidatePath("/import");
