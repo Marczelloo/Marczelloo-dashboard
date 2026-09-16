@@ -42,6 +42,8 @@ import {
 } from "@/components/ui";
 import { preflightDeploymentAction, provisionGitHubProjectAction } from "@/app/actions/projects";
 import { slugify } from "@/lib/utils";
+import type { BuildSpec } from "@/server/deployments/detect";
+import { BuildPlan } from "./build-plan";
 
 interface GitHubRepo {
   id: number;
@@ -105,6 +107,7 @@ export function GitHubRepoSelector() {
   const [hostname, setHostname] = useState("");
   const [localPort, setLocalPort] = useState("");
   const [preflight, setPreflight] = useState<Preflight | null>(null);
+  const [build, setBuild] = useState<BuildSpec | null>(null);
   const [checking, setChecking] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
 
@@ -149,6 +152,7 @@ export function GitHubRepoSelector() {
     setHostname("");
     setLocalPort("");
     setPreflight(null);
+    setBuild(null);
   }
 
   function configInput() {
@@ -164,6 +168,7 @@ export function GitHubRepoSelector() {
       exposure,
       hostname: hostname.trim() || undefined,
       localPort: localPort ? Number(localPort) : undefined,
+      build: build && build.kind !== "compose" ? build : null,
     };
   }
 
@@ -254,11 +259,13 @@ export function GitHubRepoSelector() {
             <Field label="Branch" icon={<GitBranch className="h-4 w-4" />}><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
             <Field label="Compose project"><Input value={composeProject} onChange={(event) => setComposeProject(event.target.value)} /></Field>
             <Field label="Repository path" className="md:col-span-2"><Input className="font-mono text-xs" value={repoPath} onChange={(event) => setRepoPath(event.target.value)} /><p className="text-xs text-muted-foreground">Nowe repo zostanie sklonowane tutaj. Istniejący katalog musi być poprawnym repozytorium Git.</p></Field>
-            <Field label="Compose file (optional)"><Input placeholder="Auto-detect: compose.yml" value={composeFile} onChange={(event) => setComposeFile(event.target.value)} /></Field>
+            {(!build || build.kind === "compose") && <Field label="Compose file (optional)"><Input placeholder="Auto-detect: compose.yml" value={composeFile} onChange={(event) => setComposeFile(event.target.value)} /></Field>}
             <Field label="Production profiles (optional)"><Input placeholder="api, production" value={profiles} onChange={(event) => setProfiles(event.target.value)} /><p className="text-xs text-muted-foreground">Tylko wybrane profile; `dev` nie jest uruchamiany automatycznie.</p></Field>
             <Field label="Runtime"><Select value={runtime} onValueChange={(value) => setRuntime(value as Runtime)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="web">Web application</SelectItem><SelectItem value="bot">Bot</SelectItem><SelectItem value="worker">Worker / background job</SelectItem><SelectItem value="stack">Multi-service stack</SelectItem></SelectContent></Select></Field>
             <Field label="Exposure"><Select value={exposure} onValueChange={(value) => setExposure(value as Exposure)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="internal">Internal only</SelectItem><SelectItem value="cloudflare">Cloudflare Tunnel</SelectItem></SelectContent></Select></Field>
           </div>
+
+          <BuildPlan githubUrl={selected.html_url} branch={branch} runtime={runtime} value={build} onChange={setBuild} />
 
           {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-border/70 bg-secondary/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-primary" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-muted-foreground">Po udanym deployu dashboard doda trasę tunelu i rekord DNS dla wybranej domeny.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
 

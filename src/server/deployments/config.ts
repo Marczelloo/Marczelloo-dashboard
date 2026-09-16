@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { BuildSpec } from "./detect";
 import { settings } from "@/server/atlashub";
 
 export type DeploymentRuntime = "web" | "worker" | "bot" | "stack";
@@ -31,6 +32,11 @@ export interface DeploymentConfig {
   tunnel: CloudflareTunnelRoute | null;
   /** Deploy engine; missing means the legacy runner script. */
   engine?: "script" | "agent";
+  /**
+   * How a repository without its own compose file is built (Dockerfile or a
+   * template); missing or kind "compose" means the repository's compose file.
+   */
+  build?: BuildSpec | null;
   createdAt: string;
   updatedAt: string;
 }

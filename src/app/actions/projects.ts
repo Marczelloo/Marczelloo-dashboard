@@ -33,6 +33,7 @@ import {
 import { queueAgentDeployment, readAgentDeployLog } from "@/server/agent/deploy";
 import { isAgentConfigured } from "@/server/agent/client";
 import { hostnameConflict } from "@/server/deployments/hostname-guard";
+import { validateBuildSpec, type BuildSpec } from "@/server/deployments/detect";
 import { agentLogRef, parseAgentLogRef } from "@/server/agent/refs";
 
 // ========================================
@@ -67,6 +68,29 @@ export interface ActionResult<T = void> {
   error?: string;
 }
 
+const nullableText = (max: number) => z.string().max(max).nullable();
+const buildSpecSchema = z
+  .object({
+    kind: z.enum(["compose", "dockerfile", "node", "static", "python"]),
+    framework: nullableText(40),
+    packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]).nullable(),
+    port: z.number().int().min(1).max(65535).nullable(),
+    installCommand: nullableText(300),
+    buildCommand: nullableText(300),
+    startCommand: nullableText(300),
+    outputDir: nullableText(200),
+    dockerfile: nullableText(200),
+    composeFile: nullableText(200),
+  })
+  .superRefine((spec, context) => {
+    for (const message of validateBuildSpec(spec)) context.addIssue({ code: z.ZodIssueCode.custom, message });
+  });
+
+/** A build spec of kind "compose" is the default path and is not stored. */
+function generatedBuild(spec: BuildSpec | null | undefined): BuildSpec | null {
+  return spec && spec.kind !== "compose" ? spec : null;
+}
+
 const deploymentSetupFields = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
@@ -84,6 +108,7 @@ const deploymentSetupFields = z.object({
   hostname: z.string().max(253).regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i, "Hostname must be a valid domain").optional(),
   localPort: z.coerce.number().int().min(1).max(65535).optional(),
   deployNow: z.boolean().default(true),
+  build: buildSpecSchema.nullable().optional(),
 });
 
 const deploymentSetupSchema = deploymentSetupFields.superRefine((value, context) => {
@@ -216,6 +241,9 @@ async function queueConfiguredDeployment(
   }
 
   const service = await ensureDeploymentService(projectId, project.name, config);
+  if (generatedBuild(config.build) && config.engine !== "agent") {
+    return { success: false, error: "Ten projekt jest budowany bez własnego compose — przełącz go na agenta wdrożeń." };
+  }
   if (config.engine === "agent") {
     const queued = await queueAgentDeployment({ config, serviceId: service.id, triggeredBy, commitSha });
     const logFile = agentLogRef(queued.jobId);
@@ -294,6 +322,8 @@ export async function preflightDeploymentAction(input: Omit<DeploymentSetupInput
       runtime: parsed.runtime as DeploymentRuntime,
       exposure: parsed.exposure as DeploymentExposure,
       tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort } : null,
+      build: generatedBuild(parsed.build),
+      ...(isAgentConfigured() ? { engine: "agent" as const } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -321,6 +351,9 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
       const conflict = await findHostnameConflict("new", parsed.hostname, []);
       if (conflict) return { success: false, error: conflict };
     }
+    if (generatedBuild(parsed.build) && !isAgentConfigured()) {
+      return { success: false, error: "Build bez własnego compose wymaga agenta wdrożeń (brak AGENT_TOKEN)." };
+    }
 
     const project = await projects.createProject({
       name: parsed.name,
@@ -346,6 +379,7 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
         ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort }
         : null,
       ...(isAgentConfigured() ? { engine: "agent" as const } : {}),
+      build: generatedBuild(parsed.build),
     });
     await ensureDeploymentService(project.id, project.name, config);
     const preflight = await preflightDeployment(config);

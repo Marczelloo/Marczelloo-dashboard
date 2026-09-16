@@ -30,8 +30,19 @@ describe("toAgentTarget", () => {
       composeFile: null,
       profiles: [],
       tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false },
+      generatedCompose: null,
     });
     expect(toAgentTarget(config, true).tunnel?.probe).toBe(true);
+  });
+
+  it("renders a compose file for repositories built from a template", () => {
+    const target = toAgentTarget({
+      ...config,
+      build: { kind: "node", framework: "next", packageManager: "npm", port: 3000, installCommand: "npm ci", buildCommand: "npm run build", startCommand: "npm run start", outputDir: null, dockerfile: null, composeFile: null },
+    });
+    expect(target.generatedCompose).toContain("dockerfile_inline");
+    expect(target.generatedCompose).toContain("127.0.0.1:3202:3000");
+    expect(toAgentTarget({ ...config, build: { kind: "compose", framework: null, packageManager: null, port: null, installCommand: null, buildCommand: null, startCommand: null, outputDir: null, dockerfile: null, composeFile: "compose.yml" } }).generatedCompose).toBeNull();
   });
 
   it("drops a disabled tunnel", () => {

@@ -186,10 +186,16 @@ ${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.gi
   if (repoState === "git") messages.push({ level: "success", text: "Znaleziono istniejące repozytorium Git." });
   if (values.get("GIT_REMOTE") !== "0") messages.push({ level: "error", text: appCloneError || "Pi nie ma dostępu Git do tego repozytorium. Skonfiguruj klucz deploy/SSH dla GitHuba." });
   else messages.push({ level: "success", text: appCloneAccess ? "GitHub App potwierdził ograniczony dostęp do repo dla tego wdrożenia." : "Dostęp Git z Raspberry Pi został potwierdzony." });
-  if (composePath && values.get("COMPOSE_VALID") === "yes") messages.push({ level: "success", text: `Compose poprawny: ${composeFile}.` });
-  if (composePath && values.get("COMPOSE_VALID") !== "yes") messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
-  if (!composePath && repoState !== "missing") messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
-  if (repoState === "missing") messages.push({ level: "warning", text: "Compose zostanie wykryty po pierwszym klonowaniu; można wskazać jego ścieżkę ręcznie." });
+  const generated = Boolean(config.build && config.build.kind !== "compose");
+  if (generated) {
+    const kind = config.build!.kind === "dockerfile" ? `Dockerfile (${config.build!.dockerfile})` : `szablon ${config.build!.framework ?? config.build!.kind}`;
+    messages.push({ level: "success", text: `Compose zostanie wygenerowany przez dashboard: ${kind}.` });
+    if (config.engine !== "agent") messages.push({ level: "error", text: "Build z szablonu wymaga wdrażania przez agenta." });
+  }
+  if (!generated && composePath && values.get("COMPOSE_VALID") === "yes") messages.push({ level: "success", text: `Compose poprawny: ${composeFile}.` });
+  if (!generated && composePath && values.get("COMPOSE_VALID") !== "yes") messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
+  if (!generated && !composePath && repoState !== "missing") messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
+  if (!generated && repoState === "missing") messages.push({ level: "warning", text: "Compose zostanie wykryty po pierwszym klonowaniu; można wskazać jego ścieżkę ręcznie." });
   if (config.tunnel?.enabled && !getManagedTunnelSettings() && !tunnelSettings?.configPath) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale nie skonfigurowano jego pliku ingress w Settings." });
   if (config.tunnel?.enabled && portInUse) messages.push({ level: "warning", text: `Port ${config.tunnel.localPort} jest już używany; zostanie użyty jako źródło tunelu.` });
 
