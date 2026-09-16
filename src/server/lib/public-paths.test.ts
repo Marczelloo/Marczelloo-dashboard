@@ -7,6 +7,7 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/api/github/webhook")).toBe(true);
     expect(isPublicPath("/api/github/webhook/")).toBe(true);
     expect(isPublicPath("/api/cron/monitoring")).toBe(true);
+    expect(isPublicPath("/api/agent/events")).toBe(true);
   });
 
   it("does not allow look-alike or nested paths", () => {
