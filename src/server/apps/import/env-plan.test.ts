@@ -53,6 +53,29 @@ describe("buildEnvPlan", () => {
     expect(entry).toMatchObject({ key: "PORT", perService: { dashboard: "3100", demo: "3101" }, conflicts: ["services-differ"], services: ["dashboard", "demo"] });
   });
 
+  it("does not flag interpolation-only file values when compose explains the container value (dashboard case)", () => {
+    const [entry] = buildEnvPlan({
+      containers: [container("dashboard", { RUNNER_URL: "http://runner:8787" })],
+      imageEnv: {},
+      composeConfig: { services: { dashboard: { environment: { RUNNER_URL: "http://runner:8787" } } } },
+      envFiles: [{ path: "/p/stack/.env", entries: [{ key: "RUNNER_URL", value: "http://127.0.0.1:8787" }], interpolation: true }],
+      legacy: [],
+    });
+    expect(entry).toMatchObject({ key: "RUNNER_URL", origin: "compose", conflicts: [] });
+  });
+
+  it("recognises file keys whose container value equals the image default (Drive case)", () => {
+    const plan = buildEnvPlan({
+      containers: [container("drive", { NODE_ENV: "production", PORT: "3000" })],
+      imageEnv: { img: { NODE_ENV: "production", PORT: "3000" } },
+      composeConfig: null,
+      envFiles: [{ path: "/p/stack/.env", entries: [{ key: "NODE_ENV", value: "production" }, { key: "PORT", value: "4000" }], interpolation: true }],
+      legacy: [],
+    });
+    expect(plan.find((entry) => entry.key === "NODE_ENV")).toMatchObject({ origin: "file", services: ["drive"], include: true, conflicts: [] });
+    expect(plan.find((entry) => entry.key === "PORT")).toMatchObject({ origin: "file", services: ["drive"], include: true, conflicts: ["file-differs"] });
+  });
+
   it("does not include keys that exist only in a non-interpolation env file", () => {
     const [entry] = buildEnvPlan({
       containers: [],

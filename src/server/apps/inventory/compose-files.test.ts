@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractEnvFileRefs } from "./compose-files";
+import { extractEnvFileRefs, normalizeComposeConfig } from "./compose-files";
 
 describe("extractEnvFileRefs", () => {
   it("resolves string, list and object env_file entries relative to the compose file", () => {
@@ -25,5 +25,17 @@ describe("extractEnvFileRefs", () => {
 
   it("returns nothing for files without services", () => {
     expect(extractEnvFileRefs("x: 1", "/a/docker-compose.yml")).toEqual([]);
+  });
+});
+
+describe("normalizeComposeConfig", () => {
+  it("unescapes $$ in environment values and labels from docker compose config JSON", () => {
+    const config = normalizeComposeConfig({
+      name: "x",
+      services: { app: { environment: { PIN_HASH: "$$2a$$10$$abc", EMPTY: null, PLAIN: "p" }, labels: { note: "a$$b" } }, bare: {} },
+    });
+    expect(config.services.app.environment).toEqual({ PIN_HASH: "$2a$10$abc", EMPTY: null, PLAIN: "p" });
+    expect(config.services.app.labels).toEqual({ note: "a$b" });
+    expect(config.services.bare).toEqual({});
   });
 });

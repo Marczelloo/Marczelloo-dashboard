@@ -31,6 +31,15 @@ describe("parseEnvLines", () => {
     expect(parseEnvLines("# a\n\nnot an entry\nX=1").map((line) => line.kind)).toEqual(["other", "other", "other", "entry"]);
   });
 
+  it("treats $$ as a literal dollar outside single quotes like Compose", () => {
+    expect(parseEnvEntries(["U=a$$b", 'D="c$$d"', "S='e$$f'", "PIN_HASH=$$2a$$10$$abc"].join("\n"))).toEqual([
+      { key: "U", value: "a$b" },
+      { key: "D", value: "c$d" },
+      { key: "S", value: "e$$f" },
+      { key: "PIN_HASH", value: "$2a$10$abc" },
+    ]);
+  });
+
   it("uses the last duplicate like Compose", () => {
     expect(parseEnvEntries("X=1\nX=2")).toEqual([{ key: "X", value: "2" }]);
   });
@@ -73,6 +82,11 @@ describe("updateEnvContent", () => {
       { key: "D", value: "new" },
     ]);
     expect(next).toBe("# AtlasHub\nA=1\nB='changed $value'\n\n# tail\nD=new\n");
+  });
+
+  it("keeps an escaped hash untouched when its value did not change", () => {
+    const original = ["PIN_HASH=$$2a$$10$$abc", ""].join("\n");
+    expect(updateEnvContent(original, [{ key: "PIN_HASH", value: "$2a$10$abc" }])).toBe(original);
   });
 
   it("drops later duplicates of an updated key", () => {

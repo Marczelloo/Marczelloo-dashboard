@@ -75,7 +75,11 @@ export function buildImportProposal(inputs: ImportInputs, id: string = randomUUI
     const warnings: string[] = [];
     if (stack.composeConfigError) warnings.push(`Nie udało się odczytać konfiguracji Compose: ${stack.composeConfigError}`);
     if (!stack.git) warnings.push("Katalog nie jest repozytorium Git — wdrożenie z GitHuba wymaga podpięcia repo.");
-    if (stack.otherEnvFiles.length) warnings.push(`Pominięte pliki env w katalogu: ${stack.otherEnvFiles.join(", ")}.`);
+    if (stack.otherEnvFiles.length > 5) {
+      warnings.push(`Pominięte pliki env w katalogu (${stack.otherEnvFiles.length}): ${stack.otherEnvFiles.slice(0, 5).join(", ")} i ${stack.otherEnvFiles.length - 5} innych.`);
+    } else if (stack.otherEnvFiles.length) {
+      warnings.push(`Pominięte pliki env w katalogu: ${stack.otherEnvFiles.join(", ")}.`);
+    }
     if (stack.configFiles.some((file) => file.includes("/.dashboard/"))) {
       warnings.push("Stack używa pliku override z katalogu logów dashboardu — przy przełączeniu trafi do konfiguracji.");
     }

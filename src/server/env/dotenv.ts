@@ -26,6 +26,11 @@ function unescapeDoubleQuoted(value: string): string {
   return value.replace(/\\([\\"nrt])/g, (_match, char: string) => ({ n: "\n", r: "\r", t: "\t" })[char as "n" | "r" | "t"] ?? char);
 }
 
+// Compose treats "$$" as a literal "$" in unquoted and double-quoted values.
+function unescapeDollars(value: string): string {
+  return value.replace(/\$\$/g, "$");
+}
+
 export function parseEnvLines(content: string): EnvLine[] {
   const lines = content.replace(/\r\n/g, "\n").split("\n");
   if (lines.at(-1) === "") lines.pop();
@@ -51,13 +56,13 @@ export function parseEnvLines(content: string): EnvLine[] {
         block += `\n${lines[index]}`;
       }
       const end = closingQuoteIndex(body);
-      result.push({ kind: "entry", key, value: unescapeDoubleQuoted(end === -1 ? body : body.slice(0, end)), raw: block });
+      result.push({ kind: "entry", key, value: unescapeDollars(unescapeDoubleQuoted(end === -1 ? body : body.slice(0, end))), raw: block });
     } else if (value.startsWith("'")) {
       const end = value.indexOf("'", 1);
       result.push({ kind: "entry", key, value: end === -1 ? value.slice(1) : value.slice(1, end), raw });
     } else {
       const comment = value.search(/\s#/);
-      result.push({ kind: "entry", key, value: (comment === -1 ? value : value.slice(0, comment)).trim(), raw });
+      result.push({ kind: "entry", key, value: unescapeDollars((comment === -1 ? value : value.slice(0, comment)).trim()), raw });
     }
   }
 

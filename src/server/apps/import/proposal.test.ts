@@ -49,6 +49,12 @@ describe("buildImportProposal", () => {
     expect(proposal.projectsWithoutStack).toEqual([{ id: "arcade", name: "Arcade Portfolio" }]);
   });
 
+  it("summarises long lists of skipped env files", () => {
+    const many = { ...snapshot, stacks: [{ ...snapshot.stacks[0], otherEnvFiles: Array.from({ length: 8 }, (_, index) => `.env.backup-${index}`) }] };
+    const [stack] = buildImportProposal({ snapshot: many, projects, services: [] as Service[], legacyEnv: [], deploymentConfigs: [] }, "proposal-1").stacks;
+    expect(stack.warnings[0]).toBe("Pominięte pliki env w katalogu (8): .env.backup-0, .env.backup-1, .env.backup-2, .env.backup-3, .env.backup-4 i 3 innych.");
+  });
+
   it("produces a client view without env values", () => {
     const proposal = buildImportProposal({ snapshot, projects, services: [] as Service[], legacyEnv: [], deploymentConfigs: [] }, "proposal-1");
     const view = toProposalView(proposal, projects);

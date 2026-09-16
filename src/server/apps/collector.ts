@@ -2,7 +2,7 @@ import "server-only";
 
 import { getCloudflareTunnelSettings, runHostCommand } from "@/server/deployments";
 import { buildEnvFilesCommand, buildInspectCommand, buildStackProbeCommand, IMAGE_ID, parseGit, parseImageEnv, type StackLocation } from "./inventory/commands";
-import { extractEnvFileRefs } from "./inventory/compose-files";
+import { extractEnvFileRefs, normalizeComposeConfig } from "./inventory/compose-files";
 import { groupByComposeProject, parseDockerInspect } from "./inventory/docker-facts";
 import { parseIngressConfig } from "./inventory/ingress";
 import { parseSections, type Section } from "./inventory/sections";
@@ -55,7 +55,7 @@ export async function collectInventory(): Promise<InventorySnapshot> {
     let composeConfigError: string | null = null;
     if (config && config.exitCode === 0) {
       try {
-        composeConfig = JSON.parse(config.body) as ComposeConfig;
+        composeConfig = normalizeComposeConfig(JSON.parse(config.body) as ComposeConfig);
       } catch {
         composeConfigError = "Niepoprawny JSON z docker compose config.";
       }
