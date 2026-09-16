@@ -48,7 +48,7 @@ docker exec marczelloo-dashboard wget -qO- http://mz-agent:8790/health
 ```
 
 Expected: klient i serwer Dockera odpowiadają, `Docker Compose version v5.0.2`, wersja Git, `{"ok":true}`.
-Jeśli `docker version` w kontenerze zgłasza brak bibliotek, binarka z hosta nie jest statyczna: w `Dockerfile` zamień `COPY vendor/docker …` na instalację `docker-ce-cli` z repozytorium Docker dla Debiana i zbuduj ponownie (Compose zostaje z `vendor/`).
+Sprawdzone 16.09.2026: host to Debian 12 (glibc 2.36), `docker` z pakietu `docker-ce-cli` wymaga GLIBC ≤ 2.34, plugin Compose jest statyczny — oba działają w `node:20-bookworm-slim`. Jeśli po aktualizacji systemu `docker version` w kontenerze zgłosi brak bibliotek: w `Dockerfile` zamień `COPY vendor/docker …` na instalację `docker-ce-cli` z repozytorium Docker dla Debiana i zbuduj ponownie (Compose zostaje z `vendor/`).
 
 ## 4. Odtworzenie dashboardu z `AGENT_TOKEN` (zgoda)
 

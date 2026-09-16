@@ -3231,7 +3231,7 @@ docker exec marczelloo-dashboard wget -qO- http://mz-agent:8790/health
 ```
 
 Expected: klient i serwer Dockera odpowiadają, `Docker Compose version v5.0.2`, wersja Git, `{"ok":true}`.
-Jeśli `docker version` w kontenerze zgłasza brak bibliotek, binarka z hosta nie jest statyczna: w `Dockerfile` zamień `COPY vendor/docker …` na instalację `docker-ce-cli` z repozytorium Docker dla Debiana i zbuduj ponownie (Compose zostaje z `vendor/`).
+Sprawdzone 16.09.2026: host to Debian 12 (glibc 2.36), `docker` z pakietu `docker-ce-cli` wymaga GLIBC ≤ 2.34, plugin Compose jest statyczny — oba działają w `node:20-bookworm-slim`. Jeśli po aktualizacji systemu `docker version` w kontenerze zgłosi brak bibliotek: w `Dockerfile` zamień `COPY vendor/docker …` na instalację `docker-ce-cli` z repozytorium Docker dla Debiana i zbuduj ponownie (Compose zostaje z `vendor/`).
 
 ## 4. Odtworzenie dashboardu z `AGENT_TOKEN` (zgoda)
 
@@ -3302,4 +3302,5 @@ git commit -m "docs: add stage 2 deploy agent runbook"
 - Task 1: w teście „keeps releases unchanged after a rollback” zmienna ma jawny typ `AgentState` (bez niego `tsc` zawęża `projects` do literału).
 - Task 6: `exec.ts` rzutuje minimalne środowisko na `NodeJS.ProcessEnv` — typy Next.js wymagają `NODE_ENV`, którego procesy potomne celowo nie dostają.
 - Task 10: `getDeployEngineAction` w trybie demo zwraca „niezarządzany” bez `requireAuth()` (użytkownik demo nie jest właścicielem; inaczej każda strona projektu w demo pokazywałaby błąd).
+- Pi (tylko odczyt): Debian 12, glibc 2.36; `/usr/bin/docker` (docker-ce-cli 29.2.0) linkowany dynamicznie, wymaga GLIBC ≤ 2.34; plugin Compose v5.0.2 statyczny. Etykiety `marczelloo-tools` potwierdzają katalog projektu = katalog pliku Compose.
 - Weryfikacja lokalna: proces agenta uruchomiony z atrapą dashboardu — zadanie przeszło kolejkę, `git clone` bez dostępu zakończył się błędem bez promptu, zdarzenia `started`/`finished` dotarły w kolejności z poprawnym tokenem. Obraz Dockera nie był budowany lokalnie (Docker Desktop wyłączony); buduje go runbook na Pi.
