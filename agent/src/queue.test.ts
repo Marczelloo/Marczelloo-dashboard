@@ -47,6 +47,16 @@ describe("enqueue", () => {
     expect(state.jobs[0].error).toContain("bbbbbbb");
   });
 
+  it("closes a request for the commit that is already being deployed", () => {
+    let state = startJob(enqueue(emptyState(), input("j1", "a"), "t1").state, "j1", "t2");
+    const result = enqueue(state, input("j2", "a"), "t3");
+    state = result.state;
+    expect(result.job).toMatchObject({ id: "j2", status: "superseded" });
+    expect(result.job.error).toContain("j1");
+    expect(nextJob(state)).toBeNull();
+    expect(state.outbox.at(-1)).toMatchObject({ id: "j2:finished", status: "superseded", deployId: "d-j2" });
+  });
+
   it("does not coalesce running jobs, rollbacks or other projects", () => {
     let state = enqueue(emptyState(), input("j1", "a"), "t1").state;
     state = startJob(state, "j1", "t2");
@@ -78,16 +88,22 @@ describe("finishJob", () => {
   it("finishes the job, stores the release and emits a finished event", () => {
     let state = enqueue(emptyState(), input("j1", "a"), "t1").state;
     state = startJob(state, "j1", "t2");
-    state = finishJob(state, "j1", { status: "succeeded", error: null, rolledBackTo: null, release: release("a"), orphanImages: [] }, "t3");
+    state = finishJob(state, "j1", { status: "succeeded", error: null, rolledBackTo: null, release: release("a"), baseline: null, orphanImages: [] }, "t3");
     expect(state.jobs[0]).toMatchObject({ status: "succeeded", finishedAt: "t3" });
     expect(state.projects["marczelloo-tools"].releases.map((item) => item.sha)).toEqual([sha("a")]);
     expect(state.outbox.at(-1)).toMatchObject({ id: "j1:finished", status: "succeeded" });
   });
 
+  it("records the live baseline before the new release", () => {
+    let state = startJob(enqueue(emptyState(), input("j1", "b"), "t1").state, "j1", "t2");
+    state = finishJob(state, "j1", { status: "succeeded", error: null, rolledBackTo: null, release: release("b"), baseline: release("a"), orphanImages: [] }, "t3");
+    expect(state.projects["marczelloo-tools"].releases.map((item) => item.sha)).toEqual([sha("b"), sha("a")]);
+  });
+
   it("keeps releases unchanged after a rollback", () => {
     let state: AgentState = { ...emptyState(), projects: { "marczelloo-tools": { releases: [release("a")] } } };
     state = startJob(enqueue(state, input("j1", "b"), "t1").state, "j1", "t2");
-    state = finishJob(state, "j1", { status: "rolled_back", error: "unhealthy", rolledBackTo: sha("a"), release: null, orphanImages: [] }, "t3");
+    state = finishJob(state, "j1", { status: "rolled_back", error: "unhealthy", rolledBackTo: sha("a"), release: null, baseline: null, orphanImages: [] }, "t3");
     expect(state.projects["marczelloo-tools"].releases.map((item) => item.sha)).toEqual([sha("a")]);
     expect(state.outbox.at(-1)).toMatchObject({ status: "rolled_back", rolledBackTo: sha("a"), error: "unhealthy" });
   });

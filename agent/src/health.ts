@@ -30,6 +30,19 @@ export function parseInspectSamples(json: string): ContainerSample[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Compose service → image ID of its running container (one-off containers ignored). */
+export function parseServiceImages(json: string): Record<string, string> {
+  const images: Record<string, string> = {};
+  for (const item of JSON.parse(json) as Array<RawInspect & { Image?: string }>) {
+    const labels = item.Config?.Labels ?? {};
+    const service = labels["com.docker.compose.service"];
+    if (!service || labels["com.docker.compose.oneoff"] === "True" || !item.Image) continue;
+    if (item.State?.Status !== "running" && item.State?.Status !== "restarting") continue;
+    images[service] = item.Image;
+  }
+  return images;
+}
+
 export function assessContainers(samples: ContainerSample[][], elapsedMs: number, options: { stableMs: number; timeoutMs: number }): GateState {
   const latest = samples.at(-1) ?? [];
   if (!latest.length) return { state: "fail", reason: "Projekt nie ma żadnych kontenerów po uruchomieniu." };

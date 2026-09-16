@@ -9,7 +9,11 @@ export interface DeployTarget {
   branch: string;
   composeFile: string | null;
   profiles: string[];
-  tunnel: { hostname: string; localPort: number } | null;
+  /**
+   * probe: the Cloudflare route already points at localPort, so the public
+   * hostname can be part of the health gate.
+   */
+  tunnel: { hostname: string; localPort: number; probe: boolean } | null;
 }
 
 export interface Job {

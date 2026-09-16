@@ -35,6 +35,19 @@ export function readAgentJobLog(jobId: string, offset: number): Promise<{ conten
   return agentFetch(`/jobs/${jobId}/log?offset=${Math.max(0, Math.floor(offset))}`);
 }
 
+/** The agent returns at most 256 KB per call; keep reading until the end of the log. */
+export async function readAgentJobLogToEnd(jobId: string, offset: number, maxBytes = 8 * 1024 * 1024): Promise<{ content: string; nextOffset: number }> {
+  let content = "";
+  let nextOffset = offset;
+  while (nextOffset - offset < maxBytes) {
+    const chunk = await readAgentJobLog(jobId, nextOffset);
+    if (!chunk.content || chunk.nextOffset === nextOffset) break;
+    content += chunk.content;
+    nextOffset = chunk.nextOffset;
+  }
+  return { content, nextOffset };
+}
+
 export function getAgentProject(composeProject: string): Promise<{ releases: Release[]; activeJob: Job | null }> {
   return agentFetch(`/projects/${encodeURIComponent(composeProject)}`);
 }

@@ -19,6 +19,8 @@ export interface JobOutcome {
   error: string | null;
   rolledBackTo: string | null;
   release: Release | null;
+  /** Images of the version that was live before this deploy, tagged by the agent. */
+  baseline: Release | null;
   /** Images built by this job that no release keeps (failed or rolled back deploys). */
   orphanImages: string[];
 }
@@ -65,6 +67,14 @@ function updateJob(state: AgentState, jobId: string, change: (job: Job) => Job):
 
 export function enqueue(state: AgentState, input: EnqueueInput, now: string): { state: AgentState; job: Job } {
   const job: Job = { ...input, status: "queued", createdAt: now, startedAt: null, finishedAt: null, error: null, rolledBackTo: null };
+  const running = state.jobs.find(
+    (candidate) => candidate.status === "running" && candidate.kind === "deploy" && candidate.target.composeProject === input.target.composeProject && candidate.sha === input.sha
+  );
+  if (input.kind === "deploy" && running) {
+    // A redelivered webhook or a double click must not rebuild the commit being deployed.
+    const duplicate: Job = { ...job, status: "superseded", finishedAt: now, error: `Ten commit jest już wdrażany (zadanie ${running.id}).` };
+    return { state: prune({ ...state, jobs: [...state.jobs, duplicate], outbox: [...state.outbox, eventFor(duplicate, "job.finished", now)] }), job: duplicate };
+  }
   const superseded = new Set(
     input.kind === "deploy"
       ? state.jobs
@@ -106,8 +116,9 @@ export function finishJob(state: AgentState, jobId: string, outcome: JobOutcome,
     finishedAt: now,
   }));
   const project = job.target.composeProject;
-  const current = state.projects[project]?.releases ?? [];
-  const releases = outcome.release ? recordRelease(current, outcome.release) : current;
+  let releases = state.projects[project]?.releases ?? [];
+  if (outcome.baseline) releases = recordRelease(releases, outcome.baseline);
+  if (outcome.release) releases = recordRelease(releases, outcome.release);
   return prune({
     ...state,
     jobs,

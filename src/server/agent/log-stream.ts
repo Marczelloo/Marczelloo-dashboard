@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getAgentJob, readAgentJobLog } from "./client";
+import { getAgentJob, readAgentJobLogToEnd } from "./client";
 
 const HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -35,7 +35,7 @@ export function agentLogStream(jobId: string, signal: AbortSignal): Response {
           complete = job.status !== "queued" && job.status !== "running";
           success = job.status === "succeeded";
           // Read after the status so the final lines of a finished job are included.
-          const log = await readAgentJobLog(jobId, offset);
+          const log = await readAgentJobLogToEnd(jobId, offset);
           if (log.content && !send("log", { content: log.content })) break;
           offset = log.nextOffset;
           if (!send("status", { running: !complete, offset, success, agentStatus: job.status })) break;

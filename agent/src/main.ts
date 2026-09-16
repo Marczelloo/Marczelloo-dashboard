@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { probe, sampleContainers } from "./docker";
+import { fetchCloneToken } from "./dashboard";
+import { probe, sampleContainers, serviceImages } from "./docker";
 import { runCommand } from "./exec";
 import { runDeploy, runRollback, type PipelineDeps } from "./pipeline";
 import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, staleImages, startJob, type JobOutcome } from "./queue";
@@ -16,10 +17,11 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const token = requireEnv("AGENT_TOKEN");
-if (token.length < 32) throw new Error("AGENT_TOKEN must have at least 32 characters");
+const agentToken = requireEnv("AGENT_TOKEN");
+if (agentToken.length < 32) throw new Error("AGENT_TOKEN must have at least 32 characters");
 const projectsDir = requireEnv("PROJECTS_DIR").replace(/\/+$/, "");
-const eventsUrl = requireEnv("DASHBOARD_EVENTS_URL");
+const dashboardUrl = requireEnv("DASHBOARD_URL").replace(/\/+$/, "");
+const eventsUrl = `${dashboardUrl}/api/agent/events`;
 const dataDir = process.env.AGENT_DATA_DIR || path.posix.join(projectsDir, ".dashboard", "agent");
 const port = Number(process.env.AGENT_PORT || 8790);
 
@@ -36,7 +38,7 @@ const mutate = (change: (current: AgentState) => AgentState) => {
   store.save(state);
 };
 
-createAgentServer({ token, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, now: iso, newId: randomUUID }).listen(port, "0.0.0.0", () => {
+createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, now: iso, newId: randomUUID }).listen(port, "0.0.0.0", () => {
   console.log(`[agent] listening on :${port}, data in ${dataDir}`);
 });
 
@@ -53,6 +55,7 @@ async function execute(job: Job): Promise<JobOutcome> {
     exists: existsSync,
     writeFile: (file, content) => writeFileSync(file, content, { mode: 0o600 }),
     sampleContainers,
+    serviceImages,
     probe,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     log,
@@ -62,9 +65,13 @@ async function execute(job: Job): Promise<JobOutcome> {
   };
   log(`[agent] ${job.kind} ${job.target.composeProject} @ ${job.sha} (${job.triggeredBy})`);
   const releases = state.projects[job.target.composeProject]?.releases ?? [];
-  if (job.kind === "deploy") return runDeploy(job, tokens.get(job.id) ?? null, releases[0] ?? null, deps);
+  if (job.kind === "deploy") {
+    // Prefer a fresh token: the one sent with the request expires after an hour and is lost on restart.
+    const token = (await fetchCloneToken(dashboardUrl, agentToken, job.target.projectId)) ?? tokens.get(job.id) ?? null;
+    return runDeploy(job, token, releases[0] ?? null, deps);
+  }
   const release = releases.find((candidate) => candidate.sha === job.sha);
-  if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, orphanImages: [] };
+  if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
   return runRollback(job, release, deps);
 }
 
@@ -81,7 +88,7 @@ async function work() {
     try {
       outcome = await execute(job);
     } catch (error) {
-      outcome = { status: "failed", error: `Błąd wewnętrzny agenta: ${error instanceof Error ? error.message : String(error)}`, rolledBackTo: null, release: null, orphanImages: [] };
+      outcome = { status: "failed", error: `Błąd wewnętrzny agenta: ${error instanceof Error ? error.message : String(error)}`, rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
     }
     store.appendLog(job.id, `[agent] Wynik: ${outcome.status}${outcome.error ? ` — ${outcome.error}` : ""}\n`);
     mutate((current) => finishJob(current, job.id, outcome, iso()));
@@ -93,7 +100,7 @@ async function work() {
   }
 }
 
-const sendEvent = httpEventSender(eventsUrl, token);
+const sendEvent = httpEventSender(eventsUrl, agentToken);
 let reporting = false;
 async function report() {
   if (reporting || !state.outbox.length) return;

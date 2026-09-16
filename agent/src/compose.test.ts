@@ -10,7 +10,7 @@ const target: DeployTarget = {
   branch: "main",
   composeFile: null,
   profiles: ["default"],
-  tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202 },
+  tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: true },
 };
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 

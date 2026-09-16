@@ -13,7 +13,7 @@ services:
     environment:
       AGENT_TOKEN: ${AGENT_TOKEN:?AGENT_TOKEN is required}
       PROJECTS_DIR: ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}
-      DASHBOARD_EVENTS_URL: http://marczelloo-dashboard:3100/api/agent/events
+      DASHBOARD_URL: http://marczelloo-dashboard:3100
       AGENT_PORT: "8790"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

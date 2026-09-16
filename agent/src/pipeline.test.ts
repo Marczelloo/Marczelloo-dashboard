@@ -23,7 +23,7 @@ function job(kind: "deploy" | "rollback", sha: string): Job {
       branch: "main",
       composeFile: null,
       profiles: [],
-      tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202 },
+      tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: true },
     },
     sha,
     deployId: "22222222-2222-4222-8222-222222222222",
@@ -37,7 +37,9 @@ function job(kind: "deploy" | "rollback", sha: string): Job {
   };
 }
 
-function harness(options: { failLabel?: string; dirty?: boolean; notGit?: boolean; samples?: ContainerSample[][]; probes?: Array<number | null> } = {}) {
+function harness(
+  options: { failLabel?: string; dirty?: boolean; notGit?: boolean; samples?: ContainerSample[][]; probes?: Array<number | null>; live?: string; running?: Record<string, string> } = {}
+) {
   let clock = 0;
   const steps: CommandStep[] = [];
   const writes: Array<{ file: string; content: string }> = [];
@@ -49,6 +51,7 @@ function harness(options: { failLabel?: string; dirty?: boolean; notGit?: boolea
     run: async (step) => {
       steps.push(step);
       if (options.failLabel && step.label.startsWith(options.failLabel)) return { code: 1, stdout: "", stderr: "boom" };
+      if (step.args.includes("rev-parse")) return { code: 0, stdout: `${options.live ?? OLD}\n`, stderr: "" };
       if (step.args.includes("--porcelain")) return { code: 0, stdout: options.dirty ? " M src/app.ts\n" : "", stderr: "" };
       if (step.args.includes("--format")) return { code: 0, stdout: CONFIG, stderr: "" };
       return { code: 0, stdout: "", stderr: "" };
@@ -58,6 +61,7 @@ function harness(options: { failLabel?: string; dirty?: boolean; notGit?: boolea
       writes.push({ file, content });
     },
     sampleContainers: async () => samples.shift() ?? [healthy],
+    serviceImages: async () => options.running ?? {},
     probe: async () => (probes.length > 1 ? probes.shift()! : probes[0]),
     sleep: async (ms) => {
       clock += ms;
@@ -78,8 +82,9 @@ describe("runDeploy", () => {
   it("builds the exact commit with SHA-tagged images and records the release", async () => {
     const { deps, steps, writes } = harness();
     const outcome = await runDeploy(job("deploy", NEW), "ghs_token", previous, deps);
-    expect(labels(steps)).toEqual(["Sprawdzenie lokalnych zmian", "Git fetch bbbbbbb", "Git checkout bbbbbbb", "Compose config", "Walidacja Compose", "Build", "Uruchomienie"]);
-    expect(steps[1].env?.GIT_CONFIG_VALUE_0).toBeDefined();
+    expect(labels(steps)).toEqual(["Aktualny commit", "Sprawdzenie lokalnych zmian", "Git fetch bbbbbbb", "Git checkout bbbbbbb", "Compose config", "Walidacja Compose", "Build", "Uruchomienie"]);
+    expect(steps[2].env?.GIT_CONFIG_VALUE_0).toBeDefined();
+    expect(steps.at(-1)?.args.slice(-4)).toEqual(["-d", "--no-build", "--pull", "missing"]);
     expect(steps.find((step) => step.label === "Compose config")?.quiet).toBe(true);
     expect(writes).toEqual([{ file: "/data/overrides/marczelloo-tools.yml", content: 'services:\n  "app":\n    image: "marczelloo-tools-app:bbbbbbbbbbbb"\n' }]);
     expect(outcome).toMatchObject({ status: "succeeded", error: null, release: { sha: NEW, images: { app: "marczelloo-tools-app:bbbbbbbbbbbb" } }, orphanImages: [] });
@@ -96,7 +101,7 @@ describe("runDeploy", () => {
   it("refuses to overwrite local changes or a directory that is not a Git checkout", async () => {
     const dirty = harness({ dirty: true });
     expect((await runDeploy(job("deploy", NEW), null, previous, dirty.deps)).error).toContain("lokalne zmiany");
-    expect(dirty.steps).toHaveLength(1);
+    expect(dirty.steps).toHaveLength(2);
     const notGit = harness({ notGit: true });
     expect((await runDeploy(job("deploy", NEW), null, previous, notGit.deps)).error).toContain("nie jest repozytorium Git");
     expect(notGit.steps).toHaveLength(0);
@@ -109,6 +114,30 @@ describe("runDeploy", () => {
     expect(outcome.error).toContain("kodem 1");
     expect(labels(steps).slice(-3)).toEqual(["Git checkout aaaaaaa", "Compose config", "Uruchomienie"]);
     expect(writes.at(-1)?.content).toContain("marczelloo-tools-app:aaaaaaaaaaaa");
+  });
+
+  it("snapshots the live version on the first agent deploy and rolls back to it", async () => {
+    const { deps, steps } = harness({ samples: [[crashed]], running: { app: "sha256:live" } });
+    const outcome = await runDeploy(job("deploy", NEW), null, null, deps);
+    const tag = steps.find((step) => step.label === "Kopia bieżącej wersji app");
+    expect(tag?.args).toEqual(["image", "tag", "sha256:live", "marczelloo-tools-app:aaaaaaaaaaaa"]);
+    expect(outcome).toMatchObject({ status: "rolled_back", rolledBackTo: OLD, baseline: { sha: OLD, images: { app: "marczelloo-tools-app:aaaaaaaaaaaa" } } });
+  });
+
+  it("does not roll back to a stale release that is no longer live", async () => {
+    const stale: Release = { ...previous, sha: "c".repeat(40), images: { app: "marczelloo-tools-app:cccccccccccc" } };
+    const { deps, steps } = harness({ samples: [[crashed]] });
+    const outcome = await runDeploy(job("deploy", NEW), null, stale, deps);
+    expect(outcome.status).toBe("failed");
+    expect(labels(steps)).not.toContain("Git checkout ccccccc");
+  });
+
+  it("skips the public probe while the route still points at another port", async () => {
+    const pending = harness({ probes: [503] });
+    const base = job("deploy", NEW);
+    const outcome = await runDeploy({ ...base, target: { ...base.target, tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false } } }, null, previous, pending.deps);
+    expect(outcome.status).toBe("succeeded");
+    expect(pending.logs.some((line) => line.startsWith("Sonda"))).toBe(false);
   });
 
   it("fails without a previous release and keeps the new images", async () => {

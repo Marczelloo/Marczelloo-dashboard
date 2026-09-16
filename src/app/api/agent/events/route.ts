@@ -1,20 +1,12 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { agentEventSchema } from "@agent/api";
+import { isAgentRequest } from "@/server/agent/auth";
 import { handleAgentEvent } from "@/server/agent/handle-event";
 
 export const dynamic = "force-dynamic";
 
-function authorized(header: string | null): boolean {
-  const token = process.env.AGENT_TOKEN;
-  if (!token) return false;
-  const expected = Buffer.from(`Bearer ${token}`);
-  const actual = Buffer.from(header ?? "");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
 export async function POST(request: NextRequest) {
-  if (!authorized(request.headers.get("authorization"))) {
+  if (!isAgentRequest(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const parsed = agentEventSchema.safeParse(await request.json().catch(() => null));

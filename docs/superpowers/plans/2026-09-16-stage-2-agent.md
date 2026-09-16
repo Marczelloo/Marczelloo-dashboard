@@ -3304,3 +3304,17 @@ git commit -m "docs: add stage 2 deploy agent runbook"
 - Task 10: `getDeployEngineAction` w trybie demo zwraca „niezarządzany” bez `requireAuth()` (użytkownik demo nie jest właścicielem; inaczej każda strona projektu w demo pokazywałaby błąd).
 - Pi (tylko odczyt): Debian 12, glibc 2.36; `/usr/bin/docker` (docker-ce-cli 29.2.0) linkowany dynamicznie, wymaga GLIBC ≤ 2.34; plugin Compose v5.0.2 statyczny. Etykiety `marczelloo-tools` potwierdzają katalog projektu = katalog pliku Compose.
 - Weryfikacja lokalna: proces agenta uruchomiony z atrapą dashboardu — zadanie przeszło kolejkę, `git clone` bez dostępu zakończył się błędem bez promptu, zdarzenia `started`/`finished` dotarły w kolejności z poprawnym tokenem. Obraz Dockera nie był budowany lokalnie (Docker Desktop wyłączony); buduje go runbook na Pi.
+
+## Poprawki po przeglądzie Codexa (GPT-5.6-Sol, high, 16.09.2026)
+
+Przyjęte:
+- **Zmiana portu tunelu** — dashboard nie przepina istniejącej trasy przed deployem (stary kontener nadal ją obsługuje). `DeployTarget.tunnel.probe` mówi agentowi, czy trasa już wskazuje nowy port; tylko wtedy bramka sonduje domenę. Po sukcesie `handleAgentEvent` przełącza trasę. Nowa domena bez trasy dostaje ją od razu (`tunnelRouteState` w `src/server/agent/target.ts`).
+- **Rollback przy pierwszym deployu agenta** — przed `up` agent czyta `git rev-parse HEAD`, taguje obrazy działających kontenerów SHA tego commita (`captureBaseline`) i wraca do nich, jeśli historia agenta nie odpowiada temu, co działa. `JobOutcome.baseline` trafia do historii wydań.
+- **Token GitHub** — agent przy starcie zadania pobiera świeży token z `POST /api/agent/token` (uwierzytelnienie `AGENT_TOKEN`); token z żądania jest tylko zapasem. Zmienna agenta `DASHBOARD_URL` zastępuje `DASHBOARD_EVENTS_URL`.
+- **`pull_policy: always`** — `up -d --no-build --pull missing`.
+- **Duplikat trwającego deployu** — zadanie dla commita, który właśnie się wdraża, od razu kończy się `superseded`.
+- **Idempotencja zdarzeń** — status wpisu `deploys` zapisywany na końcu, po trasie, powiadomieniach i audycie.
+- **Logi > 256 KB** — `readAgentJobLogToEnd` doczytuje do końca (strumień SSE i „Check status”).
+
+Odrzucone:
+- **Build z czystego worktree** — obecny skrypt buduje w tym samym katalogu, a Compose potrzebuje `.env` i ścieżek względnych projektu. Izolowany kontekst buildu (i odcięcie plików nieśledzonych) wejdzie z rendererem w etapie 4.

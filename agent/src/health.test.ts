@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessContainers, assessProbe, parseInspectSamples, type ContainerSample } from "./health";
+import { assessContainers, assessProbe, parseInspectSamples, parseServiceImages, type ContainerSample } from "./health";
 
 const options = { stableMs: 30_000, timeoutMs: 180_000 };
 const sample = (overrides: Partial<ContainerSample> = {}): ContainerSample => ({ name: "app", service: "app", status: "running", exitCode: 0, restartCount: 0, health: null, ...overrides });
@@ -11,6 +11,17 @@ describe("parseInspectSamples", () => {
       { Name: "/tools-run-1", State: { Status: "exited", ExitCode: 1 }, Config: { Labels: { "com.docker.compose.oneoff": "True" } } },
     ]);
     expect(parseInspectSamples(json)).toEqual([{ name: "tools", service: "app", status: "running", exitCode: 0, restartCount: 2, health: "healthy" }]);
+  });
+});
+
+describe("parseServiceImages", () => {
+  it("maps running services to image IDs", () => {
+    const json = JSON.stringify([
+      { Name: "/tools", Image: "sha256:aaa", State: { Status: "running" }, Config: { Labels: { "com.docker.compose.service": "app" } } },
+      { Name: "/boot", Image: "sha256:bbb", State: { Status: "exited" }, Config: { Labels: { "com.docker.compose.service": "bootstrap" } } },
+      { Name: "/run", Image: "sha256:ccc", State: { Status: "running" }, Config: { Labels: { "com.docker.compose.service": "app", "com.docker.compose.oneoff": "True" } } },
+    ]);
+    expect(parseServiceImages(json)).toEqual({ app: "sha256:aaa" });
   });
 });
 

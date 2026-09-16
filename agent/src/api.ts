@@ -22,7 +22,9 @@ export const deployTargetSchema = z.object({
     .refine((value) => !value.includes(".."), "Nieprawidłowy plik Compose.")
     .nullable(),
   profiles: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)).max(10),
-  tunnel: z.object({ hostname: z.string().regex(/^[a-z0-9.-]+$/).max(253), localPort: z.number().int().min(1).max(65535) }).nullable(),
+  tunnel: z
+    .object({ hostname: z.string().regex(/^[a-z0-9.-]+$/).max(253), localPort: z.number().int().min(1).max(65535), probe: z.boolean().default(false) })
+    .nullable(),
 });
 
 export const jobRequestSchema = z.discriminatedUnion("kind", [

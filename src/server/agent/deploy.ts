@@ -3,27 +3,43 @@ import "server-only";
 import { deploys } from "@/server/atlashub";
 import type { DeploymentConfig } from "@/server/deployments/config";
 import { resolveBranchHead } from "@/server/deployments/commit";
-import { updateCloudflareTunnelRoute } from "@/server/deployments/host";
+import { listCloudflareTunnelRoutes, updateCloudflareTunnelRoute } from "@/server/deployments/host";
 import { getRepositoryCloneToken } from "@/server/github/client";
-import { enqueueAgentJob, getAgentJob, readAgentJobLog } from "./client";
+import { enqueueAgentJob, getAgentJob, readAgentJobLogToEnd } from "./client";
 import { agentLogRef } from "./refs";
-import { toAgentTarget } from "./target";
+import { toAgentTarget, tunnelRouteState } from "./target";
 
 const describeError = (error: unknown) => (error instanceof Error ? error.message : "Agent odrzucił zadanie.");
+
+/**
+ * Decide whether the health gate may probe the public hostname. An existing
+ * route is never switched before the deploy (the old container still serves
+ * it); the dashboard switches it after a successful job. A hostname without
+ * any route gets one now, because nothing is served there yet.
+ */
+async function prepareTunnelProbe(config: DeploymentConfig, createMissingRoute: boolean): Promise<boolean> {
+  if (!config.tunnel?.enabled) return false;
+  const ingress = await listCloudflareTunnelRoutes();
+  if (!ingress.configured) return false;
+  const state = tunnelRouteState(ingress.routes, config.tunnel);
+  if (state === "matches") return true;
+  if (state === "missing" && createMissingRoute) {
+    await updateCloudflareTunnelRoute({ hostname: config.tunnel.hostname, localPort: config.tunnel.localPort });
+    return true;
+  }
+  return false;
+}
 
 export async function queueAgentDeployment(input: { config: DeploymentConfig; serviceId: string; triggeredBy: string; commitSha?: string }): Promise<{ deployId: string; jobId: string; sha: string }> {
   const { config } = input;
   const sha = input.commitSha && /^[0-9a-f]{40}$/.test(input.commitSha) ? input.commitSha : await resolveBranchHead(config.githubUrl, config.branch);
-
-  // The health gate probes the public hostname, so the route must exist before the job runs.
-  if (config.tunnel?.enabled) {
-    await updateCloudflareTunnelRoute({ hostname: config.tunnel.hostname, localPort: config.tunnel.localPort });
-  }
+  const probe = await prepareTunnelProbe(config, true);
 
   const deploy = await deploys.createDeploy({ service_id: input.serviceId, triggered_by: input.triggeredBy, commit_sha: sha });
   try {
+    // Fallback only: the agent asks /api/agent/token for a fresh token when the job starts.
     const token = await getRepositoryCloneToken(config.githubUrl).catch(() => null);
-    const job = await enqueueAgentJob({ kind: "deploy", target: toAgentTarget(config), sha, deployId: deploy.id, triggeredBy: input.triggeredBy.slice(0, 100), token });
+    const job = await enqueueAgentJob({ kind: "deploy", target: toAgentTarget(config, probe), sha, deployId: deploy.id, triggeredBy: input.triggeredBy.slice(0, 100), token });
     await deploys.setDeployLogFile(deploy.id, agentLogRef(job.id));
     return { deployId: deploy.id, jobId: job.id, sha };
   } catch (error) {
@@ -33,9 +49,10 @@ export async function queueAgentDeployment(input: { config: DeploymentConfig; se
 }
 
 export async function queueAgentRollback(input: { config: DeploymentConfig; serviceId: string; triggeredBy: string; sha?: string }): Promise<{ deployId: string; jobId: string; sha: string }> {
+  const probe = await prepareTunnelProbe(input.config, false);
   const deploy = await deploys.createDeploy({ service_id: input.serviceId, triggered_by: input.triggeredBy, ...(input.sha ? { commit_sha: input.sha } : {}) });
   try {
-    const job = await enqueueAgentJob({ kind: "rollback", target: toAgentTarget(input.config), sha: input.sha ?? null, deployId: deploy.id, triggeredBy: input.triggeredBy.slice(0, 100) });
+    const job = await enqueueAgentJob({ kind: "rollback", target: toAgentTarget(input.config, probe), sha: input.sha ?? null, deployId: deploy.id, triggeredBy: input.triggeredBy.slice(0, 100) });
     await deploys.setDeployLogFile(deploy.id, agentLogRef(job.id));
     return { deployId: deploy.id, jobId: job.id, sha: job.sha };
   } catch (error) {
@@ -45,7 +62,8 @@ export async function queueAgentRollback(input: { config: DeploymentConfig; serv
 }
 
 export async function readAgentDeployLog(jobId: string): Promise<{ log: string; isComplete: boolean; success: boolean }> {
-  const [job, log] = await Promise.all([getAgentJob(jobId), readAgentJobLog(jobId, 0)]);
+  const job = await getAgentJob(jobId);
+  const log = await readAgentJobLogToEnd(jobId, 0);
   return {
     log: log.content.slice(-60_000),
     isComplete: job.status !== "queued" && job.status !== "running",
