@@ -254,7 +254,7 @@ This starts:
 | `PORTAINER_TOKEN`        | -                        | Portainer JWT token      |
 | `RUNNER_URL`             | `http://runner:8787`     | Runner service URL       |
 | `DEV_USER_EMAIL`         | `admin@marczelloo.local` | Dev mode user email      |
-| `MONITORING_INTERVAL_MS` | `300000`                 | Monitoring interval (ms) |
+| `MONITORING_INTERVAL_MS` | `60000`                  | Monitoring interval (ms) |
 | `DISCORD_WEBHOOK_URL`    | -                        | Discord alerts           |
 | `ENCRYPTION_KEY`         | -                        | Env vars encryption key  |
 
