@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/app/actions/projects";
 import { collectInventory } from "@/server/apps/collector";
+import { ENV_KEY } from "@/server/apps/import/env-plan";
 import { buildImportProposal, toProposalView, type ImportProposalView } from "@/server/apps/import/proposal";
 import { saveImport, type SaveImportResult } from "@/server/apps/import/save-import";
 import { storeProposal, takeProposal } from "@/server/apps/proposal-store";
@@ -77,7 +78,7 @@ const saveSchema = z.object({
       z.object({
         composeProject: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/),
         projectId: z.string().uuid().nullable(),
-        includeKeys: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)).max(500),
+        includeKeys: z.array(z.string().regex(ENV_KEY, "Nieprawidłowa nazwa zmiennej")).max(500),
       })
     )
     .min(1)

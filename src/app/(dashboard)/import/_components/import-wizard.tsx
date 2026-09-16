@@ -15,6 +15,7 @@ const CONFLICT_LABEL = {
   "services-differ": "różne w usługach",
   "legacy-differs": "stara baza ≠ kontener",
   "not-in-container": "nieużywana w kontenerach",
+  "invalid-key": "nieprawidłowa nazwa — pominięta",
 } as const;
 const SKIP = "__skip__";
 
@@ -198,6 +199,7 @@ export function ImportWizard({ imported }: { imported: Array<{ composeProject: s
                               <input
                                 id={id}
                                 type="checkbox"
+                                disabled={entry.conflicts.includes("invalid-key")}
                                 checked={decision?.includeKeys.has(entry.key) ?? false}
                                 onChange={(event) =>
                                   update(stack.composeProject, (current) => {

@@ -86,4 +86,16 @@ describe("buildEnvPlan", () => {
     });
     expect(entry).toMatchObject({ key: "UNUSED", include: false });
   });
+
+  it("shows but excludes names that cannot be imported (portfolio case)", () => {
+    const plan = buildEnvPlan({
+      containers: [container("portfolio", { "process.env.NEXT_URL": "http://localhost:3000", NEXT_URL: "https://example.com" })],
+      imageEnv: {},
+      composeConfig: null,
+      envFiles: [{ path: "/p/stack/.env", entries: [{ key: "process.env.NEXT_URL", value: "http://localhost:3000" }, { key: "NEXT_URL", value: "https://example.com" }], interpolation: true }],
+      legacy: [],
+    });
+    expect(plan.find((entry) => entry.key === "process.env.NEXT_URL")).toMatchObject({ include: false, conflicts: ["invalid-key"] });
+    expect(plan.find((entry) => entry.key === "NEXT_URL")).toMatchObject({ include: true, conflicts: [] });
+  });
 });

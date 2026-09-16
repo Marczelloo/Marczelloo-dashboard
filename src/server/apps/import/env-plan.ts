@@ -2,7 +2,10 @@ import type { EnvEntry } from "@/server/env/dotenv";
 import type { ComposeConfig, ContainerFact } from "../types";
 
 export type EnvOrigin = "file" | "compose" | "container" | "legacy-db";
-export type EnvConflict = "file-differs" | "services-differ" | "legacy-differs" | "not-in-container";
+export type EnvConflict = "file-differs" | "services-differ" | "legacy-differs" | "not-in-container" | "invalid-key";
+
+/** Names a shell, dotenv and the import schema all accept. */
+export const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export interface EnvPlanEntry {
   key: string;
@@ -102,5 +105,9 @@ export function buildEnvPlan(input: EnvPlanInput): EnvPlanEntry[] {
     entries.push({ key, value: [...values][0], perService: null, origin: "legacy-db", sourcePath: null, services: [], secret: isSecretKey(key), include: false, conflicts: ["not-in-container"] });
   }
 
-  return entries.sort((a, b) => a.key.localeCompare(b.key));
+  // Docker passes any env_file line through (e.g. a pasted `process.env.X=...`),
+  // but such a name cannot be imported; show it and leave it out.
+  return entries
+    .map((entry) => (ENV_KEY.test(entry.key) ? entry : { ...entry, include: false, conflicts: [...entry.conflicts, "invalid-key" as const] }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
