@@ -26,7 +26,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    const result = await runHostCommand(buildComposeRecreateCommand(stack), 180_000);
+    // Services that wait for a dependency's healthcheck (NeoBeat bot → Lavalink) start only after it passes;
+    // a timeout that kills Compose earlier leaves them created but never started.
+    const result = await runHostCommand(buildComposeRecreateCommand(stack), 600_000);
     await auditLogs.logAction(user.email, "update", "service", id, {
       apply_env: true,
       compose_project: stack.project,
