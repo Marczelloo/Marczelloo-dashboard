@@ -15,6 +15,7 @@ services:
       PROJECTS_DIR: ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}
       DASHBOARD_URL: http://marczelloo-dashboard:3100
       AGENT_PORT: "8790"
+      AGENT_BUILD_CACHE_MAX: ${AGENT_BUILD_CACHE_MAX:-10GB}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Mounted under the same absolute path as on the host: Compose resolves

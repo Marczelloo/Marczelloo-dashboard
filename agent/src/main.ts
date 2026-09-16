@@ -4,8 +4,9 @@ import path from "node:path";
 import { fetchCloneToken } from "./dashboard";
 import { probe, sampleContainers, serviceImages } from "./docker";
 import { runCommand } from "./exec";
+import { buildCacheLimit, collectableImages, imageRepository } from "./gc";
 import { runDeploy, runRollback, type PipelineDeps } from "./pipeline";
-import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, staleImages, startJob, type JobOutcome } from "./queue";
+import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, startJob, type JobOutcome } from "./queue";
 import { deliverEvents, httpEventSender } from "./reporter";
 import { createAgentServer } from "./server";
 import { FileStore } from "./store";
@@ -24,6 +25,7 @@ const dashboardUrl = requireEnv("DASHBOARD_URL").replace(/\/+$/, "");
 const eventsUrl = `${dashboardUrl}/api/agent/events`;
 const dataDir = process.env.AGENT_DATA_DIR || path.posix.join(projectsDir, ".dashboard", "agent");
 const port = Number(process.env.AGENT_PORT || 8790);
+const buildCacheMax = buildCacheLimit(process.env.AGENT_BUILD_CACHE_MAX);
 
 const store = new FileStore(dataDir);
 const overrideDir = path.posix.join(dataDir, "overrides");
@@ -43,9 +45,39 @@ createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () =>
 });
 
 async function removeImages(images: string[]) {
+  let removed = 0;
   for (const image of images) {
-    await runCommand({ label: "docker image rm", command: "docker", args: ["image", "rm", image], timeoutMs: 60_000, quiet: true, allowFailure: true }, () => undefined);
+    const result = await runCommand({ label: "docker image rm", command: "docker", args: ["image", "rm", image], timeoutMs: 60_000, quiet: true, allowFailure: true }, () => undefined);
+    if (result.code === 0) removed += 1;
   }
+  return removed;
+}
+
+async function dockerOutput(label: string, args: string[]): Promise<string[]> {
+  const result = await runCommand({ label, command: "docker", args, timeoutMs: 60_000, quiet: true, allowFailure: true }, () => undefined);
+  return result.code === 0 ? result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : [];
+}
+
+async function cleanUp(job: Job, before: string[], after: string[], orphanImages: string[]): Promise<void> {
+  let removed = 0;
+  try {
+    const repositories = new Set([...before, ...after, ...orphanImages].map(imageRepository).filter((repository): repository is string => repository !== null));
+    const tags = (await Promise.all([...repositories].map((repository) => dockerOutput("docker image ls", ["image", "ls", "--format", "{{.Repository}}:{{.Tag}}", repository])))).flat();
+    const inUse = await dockerOutput("docker ps", ["ps", "-a", "--format", "{{.Image}}"]);
+    const images = [...new Set([...collectableImages({ repositories, tags, kept: after, inUse }), ...orphanImages])];
+    removed = await removeImages(images);
+  } catch {
+    // Cleanup is best-effort and must not affect a completed job.
+  }
+  try {
+    await runCommand({ label: "docker image prune", command: "docker", args: ["image", "prune", "-f"], timeoutMs: 60_000, quiet: true, allowFailure: true }, () => undefined);
+    if (job.kind === "deploy") {
+      await runCommand({ label: "docker builder prune", command: "docker", args: ["builder", "prune", "-f", "--max-used-space", buildCacheMax], timeoutMs: 60_000, quiet: true, allowFailure: true }, () => undefined);
+    }
+  } catch {
+    // Cleanup is best-effort and must not affect a completed job.
+  }
+  store.appendLog(job.id, `[agent] Sprzątanie: usunięto ${removed} obrazów\n`);
 }
 
 async function execute(job: Job): Promise<JobOutcome> {
@@ -92,8 +124,13 @@ async function work() {
     }
     store.appendLog(job.id, `[agent] Wynik: ${outcome.status}${outcome.error ? ` — ${outcome.error}` : ""}\n`);
     mutate((current) => finishJob(current, job.id, outcome, iso()));
+    try {
+      store.pruneLogs(new Set(state.jobs.map((item) => item.id)));
+    } catch {
+      // A log retention failure must not interrupt the agent queue.
+    }
     const after = state.projects[job.target.composeProject]?.releases ?? [];
-    await removeImages([...staleImages(before, after), ...outcome.orphanImages]);
+    await cleanUp(job, before.flatMap((release) => Object.values(release.images)), after.flatMap((release) => Object.values(release.images)), outcome.orphanImages);
   } finally {
     tokens.delete(job.id);
     working = false;

@@ -1,4 +1,4 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { emptyState } from "./queue";
 import type { AgentState } from "./types";
@@ -43,6 +43,14 @@ export class FileStore {
       return { content: buffer.subarray(0, bytesRead).toString("utf8"), nextOffset: offset + bytesRead };
     } finally {
       closeSync(descriptor);
+    }
+  }
+
+  pruneLogs(keepJobIds: Set<string>): void {
+    for (const entry of readdirSync(this.logDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".log")) continue;
+      const jobId = entry.name.slice(0, -".log".length);
+      if (JOB_ID.test(jobId) && !keepJobIds.has(jobId)) unlinkSync(path.join(this.logDir, entry.name));
     }
   }
 
