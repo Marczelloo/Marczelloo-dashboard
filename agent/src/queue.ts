@@ -1,0 +1,144 @@
+import type { AgentEvent, AgentState, DeployTarget, Job, JobKind, JobStatus, Release } from "./types";
+
+export const MAX_FINISHED_JOBS = 200;
+export const MAX_RELEASES = 3;
+
+const ACTIVE = new Set<JobStatus>(["queued", "running"]);
+
+export interface EnqueueInput {
+  id: string;
+  kind: JobKind;
+  target: DeployTarget;
+  sha: string;
+  deployId: string;
+  triggeredBy: string;
+}
+
+export interface JobOutcome {
+  status: "succeeded" | "failed" | "rolled_back";
+  error: string | null;
+  rolledBackTo: string | null;
+  release: Release | null;
+  /** Images built by this job that no release keeps (failed or rolled back deploys). */
+  orphanImages: string[];
+}
+
+export function emptyState(): AgentState {
+  return { jobs: [], projects: {}, outbox: [] };
+}
+
+function eventFor(job: Job, type: AgentEvent["type"], now: string): AgentEvent {
+  return {
+    id: `${job.id}:${type === "job.started" ? "started" : "finished"}`,
+    type,
+    jobId: job.id,
+    deployId: job.deployId,
+    projectId: job.target.projectId,
+    composeProject: job.target.composeProject,
+    kind: job.kind,
+    sha: job.sha,
+    status: job.status,
+    error: job.error,
+    rolledBackTo: job.rolledBackTo,
+    at: now,
+  };
+}
+
+function prune(state: AgentState): AgentState {
+  const finished = state.jobs.filter((job) => !ACTIVE.has(job.status));
+  const excess = finished.length - MAX_FINISHED_JOBS;
+  if (excess <= 0) return state;
+  const drop = new Set(finished.slice(0, excess).map((job) => job.id));
+  return { ...state, jobs: state.jobs.filter((job) => !drop.has(job.id)) };
+}
+
+function updateJob(state: AgentState, jobId: string, change: (job: Job) => Job): { jobs: Job[]; job: Job } {
+  let updated: Job | null = null;
+  const jobs = state.jobs.map((job) => {
+    if (job.id !== jobId) return job;
+    updated = change(job);
+    return updated;
+  });
+  if (!updated) throw new Error(`Nieznane zadanie ${jobId}.`);
+  return { jobs, job: updated };
+}
+
+export function enqueue(state: AgentState, input: EnqueueInput, now: string): { state: AgentState; job: Job } {
+  const job: Job = { ...input, status: "queued", createdAt: now, startedAt: null, finishedAt: null, error: null, rolledBackTo: null };
+  const superseded = new Set(
+    input.kind === "deploy"
+      ? state.jobs
+          .filter((candidate) => candidate.status === "queued" && candidate.kind === "deploy" && candidate.target.composeProject === input.target.composeProject)
+          .map((candidate) => candidate.id)
+      : []
+  );
+  const events: AgentEvent[] = [];
+  const jobs = state.jobs.map((candidate) => {
+    if (!superseded.has(candidate.id)) return candidate;
+    // Only the newest push is built; the older request is closed explicitly.
+    const closed: Job = { ...candidate, status: "superseded", finishedAt: now, error: `Zastąpione przez nowszy commit ${input.sha.slice(0, 7)}.` };
+    events.push(eventFor(closed, "job.finished", now));
+    return closed;
+  });
+  return { state: prune({ ...state, jobs: [...jobs, job], outbox: [...state.outbox, ...events] }), job };
+}
+
+export function nextJob(state: AgentState): Job | null {
+  if (state.jobs.some((job) => job.status === "running")) return null;
+  return state.jobs.find((job) => job.status === "queued") ?? null;
+}
+
+export function startJob(state: AgentState, jobId: string, now: string): AgentState {
+  const { jobs, job } = updateJob(state, jobId, (current) => ({ ...current, status: "running", startedAt: now }));
+  return { ...state, jobs, outbox: [...state.outbox, eventFor(job, "job.started", now)] };
+}
+
+export function recordRelease(releases: Release[], release: Release): Release[] {
+  return [release, ...releases.filter((item) => item.sha !== release.sha)].slice(0, MAX_RELEASES);
+}
+
+export function finishJob(state: AgentState, jobId: string, outcome: JobOutcome, now: string): AgentState {
+  const { jobs, job } = updateJob(state, jobId, (current) => ({
+    ...current,
+    status: outcome.status,
+    error: outcome.error,
+    rolledBackTo: outcome.rolledBackTo,
+    finishedAt: now,
+  }));
+  const project = job.target.composeProject;
+  const current = state.projects[project]?.releases ?? [];
+  const releases = outcome.release ? recordRelease(current, outcome.release) : current;
+  return prune({
+    ...state,
+    jobs,
+    projects: { ...state.projects, [project]: { releases } },
+    outbox: [...state.outbox, eventFor(job, "job.finished", now)],
+  });
+}
+
+export function recoverAfterRestart(state: AgentState, now: string): AgentState {
+  const events: AgentEvent[] = [];
+  const jobs = state.jobs.map((job) => {
+    if (job.status !== "running") return job;
+    const failed: Job = { ...job, status: "failed", finishedAt: now, error: "Agent został zrestartowany w trakcie zadania — uruchom wdrożenie ponownie." };
+    events.push(eventFor(failed, "job.finished", now));
+    return failed;
+  });
+  return { ...state, jobs, outbox: [...state.outbox, ...events] };
+}
+
+export function rollbackRelease(state: AgentState, composeProject: string, sha?: string): Release | null {
+  const releases = state.projects[composeProject]?.releases ?? [];
+  if (sha) return releases.find((release) => release.sha === sha) ?? null;
+  return releases[1] ?? null;
+}
+
+export function staleImages(before: Release[], after: Release[]): string[] {
+  const kept = new Set(after.flatMap((release) => Object.values(release.images)));
+  return [...new Set(before.flatMap((release) => Object.values(release.images)))].filter((image) => !kept.has(image));
+}
+
+export function acknowledgeEvents(state: AgentState, ids: string[]): AgentState {
+  const delivered = new Set(ids);
+  return { ...state, outbox: state.outbox.filter((event) => !delivered.has(event.id)) };
+}
