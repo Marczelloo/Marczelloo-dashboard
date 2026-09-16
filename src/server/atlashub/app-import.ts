@@ -4,16 +4,18 @@ import type { AppConfigRowInput, AppRouteRowInput, EnvVersionPayload } from "@/s
 import type { EnvFileVersionPayload } from "@/server/env/file-versions";
 import { decrypt, encrypt } from "@/server/lib/encryption";
 import * as db from "./client";
+import { jsonbColumns } from "./jsonb";
 
 interface AppConfigRow extends AppConfigRowInput {
   id: string;
   created_at: string;
 }
 
-export async function upsertAppConfig(row: AppConfigRowInput): Promise<{ id: string; created: boolean }> {
-  const existing = await db.select<AppConfigRow>("app_configs", { filters: [{ operator: "eq", column: "project_id", value: row.project_id }], limit: 1 });
+export async function upsertAppConfig(input: AppConfigRowInput): Promise<{ id: string; created: boolean }> {
+  const row = jsonbColumns(input, ["config_files", "source", "processes"]);
+  const existing = await db.select<AppConfigRow>("app_configs", { filters: [{ operator: "eq", column: "project_id", value: input.project_id }], limit: 1 });
   if (existing.data[0]) {
-    await db.updateById<AppConfigRow>("app_configs", existing.data[0].id, row);
+    await db.updateById("app_configs", existing.data[0].id, row);
     return { id: existing.data[0].id, created: false };
   }
   const inserted = await db.insert<AppConfigRow>("app_configs", row);
@@ -34,7 +36,7 @@ export async function insertEnvVersion(input: { projectId: string; version: numb
   await db.insert("app_env_versions", {
     project_id: input.projectId,
     version: input.version,
-    keys: input.keys,
+    keys: JSON.stringify(input.keys),
     payload_encrypted: await encrypt(JSON.stringify(input.payload)),
     fingerprint: input.fingerprint,
     note: input.note,
@@ -78,7 +80,7 @@ export async function getEnvVersionPayload(projectId: string, version: number): 
 export async function replaceImportedRoutes(rows: AppRouteRowInput[]): Promise<number> {
   await db.deleteRows("app_routes", [{ operator: "eq", column: "source", value: "imported" }]);
   if (!rows.length) return 0;
-  const inserted = await db.insert("app_routes", rows);
+  const inserted = await db.insert("app_routes", rows.map((row) => jsonbColumns(row, ["origin_request", "target"])));
   return inserted.data.length;
 }
 
