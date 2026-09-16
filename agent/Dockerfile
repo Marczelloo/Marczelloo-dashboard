@@ -10,6 +10,9 @@ RUN apt-get update \
 # containers that did not change.
 COPY --chmod=0755 vendor/docker /usr/local/bin/docker
 COPY --chmod=0755 vendor/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+# Without buildx Compose falls back to the classic builder, which ignores the
+# BuildKit cache that host builds use.
+COPY --chmod=0755 vendor/docker-buildx /usr/local/lib/docker/cli-plugins/docker-buildx
 
 WORKDIR /app
 COPY package.json package-lock.json ./

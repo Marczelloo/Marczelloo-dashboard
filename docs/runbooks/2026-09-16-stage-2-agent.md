@@ -30,10 +30,11 @@ mkdir -p vendor ~/projects/.dashboard/agent
 chmod 700 ~/projects/.dashboard/agent
 cp "$(command -v docker)" vendor/docker
 cp "$(docker info --format '{{range .ClientInfo.Plugins}}{{if eq .Name "compose"}}{{.Path}}{{end}}{{end}}')" vendor/docker-compose
+cp "$(docker info --format '{{range .ClientInfo.Plugins}}{{if eq .Name "buildx"}}{{.Path}}{{end}}{{end}}')" vendor/docker-buildx
 ls -l vendor
 ```
 
-Expected: oba pliki wykonywalne.
+Expected: trzy pliki wykonywalne. `Dockerfile` nadaje im tryb 0755, bo agent dzia³a jako UID 1000.
 
 ## 3. Budowa i start agenta (zgoda)
 
@@ -43,6 +44,7 @@ docker compose build
 docker compose up -d
 docker exec marczelloo-agent docker version --format '{{.Client.Version}} / {{.Server.Version}}'
 docker exec marczelloo-agent docker compose version
+docker exec marczelloo-agent docker buildx version
 docker exec marczelloo-agent git --version
 docker exec marczelloo-dashboard wget -qO- http://mz-agent:8790/health
 ```
