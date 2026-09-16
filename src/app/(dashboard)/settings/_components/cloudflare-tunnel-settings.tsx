@@ -21,8 +21,11 @@ type TunnelRoute = {
   project: { projectId: string; projectName: string; projectSlug: string; hostname: string; localPort: number } | null;
 };
 
+type ManagedTunnel = { tunnelId: string; name: string; status: string | null; zones: string[] } | { error: string };
+
 type TunnelResponse = {
   success: boolean;
+  managedTunnel?: ManagedTunnel | null;
   configured?: boolean;
   tunnel?: TunnelConfig;
   routes?: TunnelRoute[];
@@ -42,6 +45,7 @@ export function CloudflareTunnelSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
+  const [managedTunnel, setManagedTunnel] = useState<ManagedTunnel | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,6 +63,7 @@ export function CloudflareTunnelSettings() {
       setSource(data.tunnel.source);
       setConfigured(Boolean(data.configured));
       setRoutes(data.routes || []);
+      setManagedTunnel(data.managedTunnel ?? null);
       if (data.error) setError(data.error);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Nie udało się odczytać konfiguracji Tunnel.");
@@ -106,7 +111,7 @@ export function CloudflareTunnelSettings() {
                 Cloudflare Tunnel
                 {configured ? <Badge variant="success">Ingress online</Badge> : <Badge variant="secondary">Not configured</Badge>}
               </CardTitle>
-              <CardDescription>Globalny plik ingress oraz rzeczywisty spis publicznie wystawionych hostów.</CardDescription>
+              <CardDescription>{managedTunnel ? "Trasy i rekordy DNS zarządzane przez Cloudflare API, bez restartu cloudflared." : "Globalny plik ingress oraz rzeczywisty spis publicznie wystawionych hostów."}</CardDescription>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || saving}>
@@ -116,6 +121,30 @@ export function CloudflareTunnelSettings() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {managedTunnel ? (
+          "error" in managedTunnel ? (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <span>Tryb Cloudflare API jest włączony, ale API nie odpowiada: {managedTunnel.error}</span>
+            </div>
+          ) : (
+            <div className="grid gap-3 border-b border-border/60 pb-6 sm:grid-cols-3">
+              <div className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Tunel</p>
+                <p className="mt-1 text-sm font-medium">{managedTunnel.name} <Badge variant={managedTunnel.status === "healthy" ? "success" : "warning"} className="ml-1">{managedTunnel.status ?? "?"}</Badge></p>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">ID</p>
+                <p className="mt-1 truncate font-mono text-xs" title={managedTunnel.tunnelId}>{managedTunnel.tunnelId}</p>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Domeny</p>
+                <p className="mt-1 text-sm">{managedTunnel.zones.join(", ") || "—"}</p>
+              </div>
+            </div>
+          )
+        ) : (
+        <>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="cloudflared-config-path">Ingress config path</Label>
@@ -164,6 +193,8 @@ export function CloudflareTunnelSettings() {
           </Button>
           <span className="text-xs text-muted-foreground">Source: {source === "database" ? "dashboard settings" : source === "environment" ? "environment fallback" : "not set"}</span>
         </div>
+        </>
+        )}
 
         {error && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">

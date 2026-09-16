@@ -1,0 +1,21 @@
+# Connector for the Cloudflare-managed tunnel. Routes live in Cloudflare and are
+# edited by the dashboard through the API, so changing them never restarts
+# this container. A separate Compose project: redeploying the dashboard stack
+# must not drop every public hostname.
+name: marczelloo-tunnel
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.1.2
+    container_name: marczelloo-cloudflared
+    restart: unless-stopped
+    # Origins are published on 127.0.0.1 of the host.
+    network_mode: host
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20242", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is required (see docs/runbooks/2026-09-17-stage-3-cloudflare.md)}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

@@ -4,6 +4,7 @@ import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 import { getRepositoryCloneToken, parseGitHubUrl } from "@/server/github/client";
 import { stackFromContainers, type ComposeContainerInfo, type ComposeStack } from "./compose-stack";
 import type { DeploymentConfig } from "./config";
+import { applyManagedRouteUpdate, getManagedTunnelSettings, listManagedRoutes } from "@/server/cloudflare/managed-tunnel";
 import { getCloudflareReloadCommand, getCloudflareTunnelSettings } from "./tunnel";
 
 const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
@@ -189,7 +190,7 @@ ${appCloneAccess ? 'echo "GIT_REMOTE=0"' : `git ls-remote ${shellQuote(config.gi
   if (composePath && values.get("COMPOSE_VALID") !== "yes") messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
   if (!composePath && repoState !== "missing") messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
   if (repoState === "missing") messages.push({ level: "warning", text: "Compose zostanie wykryty po pierwszym klonowaniu; można wskazać jego ścieżkę ręcznie." });
-  if (config.tunnel?.enabled && !tunnelSettings?.configPath) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale nie skonfigurowano jego pliku ingress w Settings." });
+  if (config.tunnel?.enabled && !getManagedTunnelSettings() && !tunnelSettings?.configPath) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale nie skonfigurowano jego pliku ingress w Settings." });
   if (config.tunnel?.enabled && portInUse) messages.push({ level: "warning", text: `Port ${config.tunnel.localPort} jest już używany; zostanie użyty jako źródło tunelu.` });
 
   return {
@@ -277,12 +278,25 @@ ${hostname ? `echo "Cloudflare route active: https://${hostname} -> 127.0.0.1:${
 }
 
 export async function updateCloudflareTunnelRoute(update: CloudflareRouteUpdate): Promise<{ changed: boolean }> {
+  if (getManagedTunnelSettings()) {
+    const { changed, dns } = await applyManagedRouteUpdate(update);
+    if (dns.length) console.log(`[Cloudflare] ${dns.join(", ")}`);
+    return { changed };
+  }
   const result = await runHostCommand(await buildCloudflareRouteScript(update), 30_000);
   if (!result.success) throw new Error(result.stderr || result.stdout || "Nie udało się zaktualizować Cloudflare Tunnel.");
   return { changed: /CONFIG_CHANGED=1/.test(result.stdout) };
 }
 
 export async function listCloudflareTunnelRoutes(): Promise<{ configured: boolean; routes: TunnelIngressRoute[]; error?: string }> {
+  if (getManagedTunnelSettings()) {
+    try {
+      const rules = await listManagedRoutes();
+      return { configured: true, routes: rules.flatMap((rule) => (rule.hostname ? [{ hostname: rule.hostname, service: rule.service }] : [])) };
+    } catch (error) {
+      return { configured: true, routes: [], error: error instanceof Error ? error.message : "Nie udało się odczytać tunelu z Cloudflare API." };
+    }
+  }
   const settings = await getCloudflareTunnelSettings();
   if (!settings.configPath) return { configured: false, routes: [] };
 

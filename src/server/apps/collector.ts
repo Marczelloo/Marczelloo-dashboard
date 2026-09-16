@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getManagedTunnelSettings, listManagedRoutes } from "@/server/cloudflare/managed-tunnel";
 import { getCloudflareTunnelSettings, runHostCommand } from "@/server/deployments";
 import { buildEnvFilesCommand, buildInspectCommand, buildStackProbeCommand, IMAGE_ID, parseGit, parseImageEnv, type StackLocation } from "./inventory/commands";
 import { extractEnvFileRefs, normalizeComposeConfig } from "./inventory/compose-files";
@@ -25,9 +26,10 @@ export async function collectInventory(): Promise<InventorySnapshot> {
     return reference?.workingDir ? [{ project, workingDir: reference.workingDir, configFiles: reference.configFiles }] : [];
   });
 
+  const managedTunnel = getManagedTunnelSettings();
   const tunnel = await getCloudflareTunnelSettings();
   const imageIds = [...new Set(containers.map((container) => container.imageId).filter((imageId) => IMAGE_ID.test(imageId)))];
-  const probe = parseSections((await runHostCommand(buildStackProbeCommand(locations, imageIds, { path: tunnel.configPath, useSudo: tunnel.useSudo }), 120_000)).stdout);
+  const probe = parseSections((await runHostCommand(buildStackProbeCommand(locations, imageIds, { path: managedTunnel ? null : tunnel.configPath, useSudo: tunnel.useSudo }), 120_000)).stdout);
 
   const referencedEnv = new Map<string, string[]>();
   for (const location of locations) {
@@ -75,7 +77,23 @@ export async function collectInventory(): Promise<InventorySnapshot> {
   const imageSection = find(probe, "image-env", "all");
   const ingressSection = find(probe, "ingress", "config");
   let ingress: InventorySnapshot["ingress"] = { rules: [], error: tunnel.configPath ? "Nie odczytano konfiguracji cloudflared." : "Ścieżka konfiguracji tunelu nie jest ustawiona." };
-  if (ingressSection && ingressSection.exitCode === 0) {
+  if (managedTunnel) {
+    try {
+      const rules = await listManagedRoutes();
+      ingress = {
+        rules: rules.map((rule, position) => ({
+          position,
+          hostname: rule.hostname?.toLowerCase() ?? null,
+          path: rule.path ?? null,
+          service: rule.service,
+          originRequest: rule.originRequest && Object.keys(rule.originRequest).length ? rule.originRequest : null,
+        })),
+        error: null,
+      };
+    } catch (error) {
+      ingress = { rules: [], error: error instanceof Error ? error.message : "Nie odczytano tras z Cloudflare API." };
+    }
+  } else if (ingressSection && ingressSection.exitCode === 0) {
     try {
       ingress = { rules: parseIngressConfig(ingressSection.body), error: null };
     } catch (error) {

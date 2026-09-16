@@ -169,8 +169,9 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
         },
       });
 
-      // For self-deployment, use safe deployment with health checks and rollback
-      if (selfDeploy) {
+      // For self-deployment, use safe deployment with health checks and rollback.
+      // With the agent engine the separate agent container deploys the dashboard like any other project.
+      if (selfDeploy && deploymentConfig?.engine !== "agent") {
         console.log(`[GitHub Webhook] Starting SAFE self-deploy for ${project.name}`);
 
         // Start safe deployment in background without waiting

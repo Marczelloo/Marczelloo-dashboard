@@ -17,6 +17,7 @@ import type { CreateProjectInput, UpdateProjectInput } from "@/types";
 import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
 import {
   allocateDeploymentPort,
+  deleteDeploymentConfig,
   getDeploymentConfig,
   isDeploymentLogPath,
   listCloudflareTunnelRoutes,
@@ -30,6 +31,8 @@ import {
   type DeploymentRuntime,
 } from "@/server/deployments";
 import { queueAgentDeployment, readAgentDeployLog } from "@/server/agent/deploy";
+import { isAgentConfigured } from "@/server/agent/client";
+import { hostnameConflict } from "@/server/deployments/hostname-guard";
 import { agentLogRef, parseAgentLogRef } from "@/server/agent/refs";
 
 // ========================================
@@ -130,6 +133,28 @@ async function ensureDeploymentService(projectId: string, projectName: string, c
     deploy_strategy: "compose_up",
     url: publicUrl || undefined,
   });
+}
+
+function hostnameOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+async function findHostnameConflict(projectId: string, hostname: string, ownedHostnames: Array<string | null | undefined>): Promise<string | null> {
+  const [allProjects, ingress] = await Promise.all([projects.getProjects(), listCloudflareTunnelRoutes()]);
+  const owners = (
+    await Promise.all(
+      allProjects.map(async (project) => {
+        const config = await getDeploymentConfig(project.id);
+        return config?.tunnel?.enabled ? { projectId: project.id, projectName: project.name, hostname: config.tunnel.hostname } : null;
+      })
+    )
+  ).filter((owner): owner is NonNullable<typeof owner> => Boolean(owner));
+  return hostnameConflict({ projectId, hostname, ownedHostnames: ownedHostnames.filter((value): value is string => Boolean(value)), owners, routes: ingress.routes });
 }
 
 async function queueConfiguredDeployment(
@@ -292,6 +317,10 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
     if (allProjects.some((project) => project.github_url?.replace(/\.git$/, "").toLowerCase() === parsed.githubUrl.replace(/\.git$/, "").toLowerCase())) {
       return { success: false, error: "To repozytorium GitHub jest już połączone z projektem." };
     }
+    if (parsed.exposure === "cloudflare" && parsed.hostname) {
+      const conflict = await findHostnameConflict("new", parsed.hostname, []);
+      if (conflict) return { success: false, error: conflict };
+    }
 
     const project = await projects.createProject({
       name: parsed.name,
@@ -316,6 +345,7 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
       tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort
         ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort }
         : null,
+      ...(isAgentConfigured() ? { engine: "agent" as const } : {}),
     });
     await ensureDeploymentService(project.id, project.name, config);
     const preflight = await preflightDeployment(config);
@@ -425,6 +455,17 @@ export async function deleteProjectAction(id: string): Promise<ActionResult> {
 
     const user = await requirePinVerification();
 
+    // Remove the public route and its DNS record before the project that owns them disappears.
+    const deploymentConfig = await getDeploymentConfig(id);
+    if (deploymentConfig?.tunnel?.enabled) {
+      try {
+        await updateCloudflareTunnelRoute({ hostname: null, localPort: null, removeHostnames: [deploymentConfig.tunnel.hostname] });
+      } catch (error) {
+        return { success: false, error: `Nie usunięto projektu: trasa ${deploymentConfig.tunnel.hostname} nie została zdjęta (${error instanceof Error ? error.message : "błąd Cloudflare"}).` };
+      }
+    }
+    if (deploymentConfig) await deleteDeploymentConfig(id);
+
     // Delete related services and work items first
     const projectServices = await services.getServicesByProjectId(id);
     for (const service of projectServices) {
@@ -442,7 +483,7 @@ export async function deleteProjectAction(id: string): Promise<ActionResult> {
       return { success: false, error: "Project not found" };
     }
 
-    await auditLogs.logAction(user.email, "delete", "project", id);
+    await auditLogs.logAction(user.email, "delete", "project", id, deploymentConfig?.tunnel?.enabled ? { removed_hostname: deploymentConfig.tunnel.hostname } : undefined);
 
     revalidatePath("/projects");
     revalidatePath("/dashboard");
@@ -547,6 +588,10 @@ export async function updateProjectTunnelAction(
     if (!existing) return { success: false, error: "Ten projekt nie ma jeszcze zarządzanej konfiguracji GitHub/Docker." };
 
     const hostname = parsed.enabled ? parsed.hostname!.trim().toLowerCase() : null;
+    if (hostname) {
+      const conflict = await findHostnameConflict(id, hostname, [existing.tunnel?.hostname, hostnameOf(project.prod_url)]);
+      if (conflict) return { success: false, error: conflict };
+    }
     const localPort = parsed.enabled
       ? await allocateDeploymentPort(parsed.localPort!, existing.composeProject)
       : null;

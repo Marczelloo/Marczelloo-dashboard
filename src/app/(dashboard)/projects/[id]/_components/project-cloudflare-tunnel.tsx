@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/components/ui";
 import { getProjectTunnelStatusAction, updateProjectTunnelAction } from "@/app/actions/projects";
+import { CloudflareHostnameField } from "@/components/features/cloudflare-hostname-field";
 import { CheckCircle2, Cloud, ExternalLink, Pencil, RefreshCw, Server, TriangleAlert } from "lucide-react";
 
 type TunnelStatus = "active" | "pending" | "not_configured" | "unavailable";
@@ -69,7 +70,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
       description: result.data?.deployQueued
         ? "Nowy port zostanie wystawiony po automatycznym deployu projektu."
         : result.data?.changed
-          ? "Ingress przeładowano na Raspberry Pi."
+          ? "Trasa tunelu zaktualizowana."
           : "Konfiguracja była już aktualna.",
     });
     setEditing(false);
@@ -123,7 +124,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
             {data.status === "unavailable" && (
               <div className="flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <p>{data.error || "Nie udało się odczytać systemowego pliku ingress Cloudflare."}</p>
+                <p>{data.error || "Nie udało się odczytać tras Cloudflare Tunnel."}</p>
               </div>
             )}
 
@@ -160,7 +161,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="tunnel-hostname">Domena</Label>
-                      <Input id="tunnel-hostname" value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="app.marczelloo.dev" autoCapitalize="none" autoCorrect="off" />
+                      <CloudflareHostnameField id="tunnel-hostname" value={hostname} onChange={setHostname} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="tunnel-port">Port lokalny</Label>

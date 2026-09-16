@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Star,
 } from "lucide-react";
+import { CloudflareHostnameField } from "@/components/features/cloudflare-hostname-field";
 import { toast } from "sonner";
 import {
   Badge,
@@ -259,7 +260,7 @@ export function GitHubRepoSelector() {
             <Field label="Exposure"><Select value={exposure} onValueChange={(value) => setExposure(value as Exposure)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="internal">Internal only</SelectItem><SelectItem value="cloudflare">Cloudflare Tunnel</SelectItem></SelectContent></Select></Field>
           </div>
 
-          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-border/70 bg-secondary/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-primary" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-muted-foreground">Po udanym deployu dashboard doda ingress route i przeładuje cloudflared. Wymaga konfiguracji operatora na Pi.</p></div></div><Field label="Hostname"><Input placeholder="app.marczelloo.dev" value={hostname} onChange={(event) => setHostname(event.target.value)} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
+          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-border/70 bg-secondary/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-primary" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-muted-foreground">Po udanym deployu dashboard doda trasę tunelu i rekord DNS dla wybranej domeny.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
 
           {preflight && <div className="rounded-lg border border-border/70 bg-background/50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><ShieldCheck className={`h-4 w-4 ${preflight.ok ? "text-success" : "text-destructive"}`} /><p className="text-sm font-medium">Preflight {preflight.ok ? "passed" : "needs attention"}</p>{preflight.composeFile && <Badge variant="secondary" className="font-mono">{preflight.composeFile}</Badge>}{preflight.services.map((service) => <Badge key={service} variant="outline" className="font-mono">{service}</Badge>)}</div><div className="space-y-2">{preflight.messages.map((message, index) => <div key={`${message.text}-${index}`} className="flex gap-2 text-sm"><span className={message.level === "success" ? "text-success" : message.level === "warning" ? "text-warning" : "text-destructive"}>{message.level === "success" ? "✓" : message.level === "warning" ? "!" : "×"}</span><span className="text-muted-foreground">{message.text}</span></div>)}</div></div>}
 

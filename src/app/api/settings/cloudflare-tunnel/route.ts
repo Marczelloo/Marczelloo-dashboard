@@ -7,6 +7,7 @@ import {
   listCloudflareTunnelRoutes,
   saveCloudflareTunnelSettings,
 } from "@/server/deployments";
+import { getManagedTunnelSettings, getManagedTunnelStatus } from "@/server/cloudflare/managed-tunnel";
 import { requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -72,8 +73,12 @@ export async function GET() {
       });
     }
 
+    const managedTunnel = getManagedTunnelSettings()
+      ? await getManagedTunnelStatus().catch((error: unknown) => ({ error: error instanceof Error ? error.message : "Cloudflare API niedostępne." }))
+      : null;
+
     return NextResponse.json(
-      { success: true, tunnel, configured: ingress.configured, routes, error: ingress.error },
+      { success: true, tunnel, managedTunnel, configured: ingress.configured, routes, error: ingress.error },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (error) {
