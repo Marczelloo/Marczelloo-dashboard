@@ -8,8 +8,8 @@ RUN apt-get update \
 # runbook (agent/vendor). The agent must use the same Compose version as the
 # host, otherwise Compose computes different config hashes and recreates
 # containers that did not change.
-COPY vendor/docker /usr/local/bin/docker
-COPY vendor/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+COPY --chmod=0755 vendor/docker /usr/local/bin/docker
+COPY --chmod=0755 vendor/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
 
 WORKDIR /app
 COPY package.json package-lock.json ./
