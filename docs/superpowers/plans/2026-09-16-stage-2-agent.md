@@ -229,7 +229,7 @@ import {
   staleImages,
   startJob,
 } from "./queue";
-import type { DeployTarget, Release } from "./types";
+import type { AgentState, DeployTarget, Release } from "./types";
 
 const target = (composeProject = "marczelloo-tools"): DeployTarget => ({
   projectId: "11111111-1111-4111-8111-111111111111",
@@ -302,7 +302,7 @@ describe("finishJob", () => {
   });
 
   it("keeps releases unchanged after a rollback", () => {
-    let state = { ...emptyState(), projects: { "marczelloo-tools": { releases: [release("a")] } } };
+    let state: AgentState = { ...emptyState(), projects: { "marczelloo-tools": { releases: [release("a")] } } };
     state = startJob(enqueue(state, input("j1", "b"), "t1").state, "j1", "t2");
     state = finishJob(state, "j1", { status: "rolled_back", error: "unhealthy", rolledBackTo: sha("a"), release: null, orphanImages: [] }, "t3");
     expect(state.projects["marczelloo-tools"].releases.map((item) => item.sha)).toEqual([sha("a")]);
@@ -1909,7 +1909,8 @@ export function runCommand(step: CommandStep, onOutput: (chunk: string) => void)
   return new Promise((resolve) => {
     // Never inherit the agent environment: Compose prefers process variables over
     // a project's .env, so AGENT_TOKEN, NODE_ENV or PROJECTS_DIR would leak into apps.
-    const env = { PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin", HOME: process.env.HOME ?? "/tmp", ...step.env };
+    // Cast: Next.js augments ProcessEnv with a required NODE_ENV, which children must not get.
+    const env = { PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin", HOME: process.env.HOME ?? "/tmp", ...step.env } as unknown as NodeJS.ProcessEnv;
     const child = spawn(step.command, step.args, { env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -3295,3 +3296,10 @@ git commit -m "docs: add stage 2 deploy agent runbook"
 - Przełączenie pozostałych projektów, `compose.generated.yml`, `--remove-orphans` — etap 4.
 - Zastąpienie runnera w terminalu i operacjach kontenerów, decyzja o Portainerze — po etapie 4.
 - Sondy per proces z `marczelloo.yml`, strumień `docker events`, polling SHA jako zapas webhooka — etapy 5–6.
+
+## Zmiany względem planu (implementacja 16.09.2026)
+
+- Task 1: w teście „keeps releases unchanged after a rollback” zmienna ma jawny typ `AgentState` (bez niego `tsc` zawęża `projects` do literału).
+- Task 6: `exec.ts` rzutuje minimalne środowisko na `NodeJS.ProcessEnv` — typy Next.js wymagają `NODE_ENV`, którego procesy potomne celowo nie dostają.
+- Task 10: `getDeployEngineAction` w trybie demo zwraca „niezarządzany” bez `requireAuth()` (użytkownik demo nie jest właścicielem; inaczej każda strona projektu w demo pokazywałaby błąd).
+- Weryfikacja lokalna: proces agenta uruchomiony z atrapą dashboardu — zadanie przeszło kolejkę, `git clone` bez dostępu zakończył się błędem bez promptu, zdarzenia `started`/`finished` dotarły w kolejności z poprawnym tokenem. Obraz Dockera nie był budowany lokalnie (Docker Desktop wyłączony); buduje go runbook na Pi.
