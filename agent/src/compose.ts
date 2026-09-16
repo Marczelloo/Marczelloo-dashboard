@@ -20,12 +20,13 @@ export function resolveComposeFile(target: DeployTarget, exists: (filePath: stri
 
 export function composeArgs(target: DeployTarget, files: string[]): string[] {
   // Same default as Compose and the legacy script: the directory of the first file.
+  // A generated file lives in the agent's data directory, so relative paths resolve against the repository.
   return [
     "compose",
     "-p",
     target.composeProject,
     "--project-directory",
-    path.posix.dirname(files[0]),
+    target.generatedCompose ? target.repoPath : path.posix.dirname(files[0]),
     ...files.flatMap((file) => ["-f", file]),
     ...target.profiles.flatMap((profile) => ["--profile", profile]),
   ];

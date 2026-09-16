@@ -27,6 +27,10 @@ describe("composeArgs", () => {
     expect(composeArgs({ ...target, profiles: [] }, ["/p/tools/deploy/compose.yml"]).slice(0, 5)).toEqual(["compose", "-p", "marczelloo-tools", "--project-directory", "/p/tools/deploy"]);
   });
 
+  it("resolves a generated file against the repository", () => {
+    expect(composeArgs({ ...target, profiles: [], generatedCompose: "services: {}" }, ["/data/overrides/marczelloo-tools.generated.yml"]).slice(3, 5)).toEqual(["--project-directory", "/p/tools"]);
+  });
+
   it("pins the project, directory, files and profiles", () => {
     expect(composeArgs(target, ["/p/tools/docker-compose.yml", "/o/tools.yml"])).toEqual([
       "compose", "-p", "marczelloo-tools", "--project-directory", "/p/tools",

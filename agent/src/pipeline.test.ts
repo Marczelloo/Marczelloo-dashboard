@@ -98,6 +98,17 @@ describe("runDeploy", () => {
     expect(outcome).toMatchObject({ status: "succeeded", error: null, release: { sha: NEW, images: { app: "marczelloo-tools-app:bbbbbbbbbbbb" } }, orphanImages: [] });
   });
 
+  it("writes a dashboard-rendered compose file instead of reading one from the repository", async () => {
+    const { deps, steps, writes } = harness();
+    const generated = { ...job("deploy", NEW), target: { ...job("deploy", NEW).target, generatedCompose: "services:\n  app:\n    build: {context: /p/tools}\n" } };
+    const outcome = await runDeploy(generated, null, previous, deps);
+    expect(outcome.status).toBe("succeeded");
+    expect(writes[0]).toEqual({ file: "/data/overrides/marczelloo-tools.generated.yml", content: generated.target.generatedCompose });
+    const build = steps.find((step) => step.label === "Build")!;
+    expect(build.args).toContain("/data/overrides/marczelloo-tools.generated.yml");
+    expect(build.args[build.args.indexOf("--project-directory") + 1]).toBe("/p/tools");
+  });
+
   it("leaves running containers untouched when the build fails", async () => {
     const { deps, steps } = harness({ failLabel: "Build" });
     const outcome = await runDeploy(job("deploy", NEW), null, previous, deps);

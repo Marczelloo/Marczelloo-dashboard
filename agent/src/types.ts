@@ -14,6 +14,11 @@ export interface DeployTarget {
    * hostname can be part of the health gate.
    */
   tunnel: { hostname: string; localPort: number; probe: boolean } | null;
+  /**
+   * Compose file rendered by the dashboard for repositories without their own
+   * (built from a template or a plain Dockerfile). Missing in older jobs.
+   */
+  generatedCompose?: string | null;
 }
 
 export interface Job {

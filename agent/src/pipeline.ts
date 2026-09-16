@@ -65,6 +65,14 @@ async function composeConfig(job: Job, composeFile: string, deps: PipelineDeps):
 
 const overridePath = (job: Job, deps: PipelineDeps) => path.posix.join(deps.overrideDir, `${job.target.composeProject}.yml`);
 
+/** The repository's compose file, or the dashboard-rendered one written next to the override. */
+function prepareComposeFile(job: Job, deps: PipelineDeps): string {
+  if (!job.target.generatedCompose) return resolveComposeFile(job.target, deps.exists);
+  const file = path.posix.join(deps.overrideDir, `${job.target.composeProject}.generated.yml`);
+  deps.writeFile(file, job.target.generatedCompose);
+  return file;
+}
+
 export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<string | null> {
   deps.log("=== Bramka zdrowia ===");
   const started = deps.now();
@@ -104,7 +112,7 @@ async function upAndCheck(job: Job, files: string[], deps: PipelineDeps): Promis
 
 async function restoreRelease(job: Job, release: Release, deps: PipelineDeps): Promise<string | null> {
   await runStep(deps, gitCheckoutStep(job.target.repoPath, release.sha));
-  const composeFile = resolveComposeFile(job.target, deps.exists);
+  const composeFile = prepareComposeFile(job, deps);
   const config = await composeConfig(job, composeFile, deps);
   const port = job.target.tunnel ? loopbackPortOverride(config, job.target.tunnel.localPort) : null;
   const file = overridePath(job, deps);
@@ -193,7 +201,7 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
       await runStep(deps, step);
     }
 
-    const composeFile = resolveComposeFile(target, deps.exists);
+    const composeFile = prepareComposeFile(job, deps);
     const config = await composeConfig(job, composeFile, deps);
     const override = buildOverride(config, { project: target.composeProject, sha: job.sha, tunnelPort: target.tunnel?.localPort ?? null });
     images = override.images;

@@ -27,6 +27,7 @@ export const deployTargetSchema = z.object({
   tunnel: z
     .object({ hostname: z.string().regex(/^[a-z0-9.-]+$/).max(253), localPort: z.number().int().min(1).max(65535), probe: z.boolean().default(false) })
     .nullable(),
+  generatedCompose: z.string().min(1).max(200_000).nullable().default(null),
 });
 
 export const jobRequestSchema = z.discriminatedUnion("kind", [
