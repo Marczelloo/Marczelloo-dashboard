@@ -67,6 +67,7 @@ describe("agent HTTP API", () => {
     const finished = {
       ...deploy,
       id: SECOND_JOB_ID,
+      kind: "deploy" as const,
       status: "succeeded" as const,
       createdAt: "2026-09-16T08:00:00.000Z",
       startedAt: "2026-09-16T08:01:00.000Z",
