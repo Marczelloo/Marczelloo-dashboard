@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from "@/components/ui";
-import { DeployLogsButton } from "@/app/(dashboard)/dashboard/_components/deploy-logs-button";
+import { DeployLogsButton } from "@/components/features/deploy-logs-button";
 import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 import { checkDeployLogAction } from "@/app/actions/projects";
 import { GitHubTabs } from "./github-tabs";

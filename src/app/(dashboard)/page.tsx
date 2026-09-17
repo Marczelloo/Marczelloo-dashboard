@@ -1,64 +1,13 @@
-import { Suspense } from "react";
+import { getOverview } from "@/server/overview";
+import { OverviewView } from "./_overview/overview-view";
 
 export const dynamic = "force-dynamic";
-import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { DashboardStats } from "./dashboard/_components/dashboard-stats";
-import { RecentActivity } from "./dashboard/_components/recent-activity";
-import { ServiceStatus } from "./dashboard/_components/service-status";
-import { QuickActions } from "./dashboard/_components/quick-actions";
-import { RecentDeploysServer } from "./dashboard/_components/recent-deploys";
-import { Skeleton } from "@/components/ui";
+export const metadata = { title: "Overview" };
 
-export default function DashboardPage() {
-  return (
-    <>
-      <PageHeader title="Dashboard" description="Overview of your projects and services" />
-      <PageBody className="space-y-6">
-        {/* Stats Cards */}
-        <Suspense fallback={<StatsSkeletons />}>
-          <DashboardStats />
-        </Suspense>
-
-        {/* Main Grid */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Service Status - 2 columns, scrollable with max height matching Quick Actions */}
-          <div className="lg:col-span-2 max-h-[400px] overflow-hidden flex flex-col">
-            <Suspense fallback={<CardSkeleton className="h-full" />}>
-              <ServiceStatus />
-            </Suspense>
-          </div>
-
-          {/* Quick Actions - 1 column */}
-          <div>
-            <QuickActions />
-          </div>
-        </div>
-
-        {/* Recent Deploys + Recent Activity - 2 columns side by side */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Suspense fallback={<CardSkeleton className="h-80" />}>
-            <RecentDeploysServer />
-          </Suspense>
-
-          <Suspense fallback={<CardSkeleton className="h-80" />}>
-            <RecentActivity />
-          </Suspense>
-        </div>
-      </PageBody>
-    </>
-  );
-}
-
-function StatsSkeletons() {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {[1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} className="h-28 rounded-lg" />
-      ))}
-    </div>
-  );
-}
-
-function CardSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={`rounded-lg ${className}`} />;
+export default async function OverviewPage() {
+  const overview = await getOverview().catch((error) => {
+    console.error("[overview] Initial load failed:", error);
+    return null;
+  });
+  return <OverviewView initial={overview} />;
 }
