@@ -48,7 +48,15 @@ function tunnelPortCandidate(config: ComposeConfigJson, port: number): { service
       .map((entry) => ({ service, published: String(entry.published), target: Number(entry.target), hostIp: entry.host_ip ?? "" }))
   );
   const matching = candidates.filter((candidate) => candidate.published === String(port));
-  return candidates.length === 1 ? candidates[0] : matching.length === 1 ? matching[0] : null;
+  if (candidates.length === 1) return candidates[0];
+  if (matching.length === 1) return matching[0];
+  // Without host ports the configured port is the container port.
+  const byTarget = Object.entries(config.services ?? {}).flatMap(([service, definition]) =>
+    (definition.ports ?? [])
+      .filter((entry) => entry.target === port && (entry.protocol ?? "tcp") === "tcp")
+      .map((entry) => ({ service, published: String(entry.published ?? ""), target: port, hostIp: entry.host_ip ?? "" }))
+  );
+  return byTarget.length === 1 ? byTarget[0] : null;
 }
 
 export function loopbackPortOverride(config: ComposeConfigJson, port: number): { service: string; mapping: string } | null {
@@ -60,6 +68,8 @@ export function loopbackPortOverride(config: ComposeConfigJson, port: number): {
 
 export interface EdgeAttachment {
   network: string;
+  /** Edge services publish no host ports; the tunnel reaches them over the network. */
+  dropPorts: boolean;
   /** Service → networks it already uses, kept because a service's network list is replaced as a whole. */
   services: Record<string, string[]>;
 }
@@ -71,18 +81,19 @@ export interface EdgeAttachment {
  */
 export function edgeAttachment(
   config: ComposeConfigJson,
-  edge: { network: string; services: string[] } | null | undefined,
-  tunnelPort: number | null = null
+  edge: { network: string; services: string[]; dropPorts?: boolean } | null | undefined,
+  tunnelPort: number | null = null,
+  explicitTunnelService: string | null = null
 ): EdgeAttachment | null {
   if (!edge) return null;
-  const tunnelService = tunnelPort ? tunnelPortCandidate(config, tunnelPort)?.service : undefined;
+  const tunnelService = explicitTunnelService ?? (tunnelPort ? tunnelPortCandidate(config, tunnelPort)?.service : undefined);
   const services: Record<string, string[]> = {};
   for (const name of new Set([...edge.services, ...(tunnelService ? [tunnelService] : [])])) {
     const definition = config.services?.[name];
     if (!definition) throw new Error(`Usługa ${name} nie istnieje w projekcie Compose (sieć ${edge.network}).`);
     services[name] = Object.keys(definition.networks ?? { default: null }).filter((network) => network !== edge.network);
   }
-  return Object.keys(services).length ? { network: edge.network, services } : null;
+  return Object.keys(services).length ? { network: edge.network, dropPorts: Boolean(edge.dropPorts), services } : null;
 }
 
 export function renderOverride(images: Record<string, string>, port: { service: string; mapping: string } | null, edge: EdgeAttachment | null = null): string {
@@ -93,6 +104,7 @@ export function renderOverride(images: Record<string, string>, port: { service: 
     lines.push(`  ${JSON.stringify(name)}:`);
     if (images[name]) lines.push(`    image: ${JSON.stringify(images[name])}`);
     if (port?.service === name) lines.push("    ports: !override", `      - ${JSON.stringify(port.mapping)}`);
+    else if (edge?.dropPorts && edge.services[name]) lines.push("    ports: !reset []");
     const networks = edge?.services[name];
     if (networks) {
       lines.push("    networks:");
@@ -105,13 +117,13 @@ export function renderOverride(images: Record<string, string>, port: { service: 
 
 export function buildOverride(
   config: ComposeConfigJson,
-  input: { project: string; sha: string; tunnelPort: number | null; edge?: { network: string; services: string[] } | null }
+  input: { project: string; sha: string; tunnelPort: number | null; tunnelService?: string | null; edge?: { network: string; services: string[]; dropPorts?: boolean } | null }
 ): { yaml: string; images: Record<string, string> } {
   const tag = input.sha.slice(0, 12);
   const images: Record<string, string> = {};
   for (const [service, definition] of Object.entries(config.services ?? {})) {
     if (definition.build) images[service] = `${imageRepository(input.project, service, definition.image)}:${tag}`;
   }
-  const port = input.tunnelPort ? loopbackPortOverride(config, input.tunnelPort) : null;
-  return { yaml: renderOverride(images, port, edgeAttachment(config, input.edge, input.tunnelPort)), images };
+  const port = input.tunnelPort && !input.edge?.dropPorts ? loopbackPortOverride(config, input.tunnelPort) : null;
+  return { yaml: renderOverride(images, port, edgeAttachment(config, input.edge, input.tunnelPort, input.tunnelService ?? null)), images };
 }

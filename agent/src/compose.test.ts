@@ -81,16 +81,30 @@ describe("renderOverride and buildOverride", () => {
     );
   });
 
+  it("drops host ports of edge services instead of publishing the tunnel port", () => {
+    const config = { services: { app: { build: { context: "." }, ports: [{ published: "3202", target: 3000, host_ip: "127.0.0.1" }] }, db: { image: "postgres", ports: [{ published: "5432", target: 5432 }] } } };
+    const result = buildOverride(config, { project: "p", sha: SHA, tunnelPort: 3202, edge: { network: "mz-edge", services: [], dropPorts: true } });
+    expect(result.yaml).toBe(
+      'services:\n  "app":\n    image: "p-app:0123456789ab"\n    ports: !reset []\n    networks:\n      "default": {}\n      "mz-edge": {}\nnetworks:\n  "mz-edge":\n    external: true\n    name: "mz-edge"\n'
+    );
+  });
+
+  it("finds the tunnel service by container port or an explicit name", () => {
+    const config = { services: { web: { ports: [{ target: 3000 }] }, api: { ports: [{ target: 4000 }] } } };
+    expect(edgeAttachment(config, { network: "mz-edge", services: [] }, 4000)?.services).toEqual({ api: ["default"] });
+    expect(edgeAttachment(config, { network: "mz-edge", services: [] }, null, "web")?.services).toEqual({ web: ["default"] });
+  });
+
   it("treats services without explicit networks as using the default one", () => {
-    expect(edgeAttachment({ services: { web: { image: "nginx" } } }, { network: "mz-edge", services: ["web"] })).toEqual({ network: "mz-edge", services: { web: ["default"] } });
+    expect(edgeAttachment({ services: { web: { image: "nginx" } } }, { network: "mz-edge", services: ["web"] })).toEqual({ network: "mz-edge", dropPorts: false, services: { web: ["default"] } });
     expect(edgeAttachment({ services: { web: { image: "nginx" } } }, null)).toBeNull();
     expect(() => edgeAttachment({ services: {} }, { network: "mz-edge", services: ["missing"] })).toThrow(/missing/);
   });
 
   it("always attaches the service that publishes the tunnel port", () => {
     const config = { services: { app: { ports: [{ published: "3202", target: 3000, host_ip: "127.0.0.1" }] }, db: { image: "postgres" } } };
-    expect(edgeAttachment(config, { network: "mz-edge", services: [] }, 3202)).toEqual({ network: "mz-edge", services: { app: ["default"] } });
-    expect(edgeAttachment(config, { network: "mz-edge", services: ["app"] }, 3202)).toEqual({ network: "mz-edge", services: { app: ["default"] } });
+    expect(edgeAttachment(config, { network: "mz-edge", services: [] }, 3202)).toEqual({ network: "mz-edge", dropPorts: false, services: { app: ["default"] } });
+    expect(edgeAttachment(config, { network: "mz-edge", services: ["app"] }, 3202)).toEqual({ network: "mz-edge", dropPorts: false, services: { app: ["default"] } });
   });
 
   it("pins only services that are built from source", () => {

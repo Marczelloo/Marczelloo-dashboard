@@ -115,6 +115,20 @@ export function validateComposeFilename(composeFile: unknown): string | null {
   return composeFile;
 }
 
+/** TCP ports per service from `docker compose config --format json`. */
+export function parseComposePorts(json: string): PreflightResponse["ports"] {
+  try {
+    const config = JSON.parse(json) as { services?: Record<string, { ports?: Array<{ published?: string | number; target?: number; protocol?: string }> }> };
+    return Object.entries(config.services ?? {}).flatMap(([service, definition]) =>
+      (definition.ports ?? [])
+        .filter((entry) => typeof entry.target === "number" && (entry.protocol ?? "tcp") === "tcp")
+        .map((entry) => ({ service, published: entry.published === undefined || entry.published === "" ? null : Number(entry.published), target: entry.target as number }))
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function parseMeminfo(content: string): { totalBytes: number; availableBytes: number } | null {
   const values = new Map<string, number>();
   for (const line of content.split(/\r?\n/)) {
@@ -256,11 +270,12 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
           if (!isMissing(error)) throw new HostOperationError("Nie można sprawdzić pliku Compose.");
         }
       }
-      if (!composeFile || !composeAbsolute) return { repoState, composeFile: null, composeValid: null, services: [], profiles: [] };
+      if (!composeFile || !composeAbsolute) return { repoState, composeFile: null, composeValid: null, services: [], profiles: [], ports: [] };
 
       const base = ["compose", "--project-directory", repoPath, "-f", composeAbsolute, "config"];
       const [valid, services, profiles] = await Promise.all([
-        deps.run(command("docker compose config", [...base, "-q"]), silent),
+        // The JSON form also validates; it contains env values, so it is parsed for ports only and never logged.
+        deps.run(command("docker compose config", [...base, "--format", "json"]), silent),
         deps.run(command("docker compose services", [...base, "--services"]), silent),
         deps.run(command("docker compose profiles", [...base, "--profiles"]), silent),
       ]);
@@ -270,6 +285,7 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
         composeValid: valid.code === 0,
         services: services.code === 0 ? services.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : [],
         profiles: profiles.code === 0 ? profiles.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : [],
+        ports: valid.code === 0 ? parseComposePorts(valid.stdout) : [],
       };
     },
 

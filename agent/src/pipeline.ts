@@ -123,9 +123,9 @@ async function restoreRelease(job: Job, release: Release, deps: PipelineDeps): P
   await runStep(deps, gitCheckoutStep(job.target.repoPath, release.sha));
   const composeFile = prepareComposeFile(job, deps);
   const config = await composeConfig(job, composeFile, deps);
-  const port = job.target.tunnel ? loopbackPortOverride(config, job.target.tunnel.localPort) : null;
+  const port = job.target.tunnel && !job.target.edge?.dropPorts ? loopbackPortOverride(config, job.target.tunnel.localPort) : null;
   const file = overridePath(job, deps);
-  deps.writeFile(file, renderOverride(release.images, port, edgeAttachment(config, job.target.edge, job.target.tunnel?.localPort ?? null)));
+  deps.writeFile(file, renderOverride(release.images, port, edgeAttachment(config, job.target.edge, job.target.tunnel?.localPort ?? null, job.target.tunnel?.service ?? null)));
   await ensureEdgeNetwork(job, deps);
   return upAndCheck(job, [composeFile, file], deps);
 }
@@ -213,7 +213,7 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
 
     const composeFile = prepareComposeFile(job, deps);
     const config = await composeConfig(job, composeFile, deps);
-    const override = buildOverride(config, { project: target.composeProject, sha: job.sha, tunnelPort: target.tunnel?.localPort ?? null, edge: target.edge });
+    const override = buildOverride(config, { project: target.composeProject, sha: job.sha, tunnelPort: target.tunnel?.localPort ?? null, tunnelService: target.tunnel?.service ?? null, edge: target.edge });
     images = override.images;
     const file = overridePath(job, deps);
     deps.writeFile(file, override.yaml);

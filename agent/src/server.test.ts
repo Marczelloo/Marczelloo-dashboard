@@ -24,7 +24,7 @@ const applyEnv = { kind: "apply-env", target, deployId: deploy.deployId, trigger
 const host: HostOperations = {
   listEnvFiles: async () => ({ files: [] }),
   readEnvFile: async () => ({ exists: false, content: "" }),
-  preflight: async () => ({ repoState: "missing", composeFile: null, composeValid: null, services: [], profiles: [] }),
+  preflight: async () => ({ repoState: "missing", composeFile: null, composeValid: null, services: [], profiles: [], ports: [] }),
   getHostInfo: async () => ({
     hostname: "pi", uptimeSeconds: 1, loadavg: [0, 0, 0], cores: 4,
     memory: { totalBytes: 1, availableBytes: 1 }, disk: null, temperatureC: null, docker: null, publishedPorts: [],

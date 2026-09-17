@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHostOperations, HostOperationError, parseMeminfo, parsePublishedPorts, validateRepoPath } from "./host";
+import { createHostOperations, HostOperationError, parseComposePorts, parseMeminfo, parsePublishedPorts, validateRepoPath } from "./host";
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -65,6 +65,15 @@ describe("environment files", () => {
 });
 
 describe("host parsers", () => {
+  it("lists TCP ports per service from compose config JSON", () => {
+    const json = JSON.stringify({ services: { app: { ports: [{ published: "3202", target: 3000, protocol: "tcp" }, { target: 9229 }] }, dns: { ports: [{ published: "53", target: 53, protocol: "udp" }] }, db: {} } });
+    expect(parseComposePorts(json)).toEqual([
+      { service: "app", published: 3202, target: 3000 },
+      { service: "app", published: null, target: 9229 },
+    ]);
+    expect(parseComposePorts("not json")).toEqual([]);
+  });
+
   it("parses MemTotal and MemAvailable in KiB", () => {
     expect(parseMeminfo("MemTotal:       1024 kB\nMemFree: 1 kB\nMemAvailable:    256 kB\n")).toEqual({
       totalBytes: 1024 * 1024,
@@ -107,7 +116,7 @@ describe("preflight", () => {
       },
     });
     await expect(host.preflight({ repoPath: repo, composeFile: null })).resolves.toEqual({
-      repoState: "git", composeFile: "compose.yaml", composeValid: true, services: ["api", "worker"], profiles: ["debug"],
+      repoState: "git", composeFile: "compose.yaml", composeValid: true, services: ["api", "worker"], profiles: ["debug"], ports: [],
     });
     expect(calls).toHaveLength(3);
     expect(calls.every((call) => call.quiet && call.timeoutMs === 20_000)).toBe(true);

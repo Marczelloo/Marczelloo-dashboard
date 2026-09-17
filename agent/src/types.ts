@@ -15,7 +15,7 @@ export interface DeployTarget {
    * probe: the Cloudflare route already points at localPort, so the public
    * hostname can be part of the health gate.
    */
-  tunnel: { hostname: string; localPort: number; probe: boolean } | null;
+  tunnel: { hostname: string; localPort: number; probe: boolean; service?: string | null } | null;
   /**
    * Compose file rendered by the dashboard for repositories without their own
    * (built from a template or a plain Dockerfile). Missing in older jobs.
@@ -25,7 +25,7 @@ export interface DeployTarget {
    * Shared Docker network the tunnel connector reaches containers on. Listed
    * services join it in addition to their own networks. Missing in older jobs.
    */
-  edge?: { network: string; services: string[] } | null;
+  edge?: { network: string; services: string[]; dropPorts?: boolean } | null;
 }
 
 export interface Job {
@@ -116,6 +116,8 @@ export interface PreflightResponse {
   composeValid: boolean | null;
   services: string[];
   profiles: string[];
+  /** TCP ports each service declares (published may be null for container-only ports). */
+  ports: Array<{ service: string; published: number | null; target: number }>;
 }
 
 export interface PublishedPort {
