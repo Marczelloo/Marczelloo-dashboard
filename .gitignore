@@ -64,3 +64,6 @@ Thumbs.db
 *.secret
 secrets/
 .data/
+
+# Brainstorming companion mockups
+.superpowers/
