@@ -50,6 +50,7 @@ describe("assembleOverview", () => {
     ]);
     expect(fleet[0]).toMatchObject({ domain: "drive.marczelloo.dev", composeProject: "drive", serviceId: "s1", containers: { running: 1, total: 1 }, lastDeploy: { at: "2026-09-17T11:00:00.000Z", sha: "abc1234", status: "success" } });
     expect(fleet[1]).toMatchObject({ domain: "tools.marczelloo.dev", composeProject: "tools", serviceId: "s2", containers: null });
+    expect(fleet[0]).toMatchObject({ services: 1, openTasks: 0, deploys7d: 1, tags: [], description: null });
     expect(fleet[1].uptime.at(-1)?.state).toBe("down");
   });
 });

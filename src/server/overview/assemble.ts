@@ -7,6 +7,18 @@ import { hourlyUptime } from "./uptime";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Tags and technologies come back as an array or as a JSON string. */
+function parseTags(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function assembleOverview(inputs: OverviewInputs, now: Date): Overview {
   const configByProject = new Map(inputs.configs.map((config) => [config.projectId, config]));
 
@@ -30,11 +42,17 @@ export function assembleOverview(inputs: OverviewInputs, now: Date): Overview {
       const monitored = states.length > 0;
       const attention = attentionFor({ agent, states });
       const serviceIds = new Set(services.map((service) => service.id));
-      const last = inputs.deploys.filter((deploy) => serviceIds.has(deploy.service_id)).sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+      const projectDeploys = inputs.deploys.filter((deploy) => serviceIds.has(deploy.service_id)).sort((a, b) => b.started_at.localeCompare(a.started_at));
+      const last = projectDeploys[0];
       return {
         projectId: project.id,
         name: project.name,
         slug: project.slug,
+        description: project.description ?? null,
+        tags: parseTags(project.tags),
+        services: services.length,
+        openTasks: inputs.workItems.filter((item) => item.project_id === project.id && item.status !== "done").length,
+        deploys7d: projectDeploys.filter((deploy) => Date.parse(deploy.started_at) >= weekAgo).length,
         domain: config?.tunnel?.hostname ?? hostOf(project.prod_url),
         composeProject,
         serviceId: docker?.id ?? null,

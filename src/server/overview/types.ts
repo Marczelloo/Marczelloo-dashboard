@@ -25,6 +25,12 @@ export interface FleetRow {
   projectId: string;
   name: string;
   slug: string;
+  description: string | null;
+  tags: string[];
+  /** Counts shown on the projects list cards. */
+  services: number;
+  openTasks: number;
+  deploys7d: number;
   domain: string | null;
   composeProject: string | null;
   /** Docker service used for restarts. */
