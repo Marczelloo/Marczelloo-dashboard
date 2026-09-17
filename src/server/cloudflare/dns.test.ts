@@ -29,7 +29,19 @@ describe("planTunnelDns", () => {
     const record = cname("tools.marczelloo.dev", tunnelTarget(LEGACY));
     expect(planTunnelDns("tools.marczelloo.dev", [record], TUNNEL, [LEGACY])).toEqual({ kind: "update", recordId: record.id });
   });
+  it("ignores mail and verification records next to a flattened apex CNAME", () => {
+    const records = [
+      cname("marczelloo.dev", tunnelTarget(TUNNEL)),
+      { id: "mx", type: "MX", name: "marczelloo.dev", content: "mx1.example.com" },
+      { id: "txt", type: "TXT", name: "marczelloo.dev", content: "v=spf1 -all" },
+    ];
+    expect(planTunnelDns("marczelloo.dev", records, TUNNEL, [])).toEqual({ kind: "none" });
+  });
+  it("does not add a CNAME where only other record types exist", () => {
+    expect(planTunnelDns("mail.pl", [{ id: "mx", type: "MX", name: "mail.pl", content: "mx.example.com" }], TUNNEL, []).kind).toBe("conflict");
+  });
   it("refuses foreign records", () => {
+    expect(planTunnelDns("a.pl", [cname("a.pl", tunnelTarget(TUNNEL)), { id: "2", type: "A", name: "a.pl", content: "1.2.3.4" }], TUNNEL, []).kind).toBe("conflict");
     expect(planTunnelDns("bookhaven.marczelloo.dev", [cname("bookhaven.marczelloo.dev", "x.vercel-dns-017.com")], TUNNEL, [LEGACY]).kind).toBe("conflict");
     expect(planTunnelDns("a.pl", [{ id: "1", type: "A", name: "a.pl", content: "1.2.3.4" }], TUNNEL, []).kind).toBe("conflict");
   });

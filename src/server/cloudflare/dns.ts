@@ -41,8 +41,11 @@ export function planTunnelDns(hostname: string, records: CloudflareDnsRecord[], 
   const own = records.filter((record) => record.name.toLowerCase() === host);
   if (!own.length) return { kind: "create" };
 
-  const cname = own.find((record) => record.type === "CNAME");
-  if (!cname || own.length > 1) {
+  // MX, TXT, CAA and the like coexist with a flattened apex CNAME and do not
+  // affect where HTTP goes; only address records compete with the tunnel CNAME.
+  const addressing = own.filter((record) => record.type === "CNAME" || record.type === "A" || record.type === "AAAA");
+  const cname = addressing.find((record) => record.type === "CNAME");
+  if (!cname || addressing.length > 1) {
     return { kind: "conflict", message: `${host} ma już rekordy ${own.map((record) => record.type).join(", ")} — dashboard ich nie nadpisze.` };
   }
   const content = cname.content.toLowerCase();
