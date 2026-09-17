@@ -32,10 +32,6 @@ services:
       - PORTAINER_USERNAME=${PORTAINER_USERNAME}
       - PORTAINER_PASSWORD=${PORTAINER_PASSWORD}
 
-      # Runner Configuration (internal Docker network)
-      - RUNNER_URL=http://runner:8787
-      - RUNNER_TOKEN=${RUNNER_TOKEN}
-
       # Deploy agent (separate marczelloo-agent stack on the same network)
       - AGENT_URL=${AGENT_URL:-http://mz-agent:8790}
       - AGENT_TOKEN=${AGENT_TOKEN}
@@ -72,18 +68,10 @@ services:
       - GITHUB_PRIVATE_KEY_BASE64=${GITHUB_PRIVATE_KEY_BASE64}
       - GITHUB_INSTALLATION_ID=${GITHUB_INSTALLATION_ID}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-
-      # Dashboard Self-Management
-      - DASHBOARD_REPO_PATH=${DASHBOARD_REPO_PATH:-/home/Marczelloo_pi/projects/Marczelloo-dashboard}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
-      # Mount for deployment status file (shared with runner)
-      - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:/projects:ro
       # Persistent encrypted fallback for dynamic secrets such as Portainer token
       - dashboard_data:/app/data
     depends_on:
-      - runner
       - portainer
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/api/health"]
@@ -126,46 +114,6 @@ services:
     networks:
       - marczelloo
 
-  runner:
-    build:
-      context: ./runner
-      dockerfile: Dockerfile
-    container_name: marczelloo-runner
-    restart: unless-stopped
-    ports:
-      # The dashboard reaches runner through the internal Docker network.
-      # Keep the privileged shell endpoint off the public interfaces.
-      - "127.0.0.1:8787:8787"
-    environment:
-      - RUNNER_PORT=8787
-      - RUNNER_TOKEN=${RUNNER_TOKEN}
-      # SSH configuration for host access
-      - SSH_ENABLED=true
-      - SSH_HOST=host.docker.internal
-      - SSH_USER=${SSH_USER:-Marczelloo_pi}
-      - SSH_KEY_PATH=/root/.ssh/id_rsa
-      - DEFAULT_CWD=${DEFAULT_CWD:-/home/Marczelloo_pi}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      # Mount host Docker socket for container management
-      - /var/run/docker.sock:/var/run/docker.sock
-      # Mount project directories for git operations
-      - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:/projects:rw
-      # Persist allowlist configuration
-      - runner_data:/app/data
-      # Mount SSH key for host access (optional - if not provided, SSH features will be disabled)
-      # Create with: ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
-      - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8787/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    networks:
-      - marczelloo
-
   # Portainer - Docker management UI
   portainer:
     image: portainer/portainer-ce:latest
@@ -181,7 +129,6 @@ services:
 
 volumes:
   dashboard_data:
-  runner_data:
   portainer_data:
 
 networks:

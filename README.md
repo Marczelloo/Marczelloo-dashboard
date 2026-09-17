@@ -23,7 +23,6 @@ A private, self-hosted project manager panel for managing projects, Docker conta
 - 📊 **GitHub integration** with commits, PRs, releases, and changelogs
 - 📡 **Uptime monitoring** with Discord/email alerts
 - 🔒 **Secure** with Cloudflare Access + PIN protection
-- 🖥️ **Terminal access** to your Pi through the dashboard
 
 ---
 
@@ -70,18 +69,11 @@ A private, self-hosted project manager panel for managing projects, Docker conta
 - SSL expiry warnings (30/14/7 days)
 - Optional SMTP email notifications
 
-### 🖥️ Terminal
-
-- Full SSH-like terminal access to Raspberry Pi
-- Project directory shortcuts
-- Session persistence
-
 ### ⚙️ Settings Dashboard
 
 - Monitoring interval configuration
 - Port tracker (scan used ports)
-- Runner allowlist management
-- Connection tests (Portainer, Runner, Discord)
+- Connection tests (Portainer, Discord)
 
 ### 📝 Audit Log
 
@@ -169,7 +161,6 @@ docker-compose up -d --build
 This starts:
 
 - **Dashboard** on port `3100`
-- **Runner** on port `8787` (internal)
 - **Portainer** on port `9200`
 
 ### Initial Setup
@@ -199,9 +190,9 @@ This starts:
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
 ┌───────▼───────┐    ┌────────▼────────┐   ┌───────▼───────┐
-│   AtlasHub    │    │     Runner      │   │   Portainer   │
-│  (Database)   │    │ (Git/Docker Ops)│   │ (Containers)  │
-│   External    │    │   Port: 8787    │   │  Port: 9200   │
+│   AtlasHub    │    │  Deploy agent   │   │   Portainer   │
+│  (Database)   │    │ (typed Docker   │   │ (Containers)  │
+│   External    │    │  ops, :8790)    │   │  Port: 9200   │
 └───────────────┘    └─────────────────┘   └───────────────┘
 ```
 
@@ -212,10 +203,7 @@ This starts:
 ```
 ├── docker-compose.yml     # Full stack deployment
 ├── Dockerfile             # Dashboard container
-├── runner/
-│   ├── Dockerfile         # Runner container
-│   ├── index.ts           # Runner service
-│   └── data/              # Persistent allowlist
+├── agent/                 # Deploy agent (separate Compose stack)
 ├── src/
 │   ├── app/               # Next.js pages & API routes
 │   │   ├── (dashboard)/   # Dashboard pages
@@ -236,7 +224,7 @@ This starts:
 | --------------------- | ----------------------------- |
 | `ATLASHUB_API_URL`    | AtlasHub API endpoint         |
 | `ATLASHUB_SECRET_KEY` | AtlasHub API key              |
-| `RUNNER_TOKEN`        | Shared secret for runner auth |
+| `AGENT_TOKEN`         | Shared secret for agent auth  |
 
 ### GitHub Integration
 
@@ -252,7 +240,7 @@ This starts:
 | ------------------------ | ------------------------ | ------------------------ |
 | `PORTAINER_URL`          | `http://portainer:9000`  | Portainer URL            |
 | `PORTAINER_TOKEN`        | -                        | Portainer JWT token      |
-| `RUNNER_URL`             | `http://runner:8787`     | Runner service URL       |
+| `AGENT_URL`              | `http://mz-agent:8790`   | Deploy agent URL         |
 | `DEV_USER_EMAIL`         | `admin@marczelloo.local` | Dev mode user email      |
 | `MONITORING_INTERVAL_MS` | `60000`                  | Monitoring interval (ms) |
 | `DISCORD_WEBHOOK_URL`    | -                        | Discord alerts           |
@@ -271,16 +259,14 @@ Main web interface. Features:
 - Uptime monitoring
 - Container controls
 
-### Runner (port 8787)
+### Deploy agent (port 8790, internal)
 
-Secure deploy service. Operations:
+Separate container with the Docker socket. Typed operations only, no shell:
 
-- `git pull` in allowed repo paths
-- `docker compose up -d --build`
-- `docker restart`
-- Log fetching
-
-**Security:** Only executes operations for items in the allowlist. Configure via Settings → Runner Allowlist.
+- Queued deploys and rollbacks by commit SHA with a health gate
+- Applying env files with automatic restore on failure
+- Env file reads, deploy preflight, host metrics, published ports
+- Restart of Compose-managed containers
 
 ### Portainer (port 9200)
 
@@ -289,23 +275,6 @@ Docker management UI. Dashboard uses Portainer API for:
 - Container list and status
 - Start/stop/restart
 - Logs and stats
-
----
-
-## Terminal SSH Setup
-
-```bash
-# Generate SSH key on Pi
-ssh-keygen -t rsa -N "" -f ~/.ssh/dashboard_runner
-cat ~/.ssh/dashboard_runner.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-
-# Add to .env
-SSH_USER=pi
-SSH_KEY_PATH=~/.ssh/dashboard_runner
-DEFAULT_CWD=/home/pi
-PROJECTS_DIR=/home/pi/projects
-```
 
 ---
 
@@ -333,9 +302,6 @@ npm install
 
 # Start dashboard (dev mode)
 npm run dev
-
-# Start runner (separate terminal)
-cd runner && npx tsx index.ts
 
 # Type check
 npx tsc --noEmit

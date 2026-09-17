@@ -640,7 +640,7 @@ function PortTrackerSettings() {
       if (result.success) {
         setPorts(result.ports || []);
         if (result.ports?.length === 0) {
-          setError("No ports found in range. Make sure Runner SSH is configured.");
+          setError("No ports found in range. Agent wdrożeń raportuje tylko porty opublikowane przez kontenery.");
         }
       } else {
         setError(result.error || "Failed to scan ports");

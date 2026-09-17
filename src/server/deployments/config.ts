@@ -31,7 +31,7 @@ export interface DeploymentConfig {
   runtime: DeploymentRuntime;
   exposure: DeploymentExposure;
   tunnel: CloudflareTunnelRoute | null;
-  /** Deploy engine; missing means the legacy runner script. */
+  /** Deploy engine; "script" is kept only so old stored configs still parse. */
   engine?: "script" | "agent";
   /**
    * How a repository without its own compose file is built (Dockerfile or a

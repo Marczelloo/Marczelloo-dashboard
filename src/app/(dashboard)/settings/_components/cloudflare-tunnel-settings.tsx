@@ -1,16 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CloudCog, ExternalLink, Globe2, Loader2, RefreshCw, Save, Server, ShieldCheck } from "lucide-react";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/components/ui";
-import { PinDialog } from "@/components/pin-dialog";
-
-type TunnelConfig = {
-  configPath: string | null;
-  useSudo: boolean;
-  tunnelName: string;
-  source: "database" | "environment" | "none";
-};
+import { AlertTriangle, CloudCog, ExternalLink, Globe2, Loader2, RefreshCw, Server } from "lucide-react";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 
 type TunnelRoute = {
   hostname: string;
@@ -27,24 +19,15 @@ type TunnelResponse = {
   success: boolean;
   managedTunnel?: ManagedTunnel | null;
   configured?: boolean;
-  tunnel?: TunnelConfig;
   routes?: TunnelRoute[];
   error?: string;
 };
 
-const DEFAULT_CLOUDFLARED_CONFIG_PATH = "/etc/cloudflared/config.yml";
-
 export function CloudflareTunnelSettings() {
-  const [configPath, setConfigPath] = useState(DEFAULT_CLOUDFLARED_CONFIG_PATH);
-  const [useSudo, setUseSudo] = useState(true);
-  const [tunnelName, setTunnelName] = useState("");
-  const [source, setSource] = useState<TunnelConfig["source"]>("none");
   const [configured, setConfigured] = useState(false);
   const [routes, setRoutes] = useState<TunnelRoute[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showPinDialog, setShowPinDialog] = useState(false);
   const [managedTunnel, setManagedTunnel] = useState<ManagedTunnel | null>(null);
 
   const load = useCallback(async () => {
@@ -53,14 +36,7 @@ export function CloudflareTunnelSettings() {
     try {
       const response = await fetch(`/api/settings/cloudflare-tunnel?ts=${Date.now()}`, { cache: "no-store" });
       const data = await response.json() as TunnelResponse;
-      if (!response.ok || !data.success || !data.tunnel) throw new Error(data.error || "Nie udało się odczytać konfiguracji Tunnel.");
-      // A missing stored setting is the normal first-run state. Keep the
-      // standard systemd location editable so the action is immediately
-      // available instead of presenting a disabled form.
-      setConfigPath(data.tunnel.configPath || DEFAULT_CLOUDFLARED_CONFIG_PATH);
-      setUseSudo(data.tunnel.useSudo);
-      setTunnelName(data.tunnel.tunnelName);
-      setSource(data.tunnel.source);
+      if (!response.ok || !data.success) throw new Error(data.error || "Nie udało się odczytać konfiguracji Tunnel.");
       setConfigured(Boolean(data.configured));
       setRoutes(data.routes || []);
       setManagedTunnel(data.managedTunnel ?? null);
@@ -73,30 +49,6 @@ export function CloudflareTunnelSettings() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/settings/cloudflare-tunnel", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configPath, useSudo, tunnelName }),
-      });
-      const data = await response.json() as TunnelResponse & { requirePin?: boolean };
-      if (data.requirePin) {
-        setShowPinDialog(true);
-        return;
-      }
-      if (!response.ok || !data.success) throw new Error(data.error || "Nie udało się zapisać konfiguracji Tunnel.");
-      setSource("database");
-      await load();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Nie udało się zapisać konfiguracji Tunnel.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <Card>
@@ -111,10 +63,10 @@ export function CloudflareTunnelSettings() {
                 Cloudflare Tunnel
                 {configured ? <Badge variant="success">Ingress online</Badge> : <Badge variant="secondary">Not configured</Badge>}
               </CardTitle>
-              <CardDescription>{managedTunnel ? "Trasy i rekordy DNS zarządzane przez Cloudflare API, bez restartu cloudflared." : "Globalny plik ingress oraz rzeczywisty spis publicznie wystawionych hostów."}</CardDescription>
+              <CardDescription>Trasy i rekordy DNS zarządzane przez Cloudflare API, bez restartu cloudflared.</CardDescription>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || saving}>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh routes
           </Button>
@@ -144,56 +96,10 @@ export function CloudflareTunnelSettings() {
             </div>
           )
         ) : (
-        <>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="cloudflared-config-path">Ingress config path</Label>
-            <Input
-              id="cloudflared-config-path"
-              className="font-mono text-xs"
-              placeholder="/etc/cloudflared/config.yml"
-              value={configPath}
-              onChange={(event) => setConfigPath(event.target.value)}
-              disabled={saving}
-            />
-            <p className="text-xs text-muted-foreground">Absolutna ścieżka pliku cloudflared na Raspberry Pi.</p>
+          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Cloudflare API nie jest skonfigurowane — ustaw CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID i CLOUDFLARE_TUNNEL_ID.</span>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="cloudflared-tunnel-name">Tunnel name <span className="font-normal text-muted-foreground">(optional)</span></Label>
-            <Input
-              id="cloudflared-tunnel-name"
-              className="font-mono text-xs"
-              placeholder="marczelloo-pi"
-              value={tunnelName}
-              onChange={(event) => setTunnelName(event.target.value)}
-              disabled={saving}
-            />
-            <p className="text-xs text-muted-foreground">Potrzebna tylko, gdy dashboard ma również tworzyć DNS route w Cloudflare.</p>
-          </div>
-        </div>
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-secondary/20 p-3">
-          <input
-            type="checkbox"
-            checked={useSudo}
-            onChange={(event) => setUseSudo(event.target.checked)}
-            disabled={saving}
-            className="mt-0.5 h-4 w-4 accent-primary"
-          />
-          <span className="space-y-1">
-            <span className="flex items-center gap-2 text-sm font-medium"><ShieldCheck className="h-4 w-4 text-primary" />Use sudo for config access</span>
-            <span className="block text-xs text-muted-foreground">Włączone dla systemowego pliku <code>cloudflared</code> zarządzanego przez systemd.</span>
-          </span>
-        </label>
-
-        <div className="flex flex-wrap items-center gap-3 border-b border-border/60 pb-6">
-          <Button onClick={() => void save()} disabled={saving || !configPath.trim()}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save Tunnel settings
-          </Button>
-          <span className="text-xs text-muted-foreground">Source: {source === "database" ? "dashboard settings" : source === "environment" ? "environment fallback" : "not set"}</span>
-        </div>
-        </>
         )}
 
         {error && (
@@ -215,7 +121,7 @@ export function CloudflareTunnelSettings() {
           {loading ? (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading ingress routes...</div>
           ) : routes.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground"><Globe2 className="h-5 w-5" />No hostname routes found. Save the config path, then refresh.</div>
+            <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground"><Globe2 className="h-5 w-5" />Brak tras w tunelu.</div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border/70">
               <table className="w-full min-w-[680px] text-sm">
@@ -251,14 +157,6 @@ export function CloudflareTunnelSettings() {
         </section>
       </CardContent>
 
-      <PinDialog
-        open={showPinDialog}
-        onSuccess={() => {
-          setShowPinDialog(false);
-          void save();
-        }}
-        onCancel={() => setShowPinDialog(false)}
-      />
     </Card>
   );
 }

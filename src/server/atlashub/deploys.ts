@@ -112,7 +112,7 @@ export async function deleteDeployById(id: string): Promise<boolean> {
  * be removed from the dashboard.
  */
 export async function clearCompletedDeploys(): Promise<number> {
-  // Keep active deploys so the runner can still finish and report them.
+  // Keep active deploys so the agent can still finish and report them.
   const allDeploys = await getDeploys();
   const historicalDeploys = allDeploys.filter((d) => d.status !== "running");
 

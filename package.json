@@ -10,10 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "db:setup": "npx tsx scripts/setup-database.ts",
-    "db:create-package-updates": "npx tsx scripts/create-package-updates-table.ts",
-    "runner": "npx tsx runner/index.ts",
-    "runner:mock": "npx tsx runner/mock.ts"
+    "db:setup": "npx tsx scripts/setup-database.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

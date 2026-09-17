@@ -1,23 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { auditLogs, projects } from "@/server/atlashub";
-import {
-  getCloudflareTunnelSettings,
-  getDeploymentConfig,
-  listCloudflareTunnelRoutes,
-  saveCloudflareTunnelSettings,
-} from "@/server/deployments";
+import { NextResponse } from "next/server";
+import { projects } from "@/server/atlashub";
+import { getDeploymentConfig, listCloudflareTunnelRoutes } from "@/server/deployments";
 import { getManagedTunnelSettings, getManagedTunnelStatus } from "@/server/cloudflare/managed-tunnel";
-import { requireAuth, requirePinVerification } from "@/server/lib/auth";
+import { requireAuth } from "@/server/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const settingsSchema = z.object({
-  configPath: z.string().min(1).max(240),
-  useSudo: z.boolean(),
-  tunnelName: z.string().max(127).optional(),
-});
 
 function getLocalPort(service: string): number | null {
   const match = /127\.0\.0\.1:(\d+)/.exec(service) || /:(\d+)$/.exec(service);
@@ -32,8 +20,7 @@ export async function GET() {
   }
 
   try {
-    const [tunnel, ingress, allProjects] = await Promise.all([
-      getCloudflareTunnelSettings(),
+    const [ingress, allProjects] = await Promise.all([
       listCloudflareTunnelRoutes(),
       projects.getProjects(),
     ]);
@@ -78,32 +65,10 @@ export async function GET() {
       : null;
 
     return NextResponse.json(
-      { success: true, tunnel, managedTunnel, configured: ingress.configured, routes, error: ingress.error },
+      { success: true, managedTunnel, configured: ingress.configured, routes, error: ingress.error },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Unable to load Tunnel settings" }, { status: 500 });
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  let user;
-  try {
-    user = await requirePinVerification();
-  } catch {
-    return NextResponse.json({ success: false, requirePin: true, error: "PIN verification required" }, { status: 401 });
-  }
-
-  try {
-    const input = settingsSchema.parse(await request.json());
-    const tunnel = await saveCloudflareTunnelSettings(input);
-    await auditLogs.logAction(user.email, "update", "service", "cloudflare-tunnel", {
-      config_path: tunnel.configPath,
-      use_sudo: tunnel.useSudo,
-      has_tunnel_name: Boolean(tunnel.tunnelName),
-    });
-    return NextResponse.json({ success: true, tunnel });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Unable to save Tunnel settings" }, { status: 400 });
   }
 }
