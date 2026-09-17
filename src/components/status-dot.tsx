@@ -1,37 +1,34 @@
-"use client";
-
 import { cn } from "@/lib/utils";
+import { toTone, type LegacyStatus, type Tone } from "@/lib/tone";
 
 interface StatusDotProps {
-  status: "online" | "warning" | "offline" | "unknown";
+  status: Tone | LegacyStatus;
   size?: "sm" | "md" | "lg";
+  /** Legacy flag; a running operation should pass status "live" instead. */
   pulse?: boolean;
+  /** Accessible name when the dot is the only carrier of the status. */
+  label?: string;
   className?: string;
 }
 
-const sizeClasses = {
-  sm: "w-1.5 h-1.5",
-  md: "w-2 h-2",
-  lg: "w-3 h-3",
+const SIZE = { sm: "size-1.5", md: "size-[7px]", lg: "size-2.5" };
+
+const TONE: Record<Tone, string> = {
+  ok: "bg-ok shadow-[0_0_0_3px_rgb(var(--ok)/.1)]",
+  live: "bg-accent",
+  warn: "bg-warn shadow-[0_0_0_3px_rgb(var(--warn)/.1)]",
+  err: "bg-err shadow-[0_0_0_3px_rgb(var(--err)/.1)]",
+  idle: "bg-fg-4",
 };
 
-const statusStyles = {
-  online: "bg-success shadow-[0_0_8px_hsl(var(--success)/0.5)]",
-  warning: "bg-warning shadow-[0_0_8px_hsl(var(--warning)/0.5)]",
-  offline: "bg-danger shadow-[0_0_8px_hsl(var(--danger)/0.5)]",
-  unknown: "bg-muted-foreground",
-};
-
-export function StatusDot({ status, size = "md", pulse = false, className }: StatusDotProps) {
+export function StatusDot({ status, size = "md", pulse = false, label, className }: StatusDotProps) {
+  const tone = toTone(status);
   return (
     <span
-      className={cn(
-        "inline-block rounded-full",
-        sizeClasses[size],
-        statusStyles[status],
-        pulse && "animate-pulse",
-        className
-      )}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      className={cn("relative inline-block shrink-0 rounded-full", SIZE[size], TONE[tone], (tone === "live" || pulse) && "status-live", className)}
     />
   );
 }
