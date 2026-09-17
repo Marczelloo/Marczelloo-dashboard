@@ -83,7 +83,7 @@ describe("service hosts", () => {
 describe("isMuted", () => {
   const now = Date.parse("2026-09-17T12:00:00Z");
   it("mutes during a job and for two minutes after it", () => {
-    expect(isMuted({ containers: [], activeJob: { id: "j", kind: "deploy", status: "running" }, lastFinishedAt: null }, now)).toBe(true);
+    expect(isMuted({ containers: [], activeJob: { id: "j", kind: "deploy", status: "running", step: null, sha: "a".repeat(40), startedAt: null }, lastFinishedAt: null }, now)).toBe(true);
     expect(isMuted({ containers: [], activeJob: null, lastFinishedAt: "2026-09-17T11:59:00Z" }, now)).toBe(true);
     expect(isMuted({ containers: [], activeJob: null, lastFinishedAt: "2026-09-17T11:57:00Z" }, now)).toBe(false);
     expect(isMuted(undefined, now)).toBe(false);

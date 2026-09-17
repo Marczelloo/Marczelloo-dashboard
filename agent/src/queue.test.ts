@@ -9,6 +9,7 @@ import {
   recordRelease,
   recoverAfterRestart,
   rollbackRelease,
+  setJobStep,
   staleImages,
   startJob,
 } from "./queue";
@@ -133,5 +134,23 @@ describe("recovery and helpers", () => {
   it("acknowledges delivered events", () => {
     const state = startJob(enqueue(emptyState(), input("j1", "a"), "t1").state, "j1", "t2");
     expect(acknowledgeEvents(state, ["j1:started"]).outbox).toEqual([]);
+  });
+});
+
+describe("setJobStep", () => {
+  it("records the step of a running job and clears it when the job finishes", () => {
+    let state = startJob(enqueue(emptyState(), input("j1", "a"), "t1").state, "j1", "t2");
+    state = setJobStep(state, "j1", "Build");
+    expect(state.jobs[0].step).toBe("Build");
+    state = finishJob(state, "j1", { status: "succeeded", error: null, rolledBackTo: null, release: null, baseline: null, orphanImages: [] }, "t3");
+    expect(state.jobs[0].step).toBeNull();
+  });
+
+  it("ignores queued, finished and unknown jobs and returns the same state when nothing changes", () => {
+    const queued = enqueue(emptyState(), input("j1", "a"), "t1").state;
+    expect(setJobStep(queued, "j1", "Build")).toBe(queued);
+    expect(setJobStep(queued, "missing", "Build")).toBe(queued);
+    const running = setJobStep(startJob(queued, "j1", "t2"), "j1", "Build");
+    expect(setJobStep(running, "j1", "Build")).toBe(running);
   });
 });

@@ -106,7 +106,7 @@ export function assembleAgentStatus(
     );
     projects[project] = {
       containers: containers[project] ?? [],
-      activeJob: active ? { id: active.id, kind: active.kind, status: active.status } : null,
+      activeJob: active ? { id: active.id, kind: active.kind, status: active.status, step: active.step ?? null, sha: active.sha, startedAt: active.startedAt } : null,
       lastFinishedAt,
     };
   }

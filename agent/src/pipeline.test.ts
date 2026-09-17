@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CommandStep } from "./git";
 import type { ContainerSample } from "./health";
-import { runApplyEnv, runDeploy, runRollback, type PipelineDeps } from "./pipeline";
+import { runApplyEnv, runDeploy, runRollback, stepLabel, type PipelineDeps } from "./pipeline";
 import type { Job, Release } from "./types";
 
 const NEW = "b".repeat(40);
@@ -224,5 +224,17 @@ describe("runApplyEnv", () => {
     const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
     expect(outcome.status).toBe("failed");
     expect(outcome.error).toContain("przywrócenie poprzednich zmiennych też się nie powiodło");
+  });
+});
+
+describe("stepLabel", () => {
+  it("extracts the label of a step banner", () => {
+    expect(stepLabel("=== Build ===")).toBe("Build");
+    expect(stepLabel("=== Git fetch 7e1f0aa ===\n")).toBe("Git fetch 7e1f0aa");
+  });
+
+  it("ignores ordinary log lines", () => {
+    expect(stepLabel("#14 DONE 9.2s")).toBeNull();
+    expect(stepLabel("[agent] deploy tools @ abc")).toBeNull();
   });
 });

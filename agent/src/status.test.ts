@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { emptyState } from "./queue";
-import { createStatusReader, parseDockerSize } from "./status";
+import { emptyState, enqueue, setJobStep, startJob } from "./queue";
+import { assembleAgentStatus, createStatusReader, parseDockerSize } from "./status";
 
 describe("parseDockerSize", () => {
   it.each([
@@ -40,5 +40,15 @@ describe("createStatusReader", () => {
     expect(run.mock.calls.filter(([step]) => step.args[0] === "ps")).toHaveLength(2);
     expect(run.mock.calls.filter(([step]) => step.args[0] === "inspect")).toHaveLength(2);
     expect(run.mock.calls.filter(([step]) => step.args[0] === "system")).toHaveLength(1);
+  });
+});
+
+describe("assembleAgentStatus", () => {
+  it("exposes the active job's step, commit and start time", () => {
+    const target = { projectId: "p", composeProject: "drive", repoPath: "/r", githubUrl: "https://github.com/x/y", branch: "main", composeFile: null, profiles: [], tunnel: null };
+    let state = enqueue(emptyState(), { id: "j1", kind: "deploy", target, sha: "a".repeat(40), deployId: "d1", triggeredBy: "test" }, "t1").state;
+    state = setJobStep(startJob(state, "j1", "2026-09-17T10:00:00.000Z"), "j1", "Build");
+    const status = assembleAgentStatus(state, {}, null, null, "now");
+    expect(status.projects.drive.activeJob).toEqual({ id: "j1", kind: "deploy", status: "running", step: "Build", sha: "a".repeat(40), startedAt: "2026-09-17T10:00:00.000Z" });
   });
 });

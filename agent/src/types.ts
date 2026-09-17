@@ -42,6 +42,8 @@ export interface Job {
   finishedAt: string | null;
   error: string | null;
   rolledBackTo: string | null;
+  /** Label of the pipeline step running now; null when not running. Missing in older jobs. */
+  step?: string | null;
 }
 
 export interface Release {
@@ -93,7 +95,7 @@ export interface ContainerStatus extends ContainerSample {
 
 export interface ProjectStatus {
   containers: ContainerStatus[];
-  activeJob: { id: string; kind: string; status: string } | null;
+  activeJob: { id: string; kind: string; status: string; step: string | null; sha: string; startedAt: string | null } | null;
   lastFinishedAt: string | null;
 }
 

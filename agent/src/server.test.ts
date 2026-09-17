@@ -129,7 +129,7 @@ describe("agent HTTP API", () => {
     expect(await response.json()).toEqual({
       generatedAt: "2026-09-16T10:00:00.000Z",
       projects: {
-        "marczelloo-tools": { containers: containers["marczelloo-tools"], activeJob: { id: JOB_ID, kind: "rollback", status: "queued" }, lastFinishedAt: "2026-09-16T08:05:00.000Z" },
+        "marczelloo-tools": { containers: containers["marczelloo-tools"], activeJob: { id: JOB_ID, kind: "rollback", status: "queued", step: null, sha: "b".repeat(40), startedAt: null }, lastFinishedAt: "2026-09-16T08:05:00.000Z" },
         stored: { containers: [], activeJob: null, lastFinishedAt: null },
       },
       disk: { path: "/projects", totalBytes: 1000, freeBytes: 400 },

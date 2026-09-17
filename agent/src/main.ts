@@ -5,8 +5,8 @@ import { fetchCloneToken } from "./dashboard";
 import { probe, sampleContainers, serviceImages } from "./docker";
 import { runCommand } from "./exec";
 import { buildCacheLimit, collectableImages, imageRepository } from "./gc";
-import { runApplyEnv, runDeploy, runRollback, type PipelineDeps } from "./pipeline";
-import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, startJob, type JobOutcome } from "./queue";
+import { runApplyEnv, runDeploy, runRollback, stepLabel, type PipelineDeps } from "./pipeline";
+import { acknowledgeEvents, finishJob, nextJob, recoverAfterRestart, setJobStep, startJob, type JobOutcome } from "./queue";
 import { deliverEvents, httpEventSender } from "./reporter";
 import { createAgentServer } from "./server";
 import { FileStore } from "./store";
@@ -86,7 +86,11 @@ async function cleanUp(job: Job, before: string[], after: string[], orphanImages
 }
 
 async function execute(job: Job): Promise<JobOutcome> {
-  const log = (line: string) => store.appendLog(job.id, line.endsWith("\n") ? line : `${line}\n`);
+  const log = (line: string) => {
+    const step = stepLabel(line);
+    if (step) mutate((current) => setJobStep(current, job.id, step));
+    store.appendLog(job.id, line.endsWith("\n") ? line : `${line}\n`);
+  };
   const deps: PipelineDeps = {
     run: (step) => runCommand(step, (chunk) => store.appendLog(job.id, chunk)),
     exists: existsSync,

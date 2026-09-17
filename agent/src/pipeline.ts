@@ -39,6 +39,12 @@ class StepError extends Error {}
 
 const describeError = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** `=== Build ===` banners written by runStep and the health gate mark the start of a step. */
+export function stepLabel(line: string): string | null {
+  const match = /^=== (.+) ===\s*$/.exec(line);
+  return match ? match[1] : null;
+}
+
 function dockerStep(label: string, args: string[], timeoutMs: number, quiet = false): CommandStep {
   return { label, command: "docker", args, timeoutMs, quiet };
 }

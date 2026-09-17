@@ -66,7 +66,7 @@ function updateJob(state: AgentState, jobId: string, change: (job: Job) => Job):
 }
 
 export function enqueue(state: AgentState, input: EnqueueInput, now: string): { state: AgentState; job: Job } {
-  const job: Job = { ...input, status: "queued", createdAt: now, startedAt: null, finishedAt: null, error: null, rolledBackTo: null };
+  const job: Job = { ...input, status: "queued", createdAt: now, startedAt: null, finishedAt: null, error: null, rolledBackTo: null, step: null };
   const running = state.jobs.find(
     (candidate) => candidate.status === "running" && candidate.kind === "deploy" && candidate.target.composeProject === input.target.composeProject && candidate.sha === input.sha
   );
@@ -103,6 +103,13 @@ export function startJob(state: AgentState, jobId: string, now: string): AgentSt
   return { ...state, jobs, outbox: [...state.outbox, eventFor(job, "job.started", now)] };
 }
 
+/** Records which pipeline step a running job is on, for the dashboard's deploy progress. */
+export function setJobStep(state: AgentState, jobId: string, step: string | null): AgentState {
+  const current = state.jobs.find((job) => job.id === jobId);
+  if (!current || current.status !== "running" || (current.step ?? null) === step) return state;
+  return { ...state, jobs: updateJob(state, jobId, (job) => ({ ...job, step })).jobs };
+}
+
 export function recordRelease(releases: Release[], release: Release): Release[] {
   return [release, ...releases.filter((item) => item.sha !== release.sha)].slice(0, MAX_RELEASES);
 }
@@ -114,6 +121,7 @@ export function finishJob(state: AgentState, jobId: string, outcome: JobOutcome,
     error: outcome.error,
     rolledBackTo: outcome.rolledBackTo,
     finishedAt: now,
+    step: null,
   }));
   const project = job.target.composeProject;
   let releases = state.projects[project]?.releases ?? [];

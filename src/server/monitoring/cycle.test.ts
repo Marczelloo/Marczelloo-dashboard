@@ -104,7 +104,7 @@ describe("runMonitorCycle", () => {
   it("stays silent while the project is being deployed", async () => {
     const h = harness();
     await h.cycle();
-    h.world.project = { containers: [], activeJob: { id: "j", kind: "deploy", status: "running" }, lastFinishedAt: null };
+    h.world.project = { containers: [], activeJob: { id: "j", kind: "deploy", status: "running", step: null, sha: "a".repeat(40), startedAt: null }, lastFinishedAt: null };
     h.world.domainStatus = 502;
     const result = await h.cycle();
     await h.cycle();
