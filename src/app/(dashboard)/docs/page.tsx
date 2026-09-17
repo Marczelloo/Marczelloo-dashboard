@@ -9,7 +9,6 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@/compo
 import {
   Database,
   Container,
-  Play,
   Shield,
   Globe,
   Key,
@@ -17,7 +16,6 @@ import {
   Server,
   Webhook,
   CheckCircle,
-  AlertTriangle,
   FolderPlus,
   Layers,
   ClipboardList,
@@ -25,7 +23,6 @@ import {
   Settings,
   Clock,
   Network,
-  List,
   Github,
   ChevronLeft,
   ChevronRight,
@@ -75,7 +72,6 @@ const DOC_CATEGORIES: DocCategory[] = [
     sections: [
       { id: "atlashub", title: "AtlasHub (Database)", icon: Database },
       { id: "portainer", title: "Portainer (Docker)", icon: Container },
-      { id: "runner", title: "Runner (Deployments)", icon: Play },
       { id: "auth", title: "Authentication", icon: Shield },
     ],
   },
@@ -365,9 +361,6 @@ export default function DocsPage() {
                   <strong>Dashboard</strong> — Next.js web app (port 3100)
                 </li>
                 <li>
-                  <strong>Runner</strong> — Local service for git/Docker operations (port 8787)
-                </li>
-                <li>
                   <strong>Portainer</strong> — Docker container management UI (port 9200)
                 </li>
                 <li>
@@ -388,8 +381,7 @@ export default function DocsPage() {
                 <li className="flex items-start gap-2">
                   <Badge className="shrink-0">2</Badge>
                   <span>
-                    Set required env vars: <code>ATLASHUB_API_URL</code>, <code>ATLASHUB_SECRET_KEY</code>,{" "}
-                    <code>RUNNER_TOKEN</code>
+                    Set required env vars: <code>ATLASHUB_API_URL</code> and <code>ATLASHUB_SECRET_KEY</code>
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -450,10 +442,6 @@ docker-compose up -d --build`}
                   <span>— Web UI on port 3100</span>
                 </li>
                 <li className="flex gap-2">
-                  <code className="bg-primary/20 text-primary px-2 py-0.5 rounded shrink-0">runner</code>
-                  <span>— Deploy service on port 8787 (internal only)</span>
-                </li>
-                <li className="flex gap-2">
                   <code className="bg-primary/20 text-primary px-2 py-0.5 rounded shrink-0">portainer</code>
                   <span>— Docker management on port 9200</span>
                 </li>
@@ -463,9 +451,6 @@ docker-compose up -d --build`}
               <CodeBlock>
                 {`# View logs
 docker-compose logs -f dashboard
-
-# Restart a service
-docker-compose restart runner
 
 # Rebuild after code changes
 docker-compose up -d --build dashboard
@@ -528,46 +513,6 @@ PORTAINER_PASSWORD=your_password_here`}
                 <li>View container logs (tail)</li>
                 <li>Recreate containers from updated images</li>
                 <li>Manage Docker Compose stacks</li>
-              </ul>
-            </Section>
-
-            <Section id="runner" title="Runner (Deploy Service)" icon={Play}>
-              <p className="text-muted-foreground mb-4">
-                The Runner handles git operations and Docker rebuilds with an allowlist for security.
-              </p>
-
-              <h4 className="font-semibold mt-4 mb-2">Connection</h4>
-              <CodeBlock>
-                {`RUNNER_URL=http://runner:8787
-RUNNER_TOKEN=your_secure_runner_token`}
-              </CodeBlock>
-
-              <h4 className="font-semibold mt-4 mb-2">Security</h4>
-              <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 mb-4">
-                <div className="flex items-center gap-2 text-warning mb-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <strong className="text-sm">Important Security Note</strong>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  The Runner uses an allowlist to restrict operations. Only pre-configured paths can be used.
-                </p>
-              </div>
-
-              <h4 className="font-semibold mt-4 mb-2">Available Operations</h4>
-              <ul className="text-muted-foreground space-y-2 text-sm">
-                <li>
-                  <code className="bg-secondary px-1 rounded">pull</code> — Run <code>git pull</code>
-                </li>
-                <li>
-                  <code className="bg-secondary px-1 rounded">rebuild</code> — Run{" "}
-                  <code>docker compose up -d --build</code>
-                </li>
-                <li>
-                  <code className="bg-secondary px-1 rounded">restart</code> — Run <code>docker compose restart</code>
-                </li>
-                <li>
-                  <code className="bg-secondary px-1 rounded">logs</code> — Fetch recent container logs
-                </li>
               </ul>
             </Section>
 
@@ -752,12 +697,6 @@ SMTP_PASS=app_password`}
                 description="Secret key for AtlasHub API authentication"
                 example="sk_Xxk48sbg..."
               />
-              <EnvVar
-                name="RUNNER_TOKEN"
-                description="Shared secret for Runner service authentication"
-                example="your_random_64_char_hex_token"
-              />
-
               <h4 className="font-semibold mt-6 mb-4">Optional Variables</h4>
               <EnvVar
                 name="DEV_USER_EMAIL"
@@ -800,13 +739,6 @@ SMTP_PASS=app_password`}
                 Scan which ports are currently in use on your machine.
               </p>
 
-              <h4 className="font-semibold mt-4 mb-2 flex items-center gap-2">
-                <List className="h-4 w-4" />
-                Runner Allowlist
-              </h4>
-              <p className="text-muted-foreground text-sm">
-                Manage which repositories, Docker Compose projects, and containers the Runner can access.
-              </p>
             </Section>
 
             <Section id="troubleshooting" title="Troubleshooting" icon={Terminal}>
@@ -827,23 +759,6 @@ SMTP_PASS=app_password`}
                 <li>Check the URL and credentials in your environment</li>
               </ul>
 
-              <h4 className="font-semibold mb-2">&quot;Runner not responding&quot;</h4>
-              <ul className="text-muted-foreground space-y-1 text-sm mb-4">
-                <li>
-                  Check if Running: <code>curl http://127.0.0.1:8787/health</code>
-                </li>
-                <li>
-                  Verify the <code>RUNNER_TOKEN</code> matches on both sides
-                </li>
-              </ul>
-
-              <h4 className="font-semibold mb-2">&quot;Operation not allowed&quot; from Runner</h4>
-              <ul className="text-muted-foreground space-y-1 text-sm">
-                <li>The repo path or compose project is not in the allowlist</li>
-                <li>
-                  Edit <code>runner/allowlist.json</code> to add allowed paths
-                </li>
-              </ul>
             </Section>
           </div>
         </div>

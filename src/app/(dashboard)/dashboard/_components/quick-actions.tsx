@@ -3,23 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
-import { Plus, RefreshCw, Loader2, Power, AlertTriangle } from "lucide-react";
+import { Plus, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export function QuickActions() {
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   async function handleRunChecks() {
     setChecking(true);
@@ -44,112 +34,50 @@ export function QuickActions() {
     }
   }
 
-  async function handleRestartPi() {
-    setShowRestartConfirm(false);
-    setRestarting(true);
-    toast.info("Initiating Pi restart...");
-
-    try {
-      const response = await fetch("/api/pi/restart", { method: "POST" });
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success("Pi is restarting", {
-          description: "Dashboard will be unavailable for ~1-2 minutes",
-        });
-      } else {
-        toast.error("Restart failed", { description: result.error });
-      }
-    } catch {
-      toast.error("Failed to restart Pi");
-    } finally {
-      setRestarting(false);
-    }
-  }
-
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Link href="/projects/new" className="block">
-            <Button variant="default" className="w-full justify-start gap-3 h-auto py-3">
-              <Plus className="h-4 w-4" />
-              <div className="text-left">
-                <div className="font-medium">New Project</div>
-                <div className="text-xs opacity-70">Create a new project</div>
-              </div>
-            </Button>
-          </Link>
-
-          <Button
-            variant="secondary"
-            className="w-full justify-start gap-3 h-auto py-3"
-            onClick={handleRunChecks}
-            disabled={checking}
-          >
-            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Link href="/projects/new" className="block">
+          <Button variant="default" className="w-full justify-start gap-3 h-auto py-3">
+            <Plus className="h-4 w-4" />
             <div className="text-left">
-              <div className="font-medium">Run Checks</div>
-              <div className="text-xs opacity-70">Check all services</div>
+              <div className="font-medium">New Project</div>
+              <div className="text-xs opacity-70">Create a new project</div>
             </div>
           </Button>
+        </Link>
 
-          <Link href="/containers" className="block">
-            <Button variant="outline" className="w-full justify-start gap-3 h-auto py-3">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-              <div className="text-left">
-                <div className="font-medium">Containers</div>
-                <div className="text-xs opacity-70">Manage Docker containers</div>
-              </div>
-            </Button>
-          </Link>
+        <Button
+          variant="secondary"
+          className="w-full justify-start gap-3 h-auto py-3"
+          onClick={handleRunChecks}
+          disabled={checking}
+        >
+          {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          <div className="text-left">
+            <div className="font-medium">Run Checks</div>
+            <div className="text-xs opacity-70">Check all services</div>
+          </div>
+        </Button>
 
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-auto py-3 border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setShowRestartConfirm(true)}
-            disabled={restarting}
-          >
-            {restarting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+        <Link href="/containers" className="block">
+          <Button variant="outline" className="w-full justify-start gap-3 h-auto py-3">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
             <div className="text-left">
-              <div className="font-medium">Restart Pi</div>
-              <div className="text-xs opacity-70">Reboot Raspberry Pi</div>
+              <div className="font-medium">Containers</div>
+              <div className="text-xs opacity-70">Manage Docker containers</div>
             </div>
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Restart Confirmation Dialog */}
-      <Dialog open={showRestartConfirm} onOpenChange={setShowRestartConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Restart Raspberry Pi?
-            </DialogTitle>
-            <DialogDescription>
-              This will restart the Pi and all services. The dashboard will be unavailable for 1-2 minutes. All Docker
-              containers will restart automatically after boot.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowRestartConfirm(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleRestartPi}>
-              Restart Now
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        </Link>
+      </CardContent>
+    </Card>
   );
 }

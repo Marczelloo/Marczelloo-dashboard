@@ -22,10 +22,8 @@ import {
   X,
   Loader2,
   Info,
-  Plus,
   Network,
   Clock,
-  Shield,
   Key,
   Github,
   Settings,
@@ -45,12 +43,6 @@ interface PortInfo {
   process: string;
   pid: number | null;
   label: string | null;
-}
-
-interface Blocklist {
-  repo_paths: string[];
-  compose_projects: string[];
-  container_names: string[];
 }
 
 export default function SettingsPage() {
@@ -77,8 +69,6 @@ export default function SettingsPage() {
         <CloudflareTunnelSettings />
         <MonitoringIntervalSettings />
         <PortainerSettings />
-        <RunnerSettings />
-        <RunnerBlocklistSettings />
         <PortTrackerSettings />
         <NotificationSettings />
       </div>
@@ -122,10 +112,6 @@ function EnvironmentInfo() {
             <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
               <span className="text-sm">Portainer</span>
               <Badge variant={info.portainer === "configured" ? "success" : "danger"}>{info.portainer}</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-              <span className="text-sm">Runner</span>
-              <Badge variant={info.runner === "configured" ? "success" : "danger"}>{info.runner}</Badge>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
               <span className="text-sm">Discord</span>
@@ -621,262 +607,6 @@ function PortainerSettings() {
           onSuccess={() => {
             setShowPinDialog(false);
             void refreshToken();
-          }}
-          onCancel={() => setShowPinDialog(false)}
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
-function RunnerSettings() {
-  const [status, setStatus] = useState<ConnectionStatus>({ status: "unknown" });
-
-  async function testConnection() {
-    setStatus({ status: "loading" });
-    try {
-      const response = await fetch("/api/settings/test-runner", { method: "POST" });
-      const result = await response.json();
-
-      if (result.success) {
-        setStatus({ status: "success", message: `Connected (v${result.version || "1.0"})` });
-      } else {
-        setStatus({ status: "error", message: result.error });
-      }
-    } catch {
-      setStatus({ status: "error", message: "Failed to test connection" });
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Runner Service</CardTitle>
-        <CardDescription>Local runner for git and Docker operations</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <Label className="text-muted-foreground">URL</Label>
-            <p className="font-mono text-sm">http://127.0.0.1:8787</p>
-          </div>
-          <StatusIndicator status={status} />
-        </div>
-
-        <Button variant="outline" size="sm" onClick={testConnection} disabled={status.status === "loading"}>
-          {status.status === "loading" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <TestTube className="h-4 w-4" />
-          )}
-          Test Connection
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RunnerBlocklistSettings() {
-  const [blocklist, setBlocklist] = useState<Blocklist | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<ConnectionStatus>({ status: "unknown" });
-  const [newRepo, setNewRepo] = useState("");
-  const [newProject, setNewProject] = useState("");
-  const [newContainer, setNewContainer] = useState("");
-  const [showPinDialog, setShowPinDialog] = useState(false);
-
-  useEffect(() => {
-    loadBlocklist();
-  }, []);
-
-  async function loadBlocklist() {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/settings/runner-allowlist");
-      const result = await response.json();
-      if (result.success) {
-        setBlocklist(result.blocklist || result.allowlist);
-      }
-    } catch {
-      // Runner may not be running
-    }
-    setLoading(false);
-  }
-
-  async function saveBlocklist() {
-    if (!blocklist) return;
-    setStatus({ status: "loading" });
-    try {
-      const response = await fetch("/api/settings/runner-allowlist", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blocklist }),
-      });
-      const result = await response.json();
-
-      if (result.requirePin) {
-        setStatus({ status: "unknown" });
-        setShowPinDialog(true);
-        return;
-      }
-
-      if (result.success) {
-        setStatus({ status: "success", message: "Blocklist saved" });
-        setBlocklist(result.blocklist || result.allowlist);
-      } else {
-        setStatus({ status: "error", message: result.error });
-      }
-    } catch {
-      setStatus({ status: "error", message: "Failed to save blocklist" });
-    }
-  }
-
-  function addItem(type: keyof Blocklist, value: string) {
-    if (!blocklist || !value.trim()) return;
-    if (blocklist[type].includes(value.trim())) return;
-    setBlocklist({
-      ...blocklist,
-      [type]: [...blocklist[type], value.trim()],
-    });
-    if (type === "repo_paths") setNewRepo("");
-    if (type === "compose_projects") setNewProject("");
-    if (type === "container_names") setNewContainer("");
-  }
-
-  function removeItem(type: keyof Blocklist, value: string) {
-    if (!blocklist) return;
-    setBlocklist({
-      ...blocklist,
-      [type]: blocklist[type].filter((v) => v !== value),
-    });
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Runner Blocklist
-        </CardTitle>
-        <CardDescription>Block specific repositories, projects, and containers from being managed by the runner (everything else is allowed)</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {loading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading blocklist...
-          </div>
-        ) : !blocklist ? (
-          <div className="text-muted-foreground">
-            <p>Could not load blocklist. Make sure the runner is running.</p>
-            <Button variant="outline" size="sm" className="mt-2" onClick={loadBlocklist}>
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Repository Paths */}
-            <div>
-              <Label className="text-sm font-medium">Blocked Repository Paths</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Blocked paths for git operations (e.g., /home/pi/sensitive-project)
-              </p>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  placeholder="/home/pi/sensitive-project"
-                  value={newRepo}
-                  onChange={(e) => setNewRepo(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addItem("repo_paths", newRepo)}
-                />
-                <Button size="sm" onClick={() => addItem("repo_paths", newRepo)}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {blocklist.repo_paths.map((path) => (
-                  <Badge key={path} variant="secondary" className="gap-1">
-                    <code className="text-xs">{path}</code>
-                    <button onClick={() => removeItem("repo_paths", path)} className="hover:text-danger">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Compose Projects */}
-            <div>
-              <Label className="text-sm font-medium">Blocked Compose Projects</Label>
-              <p className="text-xs text-muted-foreground mb-2">Docker compose projects to block</p>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  placeholder="my-app"
-                  value={newProject}
-                  onChange={(e) => setNewProject(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addItem("compose_projects", newProject)}
-                />
-                <Button size="sm" onClick={() => addItem("compose_projects", newProject)}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {blocklist.compose_projects.map((name) => (
-                  <Badge key={name} variant="secondary" className="gap-1">
-                    {name}
-                    <button onClick={() => removeItem("compose_projects", name)} className="hover:text-danger">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Container Names */}
-            <div>
-              <Label className="text-sm font-medium">Blocked Container Names</Label>
-              <p className="text-xs text-muted-foreground mb-2">Container names to block from restart/logs operations</p>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  placeholder="my-container"
-                  value={newContainer}
-                  onChange={(e) => setNewContainer(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addItem("container_names", newContainer)}
-                />
-                <Button size="sm" onClick={() => addItem("container_names", newContainer)}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {blocklist.container_names.map((name) => (
-                  <Badge key={name} variant="secondary" className="gap-1">
-                    {name}
-                    <button onClick={() => removeItem("container_names", name)} className="hover:text-danger">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Button variant="default" size="sm" onClick={saveBlocklist} disabled={status.status === "loading"}>
-                {status.status === "loading" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Save Blocklist
-              </Button>
-              <StatusIndicator status={status} />
-            </div>
-          </>
-        )}
-        <PinDialog
-          open={showPinDialog}
-          onSuccess={() => {
-            setShowPinDialog(false);
-            void saveBlocklist();
           }}
           onCancel={() => setShowPinDialog(false)}
         />

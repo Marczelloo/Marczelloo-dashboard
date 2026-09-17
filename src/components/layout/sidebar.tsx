@@ -11,7 +11,6 @@ import {
   Server,
   Activity,
   Container,
-  Terminal,
   History,
   Settings,
   LogOut,
@@ -25,7 +24,6 @@ import {
   Wrench,
   MonitorCog,
   Gauge,
-  DatabaseZap,
   type LucideIcon,
 } from "lucide-react";
 import { VersionDisplay } from "./version-display";
@@ -70,7 +68,6 @@ const navCategories: NavCategory[] = [
     items: [
       { href: "/services", label: "Services", icon: Server },
       { href: "/containers", label: "Containers", icon: Container },
-      { href: "/import", label: "Import", icon: DatabaseZap },
     ],
   },
   {
@@ -89,7 +86,6 @@ const navCategories: NavCategory[] = [
     icon: Wrench,
     collapsible: true,
     items: [
-      { href: "/terminal", label: "Terminal", icon: Terminal },
       { href: "/news", label: "Tech News", icon: Newspaper },
     ],
   },

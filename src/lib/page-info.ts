@@ -119,7 +119,7 @@ export const PAGE_INFO = {
     description: "Deep dive into service configuration, logs, and metrics.",
     items: [
       {
-        icon: "Terminal",
+        icon: "FileText",
         title: "View Logs",
         description: "Access real-time and historical logs from the container.",
       },
@@ -215,7 +215,7 @@ export const PAGE_INFO = {
         description: "Start, stop, restart, or remove containers.",
       },
       {
-        icon: "Terminal",
+        icon: "FileText",
         title: "Container Logs",
         description: "View real-time logs from any container.",
       },
@@ -277,33 +277,6 @@ export const PAGE_INFO = {
         icon: "Link",
         title: "Read More",
         description: "Click articles to open full content in a new tab.",
-      },
-    ] as InfoItem[],
-  },
-
-  terminal: {
-    title: "Web Terminal",
-    description: "Execute commands on your server through the web interface.",
-    items: [
-      {
-        icon: "Terminal",
-        title: "Run Commands",
-        description: "Execute allowlisted commands on the server.",
-      },
-      {
-        icon: "Shield",
-        title: "Security",
-        description: "Only pre-approved commands can be executed for safety.",
-      },
-      {
-        icon: "Clock",
-        title: "Command History",
-        description: "Browse and re-run previous commands.",
-      },
-      {
-        icon: "Download",
-        title: "Output",
-        description: "View command output and copy results.",
       },
     ] as InfoItem[],
   },
