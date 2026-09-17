@@ -2,291 +2,133 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Mark } from "@/components/brand/mark";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  Server,
-  Activity,
-  Container,
-  History,
-  Settings,
-  LogOut,
-  BookOpen,
-  Cpu,
-  CheckSquare,
-  Newspaper,
-  Sparkles,
-  ChevronDown,
-  Layers,
-  Wrench,
-  MonitorCog,
-  Gauge,
-  type LucideIcon,
-} from "lucide-react";
+import type { ShellData } from "@/server/shell";
+import { FOOTER_LINKS, isActive, NAV_GROUPS, type NavItem } from "./nav";
+import type { SidebarMode } from "./sidebar-preference";
 import { VersionDisplay } from "./version-display";
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
+interface SidebarNavProps {
+  expanded: boolean;
+  counts: ShellData["counts"];
+  onNavigate?: () => void;
+  /** Replays the mark animation, e.g. while the dashboard deploys itself. */
+  markReplayKey?: string | null;
 }
 
-interface NavCategory {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  items: NavItem[];
-  collapsible?: boolean;
+/** `hidden xl:inline` when the rail may expand on wide screens, always hidden when collapsed. */
+function labelClass(expanded: boolean, responsive: boolean) {
+  if (!expanded) return "hidden";
+  return responsive ? "hidden xl:inline" : "inline";
 }
 
-const navCategories: NavCategory[] = [
-  {
-    id: "overview",
-    label: "Overview",
-    icon: Gauge,
-    collapsible: false,
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
-  },
-  {
-    id: "work",
-    label: "Work",
-    icon: Layers,
-    collapsible: true,
-    items: [
-      { href: "/projects", label: "Projects", icon: FolderKanban },
-      { href: "/todos", label: "Todos", icon: CheckSquare },
-    ],
-  },
-  {
-    id: "infrastructure",
-    label: "Infrastructure",
-    icon: Server,
-    collapsible: true,
-    items: [
-      { href: "/services", label: "Services", icon: Server },
-      { href: "/containers", label: "Containers", icon: Container },
-    ],
-  },
-  {
-    id: "monitoring",
-    label: "Monitoring",
-    icon: Activity,
-    collapsible: true,
-    items: [
-      { href: "/monitoring", label: "Uptime", icon: Activity },
-      { href: "/pi", label: "Raspberry Pi", icon: Cpu },
-    ],
-  },
-  {
-    id: "tools",
-    label: "Tools",
-    icon: Wrench,
-    collapsible: true,
-    items: [
-      { href: "/news", label: "Tech News", icon: Newspaper },
-    ],
-  },
-  {
-    id: "system",
-    label: "System",
-    icon: MonitorCog,
-    collapsible: true,
-    items: [
-      { href: "/audit-log", label: "Audit Log", icon: History },
-      { href: "/features", label: "Features", icon: Sparkles },
-      { href: "/docs", label: "Documentation", icon: BookOpen },
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
-
-function NavCategorySection({
-  category,
-  pathname,
-  isOpen,
-  onToggle,
-}: {
-  category: NavCategory;
-  pathname: string;
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const hasActiveItem = category.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-  const CategoryIcon = category.icon;
-
-  // For non-collapsible categories (like Overview), render items directly
-  if (!category.collapsible) {
-    return (
-      <div className="mb-2">
-        {category.items.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                isActive
-                  ? "bg-primary/15 text-primary border-l-2 border-primary"
-                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
-    );
-  }
-
+function NavLink({ item, active, expanded, responsive, count, onNavigate }: { item: NavItem; active: boolean; expanded: boolean; responsive: boolean; count?: number; onNavigate?: () => void }) {
+  const Icon = item.icon;
   return (
-    <div className="mb-1">
-      {/* Category Header */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className={cn(
-          "flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
-          hasActiveItem ? "text-primary/90" : "text-muted-foreground/70 hover:text-muted-foreground"
-        )}
-      >
-        <span className="flex items-center gap-2">
-          <CategoryIcon className="h-3.5 w-3.5" />
-          {category.label}
-        </span>
-        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-3.5 w-3.5" />
-        </motion.div>
-      </button>
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      title={item.label}
+      className={cn(
+        "relative flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-[13px] transition-colors duration-quick ease-out",
+        active ? "bg-white/[.055] text-white" : "text-fg-2 hover:bg-white/[.04] hover:text-fg"
+      )}
+    >
+      {active && <span aria-hidden className="absolute -left-2 bottom-2 top-2 w-0.5 rounded-full bg-accent shadow-[0_0_10px_rgb(var(--accent)/.8)]" />}
+      <Icon className="size-4 shrink-0" strokeWidth={1.75} />
+      <span className={cn("truncate", labelClass(expanded, responsive))}>{item.label}</span>
+      {count !== undefined && <span className={cn("ml-auto font-mono text-[10.5px] text-fg-3", labelClass(expanded, responsive))}>{count}</span>}
+    </Link>
+  );
+}
 
-      {/* Category Items */}
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="ml-2 border-l border-border/50 pl-2 py-1">
-              {category.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                      isActive
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+export function SidebarNav({ expanded, counts, onNavigate, responsive = false, markReplayKey = null }: SidebarNavProps & { responsive?: boolean }) {
+  const pathname = usePathname();
+  const label = labelClass(expanded, responsive);
+  return (
+    <div className="flex h-full flex-col">
+      <Link href="/" onClick={onNavigate} className="flex h-[52px] shrink-0 items-center gap-2.5 px-3.5">
+        <Mark size={26} animate replayKey={markReplayKey} title="Marczelloo Dashboard" />
+        <span className={cn("leading-tight", label)}>
+          <span className="block text-[13.5px] font-semibold tracking-[-0.01em]">Marczelloo</span>
+          <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-fg-3">Dashboard</span>
+        </span>
+      </Link>
+
+      <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 pb-2">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label ?? "root"} className="mt-1">
+            {group.label && <p className={cn("px-2.5 pb-1 pt-3 text-[11px] font-medium text-fg-4", label)}>{group.label}</p>}
+            {group.label && !expanded && <div aria-hidden className="mx-2.5 my-2 h-px bg-line-subtle" />}
+            <div className="flex flex-col gap-px">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  active={isActive(pathname, item.href)}
+                  expanded={expanded}
+                  responsive={responsive}
+                  count={item.countKey ? counts[item.countKey] : undefined}
+                  onNavigate={onNavigate}
+                />
+              ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        ))}
+      </nav>
+
+      <div className="shrink-0 border-t border-line-subtle px-2 py-2">
+        <div className="flex flex-col gap-px">
+          {FOOTER_LINKS.map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} expanded={expanded} responsive={responsive} onNavigate={onNavigate} />
+          ))}
+          <a
+            href="/cdn-cgi/access/logout"
+            title="Sign out"
+            className="flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-[13px] text-fg-3 transition-colors duration-quick hover:bg-err/10 hover:text-err"
+          >
+            <LogOut className="size-4 shrink-0" strokeWidth={1.75} />
+            <span className={label}>Sign out</span>
+          </a>
+        </div>
+        <div className={label}>
+          <VersionDisplay />
+        </div>
+      </div>
     </div>
   );
 }
 
-export function Sidebar() {
-  const pathname = usePathname();
+interface SidebarProps {
+  mode: SidebarMode;
+  counts: ShellData["counts"];
+  onToggleMode(): void;
+  markReplayKey?: string | null;
+  className?: string;
+}
 
-  // Initialize open state - categories with active items are open by default
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    navCategories.forEach((cat) => {
-      if (cat.collapsible) {
-        const hasActive = cat.items.some(
-          (item) =>
-            typeof window !== "undefined" &&
-            (window.location.pathname === item.href || window.location.pathname.startsWith(`${item.href}/`))
-        );
-        initial[cat.id] = hasActive;
-      }
-    });
-    return initial;
-  });
-
-  // Update open state when pathname changes - auto-expand category with active item
-  useEffect(() => {
-    setOpenCategories((prev) => {
-      const updates: Record<string, boolean> = { ...prev };
-      let hasChanges = false;
-
-      navCategories.forEach((cat) => {
-        if (cat.collapsible) {
-          const hasActive = cat.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-          if (hasActive && !prev[cat.id]) {
-            updates[cat.id] = true;
-            hasChanges = true;
-          }
-        }
-      });
-
-      return hasChanges ? updates : prev;
-    });
-  }, [pathname]);
-
-  const toggleCategory = (categoryId: string) => {
-    setOpenCategories((prev) => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
-    }));
-  };
-
+export function Sidebar({ mode, counts, onToggleMode, markReplayKey, className }: SidebarProps) {
+  const expanded = mode === "expanded";
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border/50 bg-card/95 backdrop-blur-sm">
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b border-border/50 px-5">
-        <Link href="/dashboard" className="flex items-center gap-3 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
-            <span className="text-lg font-bold text-primary-foreground">M</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-base font-semibold tracking-tight leading-tight">Marczelloo</span>
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">Dashboard</span>
-          </div>
-        </Link>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex flex-col p-3 h-[calc(100vh-8rem)] overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border/50">
-        {navCategories.map((category) => (
-          <NavCategorySection
-            key={category.id}
-            category={category}
-            pathname={pathname}
-            isOpen={openCategories[category.id] ?? false}
-            onToggle={() => toggleCategory(category.id)}
-          />
-        ))}
-      </nav>
-
-      {/* Bottom section */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-border/50 bg-card/95">
-        <VersionDisplay />
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </button>
-      </div>
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 flex-col border-r border-line-subtle bg-canvas transition-[width] duration-panel ease-out",
+        expanded ? "w-14 xl:w-[232px]" : "w-14",
+        className
+      )}
+    >
+      <SidebarNav expanded={expanded} responsive counts={counts} markReplayKey={markReplayKey} />
+      <button
+        type="button"
+        onClick={onToggleMode}
+        aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+        className="absolute -right-3 top-[64px] hidden size-6 place-items-center rounded-full border border-line-strong bg-surface-raised text-fg-3 opacity-0 shadow-lift transition-[opacity,color] duration-quick hover:text-fg focus-visible:opacity-100 group-hover/shell:opacity-100 xl:grid"
+      >
+        {expanded ? <PanelLeftClose className="size-3.5" strokeWidth={1.75} /> : <PanelLeftOpen className="size-3.5" strokeWidth={1.75} />}
+      </button>
     </aside>
   );
 }

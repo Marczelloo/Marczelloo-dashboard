@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/", permanent: true },
+      { source: "/news", destination: "/", permanent: true },
+      { source: "/pi", destination: "/host", permanent: true },
+      { source: "/todos", destination: "/tasks", permanent: true },
+    ];
+  },
   // Ignore TypeScript type errors during build for faster iteration
   typescript: {
     ignoreBuildErrors: false,

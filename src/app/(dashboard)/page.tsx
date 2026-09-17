@@ -3,11 +3,11 @@ import { Suspense } from "react";
 export const dynamic = "force-dynamic";
 import { PageInfoButton } from "@/components/layout/page-info-button";
 import { PAGE_INFO } from "@/lib/page-info";
-import { DashboardStats } from "./_components/dashboard-stats";
-import { RecentActivity } from "./_components/recent-activity";
-import { ServiceStatus } from "./_components/service-status";
-import { QuickActions } from "./_components/quick-actions";
-import { RecentDeploysServer } from "./_components/recent-deploys";
+import { DashboardStats } from "./dashboard/_components/dashboard-stats";
+import { RecentActivity } from "./dashboard/_components/recent-activity";
+import { ServiceStatus } from "./dashboard/_components/service-status";
+import { QuickActions } from "./dashboard/_components/quick-actions";
+import { RecentDeploysServer } from "./dashboard/_components/recent-deploys";
 import { Skeleton } from "@/components/ui";
 import { LayoutDashboard } from "lucide-react";
 

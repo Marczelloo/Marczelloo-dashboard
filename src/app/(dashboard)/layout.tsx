@@ -1,17 +1,14 @@
-import { Sidebar } from "@/components/layout";
+import { AppShell } from "@/components/layout/app-shell";
 import { DemoBanner } from "@/components/layout/demo-banner";
 import { isDemoMode } from "@/lib/demo-mode";
+import { getShellData } from "@/server/shell";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const showDemoBanner = isDemoMode();
-
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const data = await getShellData();
   return (
-    <div className="min-h-screen bg-background">
-      {showDemoBanner && <DemoBanner />}
-      <div className="flex">
-        <Sidebar />
-        <main className={`flex-1 ml-64 min-h-screen ${showDemoBanner ? "pt-0" : ""}`}>{children}</main>
-      </div>
-    </div>
+    <>
+      {isDemoMode() && <DemoBanner />}
+      <AppShell data={data}>{children}</AppShell>
+    </>
   );
 }
