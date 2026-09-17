@@ -5,9 +5,25 @@ import { applyManagedRouteUpdate, getManagedTunnelSettings, listManagedRoutes } 
 import { validateRepoPath } from "@/server/deployments/paths";
 import { getRepositoryCloneToken } from "@/server/github/client";
 import type { DeploymentConfig } from "./config";
+import { bindingForPort, containerService } from "./edge";
 import { pickDeploymentPort, portUsedByOthers } from "./ports";
 
 export const PROJECTS_DIR = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/projects";
+
+/**
+ * EDGE_NETWORK attaches routed containers to the shared network; TUNNEL_ORIGIN=edge
+ * makes new routes target containers by name (set once cloudflared runs on that network).
+ */
+export function edgeSettings(): { network: string | null; containerOrigins: boolean } {
+  const network = process.env.EDGE_NETWORK?.trim() || null;
+  return { network, containerOrigins: Boolean(network) && process.env.TUNNEL_ORIGIN === "edge" };
+}
+
+/** Container origin behind a published loopback port, e.g. 3202 → http://marczelloo-tools:3000. */
+export async function resolveContainerOrigin(localPort: number): Promise<string | null> {
+  const binding = bindingForPort((await getAgentHost()).publishedPorts, localPort);
+  return binding ? containerService(binding.container, binding.containerPort) : null;
+}
 
 export interface DeploymentPreflight {
   ok: boolean;
@@ -128,7 +144,12 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
 
 export async function updateCloudflareTunnelRoute(update: CloudflareRouteUpdate): Promise<{ changed: boolean }> {
   if (!getManagedTunnelSettings()) throw new Error("Cloudflare API nie jest skonfigurowane (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
-  const { changed, dns } = await applyManagedRouteUpdate(update);
+  let service: string | null = null;
+  if (update.hostname && update.localPort && edgeSettings().containerOrigins) {
+    service = await resolveContainerOrigin(update.localPort);
+    if (!service) throw new Error(`Żaden kontener nie publikuje portu ${update.localPort}, więc trasy ${update.hostname} nie da się skierować na kontener.`);
+  }
+  const { changed, dns } = await applyManagedRouteUpdate({ ...update, service });
   if (dns.length) console.log(`[Cloudflare] ${dns.join(", ")}`);
   return { changed };
 }

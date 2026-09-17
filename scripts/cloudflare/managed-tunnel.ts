@@ -9,11 +9,15 @@
  *   compare <legacyTunnelId> <tunnelId>     ingress of both tunnels side by side
  *   switch-dns <fromTunnelId> <toTunnelId> [--apply] [hostname…]
  *                                           move proxied CNAMEs; dry run without --apply
+ *   edge <tunnelId> <bindings.json> [--extra 8080=http://mz-static:8080] [--backup file] [--apply]
+ *                                           route loopback origins to containers by name; dry run without --apply
+ *   restore <tunnelId> <backup.json>        put a configuration saved by `edge --backup` back
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createCloudflareClient } from "../../src/server/cloudflare/client";
 import { tunnelTarget } from "../../src/server/cloudflare/dns";
 import { assertCatchAll, sameIngress, type TunnelConfiguration } from "../../src/server/cloudflare/ingress";
+import { translateIngress, type PortBinding } from "../../src/server/deployments/edge";
 
 export {};
 
@@ -76,6 +80,41 @@ async function switchDns(fromId: string, toId: string, apply: boolean, only: str
   console.log(`${matched} record(s) ${apply ? "switched" : "matched (dry run)"}`);
 }
 
+function optionValues(args: string[], name: string): string[] {
+  return args.flatMap((arg, index) => (arg === name && args[index + 1] ? [args[index + 1]] : []));
+}
+
+/** bindings.json is the publishedPorts array of the agent's GET /host. */
+async function edge(tunnelId: string, bindingsFile: string, args: string[]) {
+  const bindings = JSON.parse(readFileSync(bindingsFile, "utf8")) as PortBinding[];
+  const extra = Object.fromEntries(
+    optionValues(args, "--extra").map((entry) => {
+      const [port, origin] = entry.split("=", 2);
+      if (!/^\d+$/.test(port) || !/^http:\/\/[A-Za-z0-9][A-Za-z0-9_.-]*:\d+$/.test(origin ?? "")) throw new Error(`Invalid --extra ${entry}`);
+      return [Number(port), origin];
+    })
+  );
+  const current = await client.getTunnelConfiguration(tunnelId);
+  if (!current.config) throw new Error("Tunnel has no configuration");
+  const result = translateIngress(current.config.ingress, bindings, extra);
+  for (const change of result.changes) console.log(`${change.hostname ?? "*"}: ${change.from} → ${change.to}`);
+  for (const miss of result.unresolved) console.log(`UNRESOLVED ${miss.hostname ?? "*"}: ${miss.from}`);
+  if (!args.includes("--apply")) return console.log(`${result.changes.length} change(s), ${result.unresolved.length} unresolved (dry run)`);
+  if (result.unresolved.length) throw new Error("Refusing to apply with unresolved loopback routes");
+  const [backup] = optionValues(args, "--backup");
+  if (!backup) throw new Error("--apply requires --backup <file>");
+  writeFileSync(backup, JSON.stringify(current.config, null, 2), { mode: 0o600 });
+  await client.putTunnelConfiguration(tunnelId, { ...current.config, ingress: result.rules });
+  console.log(`applied ${result.changes.length} change(s); previous configuration saved to ${backup}`);
+}
+
+async function restore(tunnelId: string, backupFile: string) {
+  const config = JSON.parse(readFileSync(backupFile, "utf8")) as TunnelConfiguration;
+  assertCatchAll(config.ingress);
+  await client.putTunnelConfiguration(tunnelId, config);
+  console.log(`restored ${config.ingress.length} ingress rules`);
+}
+
 async function listCnames(zoneId: string) {
   const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?per_page=500&type=CNAME`, {
     headers: { authorization: `Bearer ${required("CLOUDFLARE_API_TOKEN")}` },
@@ -99,7 +138,15 @@ async function main() {
     const hosts = args.slice(2).filter((arg) => !arg.startsWith("--"));
     return switchDns(uuid(args[0], "fromTunnelId"), uuid(args[1], "toTunnelId"), flags.includes("--apply"), hosts);
   }
-  throw new Error("Usage: create | token | compare | switch-dns (see the header of this file)");
+  if (command === "edge") {
+    if (!args[1]) throw new Error("edge <tunnelId> <bindings.json> [--extra port=origin] [--backup file] [--apply]");
+    return edge(uuid(args[0], "tunnelId"), args[1], args.slice(2));
+  }
+  if (command === "restore") {
+    if (!args[1]) throw new Error("restore <tunnelId> <backup.json>");
+    return restore(uuid(args[0], "tunnelId"), args[1]);
+  }
+  throw new Error("Usage: create | token | compare | switch-dns | edge | restore (see the header of this file)");
 }
 
 main().catch((error) => {

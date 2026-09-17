@@ -39,6 +39,9 @@ services:
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
       - CLOUDFLARE_TUNNEL_ID=${CLOUDFLARE_TUNNEL_ID:-}
       - CLOUDFLARE_LEGACY_TUNNEL_IDS=${CLOUDFLARE_LEGACY_TUNNEL_IDS:-}
+      # Shared network cloudflared reaches containers on; TUNNEL_ORIGIN=edge routes by container name
+      - EDGE_NETWORK=${EDGE_NETWORK:-}
+      - TUNNEL_ORIGIN=${TUNNEL_ORIGIN:-loopback}
 
       # App Configuration
       - OWNER_EMAILS=${OWNER_EMAILS}

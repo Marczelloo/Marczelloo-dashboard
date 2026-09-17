@@ -31,6 +31,7 @@ describe("toAgentTarget", () => {
       profiles: [],
       tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false },
       generatedCompose: null,
+      edge: null,
     });
     expect(toAgentTarget(config, true).tunnel?.probe).toBe(true);
   });

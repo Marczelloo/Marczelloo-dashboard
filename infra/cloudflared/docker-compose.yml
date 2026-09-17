@@ -9,9 +9,13 @@ services:
     image: cloudflare/cloudflared:2026.1.2
     container_name: marczelloo-cloudflared
     restart: unless-stopped
-    # Origins are published on 127.0.0.1 of the host.
-    network_mode: host
-    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20242", "run"]
+    # Origins are containers on the shared edge network, addressed by name
+    # (http://marczelloo-tools:3000), not ports published on the host.
+    networks:
+      - mz-edge
+    ports:
+      - "127.0.0.1:20242:20242"
+    command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:20242", "run"]
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is required (see docs/runbooks/2026-09-17-stage-3-cloudflare.md)}
     logging:
@@ -19,3 +23,7 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+
+networks:
+  mz-edge:
+    external: true

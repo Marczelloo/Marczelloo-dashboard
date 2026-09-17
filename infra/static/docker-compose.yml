@@ -1,0 +1,33 @@
+# Static site server for nadstrona.pl, mewbit and activity (replaces the systemd
+# Caddy on 127.0.0.1:8080). Deployed by copying this directory to
+# ~/.config/marczelloo-static and running `docker compose up -d` there.
+name: marczelloo-static
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    container_name: mz-static
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/www:/srv/www:ro
+      - caddy_data:/data
+    networks:
+      - mz-edge
+      # The /api routes proxy to the MewBit bot, which is not an edge service.
+      - neobeatbuddy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  caddy_data:
+
+networks:
+  mz-edge:
+    external: true
+  neobeatbuddy:
+    name: neobeatbuddy_default
+    external: true

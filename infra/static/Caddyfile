@@ -1,0 +1,94 @@
+# Static sites and the MewBit API proxy, served to cloudflared over the mz-edge
+# network. Site files are still published by copying them to /srv/www on the Pi.
+{
+	admin off
+}
+
+:8080 {
+	encode zstd gzip
+
+	@main host nadstrona.pl www.nadstrona.pl
+	handle @main {
+		root * /srv/www/nadstrona/main
+		file_server
+	}
+
+	@nocturne host nocturne.nadstrona.pl
+	handle @nocturne {
+		root * /srv/www/nadstrona/nocturne
+		file_server
+	}
+
+	@linia host linia.nadstrona.pl
+	handle @linia {
+		root * /srv/www/nadstrona/linia
+		file_server
+	}
+
+	@borowa host borowa.nadstrona.pl
+	handle @borowa {
+		root * /srv/www/nadstrona/borowa
+		file_server
+	}
+
+	@warstwa host warstwa.nadstrona.pl
+	handle @warstwa {
+		root * /srv/www/nadstrona/warstwa
+		file_server
+	}
+
+	@sznyt host sznyt.nadstrona.pl
+	handle @sznyt {
+		root * /srv/www/nadstrona/sznyt
+		file_server
+	}
+
+	@mewbit_api {
+		host mewbit.marczelloo.dev
+		path /api/*
+	}
+	handle @mewbit_api {
+		reverse_proxy neobeatbuddy-bot-1:8787 {
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+		}
+	}
+
+	@mewbit host mewbit.marczelloo.dev
+	handle @mewbit {
+		root * /srv/www/mewbit-web
+		@web_static path /assets/* /art/* /covers/* /shots/* /robots.txt /sitemap.xml /mark.svg
+		@hashed path /assets/*
+		route {
+			header Cache-Control "no-cache"
+			header @hashed Cache-Control "public, max-age=31536000, immutable"
+			file_server @web_static
+			try_files {path} /index.html
+			file_server
+		}
+	}
+
+	@activity_api {
+		host activity.marczelloo.dev
+		path /api/*
+	}
+	handle @activity_api {
+		reverse_proxy neobeatbuddy-bot-1:8787 {
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+		}
+	}
+
+	@activity host activity.marczelloo.dev
+	handle @activity {
+		root * /srv/www/mewbit-activity
+		@activity_static path /assets/*
+		route {
+			header Cache-Control "no-cache"
+			header @activity_static Cache-Control "public, max-age=31536000, immutable"
+			file_server @activity_static
+			try_files {path} /index.html
+			file_server
+		}
+	}
+
+	respond 404
+}

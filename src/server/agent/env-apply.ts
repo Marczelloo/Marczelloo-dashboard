@@ -4,7 +4,7 @@ import { appImport, deploys, projects, services } from "@/server/atlashub";
 import { getDeploymentConfig, type DeploymentConfig } from "@/server/deployments/config";
 import { envFileFingerprint, envFileKeys, envFilePayload, latestVersionOfFile, nextVersionNumber } from "@/server/env/file-versions";
 import { enqueueAgentJob } from "./client";
-import { prepareTunnelProbe } from "./deploy";
+import { prepareTunnelProbe, resolveEdge } from "./deploy";
 import { agentLogRef } from "./refs";
 import { toAgentTarget } from "./target";
 
@@ -64,7 +64,7 @@ export async function queueAgentEnvApply(input: {
   try {
     const job = await enqueueAgentJob({
       kind: "apply-env",
-      target: toAgentTarget(input.config, probe),
+      target: toAgentTarget(input.config, probe, await resolveEdge(input.config)),
       deployId: deploy.id,
       triggeredBy: input.triggeredBy.slice(0, 100),
       envFile: { name: input.fileName, content: input.content, previous: input.previous },

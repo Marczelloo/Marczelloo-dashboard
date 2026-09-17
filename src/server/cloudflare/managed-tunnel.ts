@@ -74,8 +74,12 @@ export async function listManagedRoutes(): Promise<TunnelIngressRule[]> {
 export interface ManagedRouteUpdate {
   hostname: string | null;
   localPort: number | null;
+  /** Origin to route to instead of the loopback port, e.g. http://marczelloo-tools:3000. */
+  service?: string | null;
   removeHostnames?: string[];
 }
+
+const CONTAINER_ORIGIN = /^http:\/\/[A-Za-z0-9][A-Za-z0-9_.-]*:\d{1,5}$/;
 
 export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promise<{ changed: boolean; dns: string[] }> {
   const settings = requireResolved();
@@ -84,7 +88,8 @@ export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promi
   const removals = [...new Set((update.removeHostnames ?? []).map((value) => value.trim().toLowerCase()).filter((value) => value && value !== hostname))];
   if (hostname && !isSafeHostname(hostname)) throw new Error("Nieprawidłowa domena Cloudflare Tunnel.");
   if (removals.some((value) => !isSafeHostname(value))) throw new Error("Nieprawidłowa domena do usunięcia z Cloudflare Tunnel.");
-  const service = hostname ? localService(update.localPort ?? 0) : null;
+  if (update.service && !CONTAINER_ORIGIN.test(update.service)) throw new Error("Nieprawidłowy cel trasy Cloudflare Tunnel.");
+  const service = hostname ? update.service || localService(update.localPort ?? 0) : null;
 
   return serialized(async () => {
     const zones = await listManagedZones();
