@@ -9,7 +9,7 @@ import { getAgentProject, isAgentConfigured } from "@/server/agent/client";
 import { queueAgentRollback } from "@/server/agent/deploy";
 import { agentLogRef } from "@/server/agent/refs";
 import { auditLogs, services } from "@/server/atlashub";
-import { getDeploymentConfig, saveDeploymentConfig } from "@/server/deployments/config";
+import { getDeploymentConfig } from "@/server/deployments/config";
 import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 type Result<T> = ActionResult<T> & { code?: string };
@@ -46,27 +46,6 @@ export async function getDeployEngineAction(projectId: string): Promise<
       }
     }
     return { success: true, data: { managed: true, engine: config.engine ?? "script", agentConfigured, releases, activeJob, agentError } };
-  } catch (error) {
-    return failure(error);
-  }
-}
-
-const engineSchema = z.enum(["script", "agent"]);
-
-export async function setDeployEngineAction(projectId: string, engine: Engine): Promise<Result<{ engine: Engine }>> {
-  try {
-    const demo = checkDemoModeBlocked();
-    if (demo.blocked) return demo.result;
-    const user = await requirePinVerification();
-    const parsed = engineSchema.parse(engine);
-    const config = await getDeploymentConfig(projectId);
-    if (!config) return { success: false, error: "Projekt nie ma konfiguracji wdrożenia." };
-    if (parsed === "agent" && !isAgentConfigured()) return { success: false, error: "Agent nie jest skonfigurowany (brak AGENT_TOKEN)." };
-
-    await saveDeploymentConfig({ ...config, engine: parsed });
-    await auditLogs.logAction(user.email, "update", "project", projectId, { deploy_engine: parsed, previous_engine: config.engine ?? "script" });
-    revalidatePath(`/projects/${projectId}`);
-    return { success: true, data: { engine: parsed } };
   } catch (error) {
     return failure(error);
   }

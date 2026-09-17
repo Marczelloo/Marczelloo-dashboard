@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, History, Loader2, RotateCcw, Terminal } from "lucide-react";
+import { Bot, History, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { getDeployEngineAction, rollbackProjectAction, setDeployEngineAction } from "@/app/actions/agent-deploy";
+import { getDeployEngineAction, rollbackProjectAction } from "@/app/actions/agent-deploy";
 import { PinDialog } from "@/components/pin-dialog";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 
 type EngineData = NonNullable<Awaited<ReturnType<typeof getDeployEngineAction>>["data"]>;
-type PendingAction = { kind: "engine"; engine: "script" | "agent" } | { kind: "rollback"; sha: string };
+type PendingAction = { kind: "rollback"; sha: string };
 
 const JOB_STATUS: Record<string, string> = { queued: "w kolejce", running: "w toku" };
 const formatDate = (value: string) => new Date(value).toLocaleString("pl-PL");
@@ -33,17 +33,17 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
 
   async function execute(action: PendingAction) {
     setBusy(true);
-    const result = action.kind === "engine" ? await setDeployEngineAction(projectId, action.engine) : await rollbackProjectAction(projectId, action.sha);
+    const result = await rollbackProjectAction(projectId, action.sha);
     setBusy(false);
     if (result.code === "PIN_REQUIRED") {
       setPending(action);
       return;
     }
     if (!result.success) {
-      toast.error(action.kind === "engine" ? "Nie zmieniono silnika wdrożeń" : "Nie zakolejkowano rollbacku", { description: result.error });
+      toast.error("Nie zakolejkowano rollbacku", { description: result.error });
       return;
     }
-    toast.success(action.kind === "engine" ? "Zmieniono silnik wdrożeń" : "Rollback trafił do kolejki agenta");
+    toast.success("Rollback trafił do kolejki agenta");
     await load();
   }
 
@@ -65,27 +65,16 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              {agent ? <Bot className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
-              Silnik wdrożeń
-            </CardTitle>
-            <CardDescription>
-              {agent
-                ? "Agent: kolejka, obrazy z tagiem commita, bramka zdrowia i automatyczny rollback."
-                : "Skrypt: dotychczasowy deploy przez runner, bez bramki zdrowia."}
-            </CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || (!agent && !data.agentConfigured)}
-            onClick={() => execute({ kind: "engine", engine: agent ? "script" : "agent" })}
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {agent ? "Wróć do skryptu" : "Przełącz na agenta"}
-          </Button>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bot className="h-4 w-4" />
+            Wydania
+          </CardTitle>
+          <CardDescription>
+            {agent
+              ? "Agent: kolejka, obrazy z tagiem commita, bramka zdrowia i automatyczny rollback."
+              : "Ten projekt nie jest jeszcze wdrażany przez agenta — zapisz jego konfigurację ponownie."}
+          </CardDescription>
         </CardHeader>
         {agent && (
           <CardContent className="space-y-3 text-sm">

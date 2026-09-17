@@ -7,7 +7,7 @@
 
 import "server-only";
 import type { RunnerRequest, RunnerResponse, NpmOutdatedResult, BackupData } from "@/types";
-import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
+import { shellQuote, validateRepoPath } from "@/server/deployments/paths";
 
 // ========================================
 // Configuration

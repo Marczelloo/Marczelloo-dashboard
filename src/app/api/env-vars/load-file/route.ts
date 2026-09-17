@@ -1,83 +1,30 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
-import { getEnvFilePath, shellQuote } from "@/server/runner/safe-paths";
+import { getEnvFilePath, validateRepoPath } from "@/server/deployments/paths";
 import { parseEnvEntries } from "@/server/env/dotenv";
-
-const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
-const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
-
-interface RunnerResult {
-  success?: boolean;
-  stdout?: string;
-  stderr?: string;
-}
-
-async function callRunner(command: string): Promise<{ response: Response; result: RunnerResult }> {
-  const response = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({ command }),
-  });
-
-  const result = (await response.json().catch(() => ({}))) as RunnerResult;
-  return { response, result };
-}
+import { listAgentEnvFiles, readAgentEnvFile } from "@/server/agent/client";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { repoPath, filename, action } = body;
+
     if (action === "list") {
       await requireAuth();
-    } else {
-      await requirePinVerification();
-    }
-    const target = getEnvFilePath(repoPath, filename);
-
-    if (!RUNNER_TOKEN) {
-      return NextResponse.json({ success: false, error: "Runner not configured" }, { status: 500 });
-    }
-
-    if (action === "list") {
-      const { response, result } = await callRunner(
-        `if [ -d ${shellQuote(target.repoPath)} ]; then ls -1a ${shellQuote(target.repoPath)}/.env* 2>/dev/null | sed 's#^.*/##'; fi`
-      );
-
-      if (!response.ok || !result.success) {
-        return NextResponse.json({ success: true, files: [] });
-      }
-
-      const files = String(result.stdout || "")
-        .split("\n")
-        .map((file) => file.trim())
-        .filter((file) => /^\.env(?:\.[A-Za-z0-9_-]+)?$/.test(file));
-
+      const { files } = await listAgentEnvFiles(validateRepoPath(repoPath)).catch(() => ({ files: [] as string[] }));
       return NextResponse.json({ success: true, files });
     }
 
-    const { filePath } = target;
-    const { response, result } = await callRunner(
-      `if [ -f ${shellQuote(filePath)} ]; then cat ${shellQuote(filePath)}; else exit 44; fi`
-    );
-
-    if (!response.ok) {
-      return NextResponse.json({ success: false, error: "Runner request failed" }, { status: response.status });
+    await requirePinVerification();
+    const target = getEnvFilePath(repoPath, filename);
+    const file = await readAgentEnvFile(target.repoPath, target.filename);
+    if (!file.exists) {
+      return NextResponse.json({ success: false, error: `File not found: ${target.filePath}`, files: [] }, { status: 404 });
     }
 
-    if (!result.success) {
-      return NextResponse.json({ success: false, error: `File not found: ${filePath}`, files: [] }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      vars: parseEnvEntries(String(result.stdout || "")),
-      filePath,
-    });
+    return NextResponse.json({ success: true, vars: parseEnvEntries(file.content), filePath: target.filePath });
   } catch (error) {
-    console.error("[Env Load] Error:", error);
+    console.error("[Env Load] Error:", error instanceof Error ? error.message : "unknown");
 
     if (error instanceof AuthError) {
       return NextResponse.json(

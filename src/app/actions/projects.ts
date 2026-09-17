@@ -3,7 +3,6 @@
 import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
 import { requirePinVerification, requireAuth, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
-import { notifyDeploySuccess, notifyDeployFailed } from "@/server/notifications";
 import {
   createRelease,
   generateReleaseNotes,
@@ -14,17 +13,15 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CreateProjectInput, UpdateProjectInput } from "@/types";
-import { shellQuote, validateRepoPath } from "@/server/runner/safe-paths";
+import { validateRepoPath } from "@/server/deployments/paths";
 import {
   allocateDeploymentPort,
   deleteDeploymentConfig,
   getDeploymentConfig,
-  isDeploymentLogPath,
   listCloudflareTunnelRoutes,
   parseLocalPortFromService,
   preflightDeployment,
   saveDeploymentConfig,
-  startDeploymentJob,
   updateCloudflareTunnelRoute,
   type DeploymentConfig,
   type DeploymentExposure,
@@ -192,32 +189,8 @@ async function queueConfiguredDeployment(
   if (!project) return { success: false, error: "Project not found" };
   let stored = await getDeploymentConfig(projectId);
   if (!stored) return { success: false, error: "Projekt nie ma jeszcze konfiguracji Docker/GitHub." };
+  if (stored.engine !== "agent") return { success: false, error: "Projekt nie jest wdrażany przez agenta. Przełącz silnik wdrożeń na agenta." };
 
-  // Older projects can already have a hostname in the shared cloudflared
-  // ingress file, while their deployment config predates managed routes.
-  // Adopt only an exact match of the project's public URL. This lets the
-  // next manual or webhook deployment transition that project safely without
-  // taking ownership of unrelated, manually maintained ingress entries.
-  let adoptedTunnelRoute: { hostname: string; localPort: number } | null = null;
-  if (!stored.tunnel?.enabled && project.prod_url) {
-    try {
-      const hostname = new URL(project.prod_url).hostname.toLowerCase();
-      const ingress = await listCloudflareTunnelRoutes();
-      const route = ingress.routes.find((candidate) => candidate.hostname.toLowerCase() === hostname);
-      const localPort = route ? parseLocalPortFromService(route.service) ?? 0 : 0;
-      if (Number.isInteger(localPort) && localPort > 0 && localPort <= 65535) {
-        stored = await saveDeploymentConfig({
-          ...stored,
-          exposure: "cloudflare",
-          tunnel: { enabled: true, hostname, localPort },
-        });
-        adoptedTunnelRoute = { hostname, localPort };
-      }
-    } catch {
-      // A malformed legacy URL or an unavailable ingress file must not block
-      // a deployment that was explicitly configured as internal.
-    }
-  }
   let reallocatedPort: number | null = null;
   if (stored.tunnel?.enabled) {
     try {
@@ -241,64 +214,26 @@ async function queueConfiguredDeployment(
   }
 
   const service = await ensureDeploymentService(projectId, project.name, config);
-  if (generatedBuild(config.build) && config.engine !== "agent") {
-    return { success: false, error: "Ten projekt jest budowany bez własnego compose — przełącz go na agenta wdrożeń." };
-  }
-  if (config.engine === "agent") {
-    const queued = await queueAgentDeployment({ config, serviceId: service.id, triggeredBy, commitSha });
-    const logFile = agentLogRef(queued.jobId);
-    await auditLogs.logAction(triggeredBy, "deploy", "project", projectId, {
-      mode: "agent-job",
-      compose_project: config.composeProject,
-      branch: config.branch,
-      sha: queued.sha,
-      deploy_id: queued.deployId,
-      job_id: queued.jobId,
-      tunnel_port_reallocated: reallocatedPort !== null,
-      adopted_existing_tunnel_route: adoptedTunnelRoute,
-    });
-    revalidatePath(`/projects/${projectId}`);
-    revalidatePath("/dashboard");
-    return {
-      success: true,
-      data: {
-        deployId: queued.deployId,
-        logFile,
-        branch: config.branch,
-        output: `Wdrożenie ${queued.sha.slice(0, 7)} trafiło do kolejki agenta.\nLog file: ${logFile}\n\nEtapy: git fetch → Compose config → build → up → bramka zdrowia → rollback przy błędzie.`,
-      },
-    };
-  }
-  const job = await startDeploymentJob(config);
-  const deploy = await deploys.createDeploy({
-    service_id: service.id,
-    triggered_by: triggeredBy,
-    logs_object_key: job.logFile,
-  });
-  await deploys.startDeploy(deploy.id);
+  const queued = await queueAgentDeployment({ config, serviceId: service.id, triggeredBy, commitSha });
+  const logFile = agentLogRef(queued.jobId);
   await auditLogs.logAction(triggeredBy, "deploy", "project", projectId, {
-    mode: "managed-job",
-    repo_path: config.repoPath,
-    compose_file: config.composeFile || "auto-detect",
+    mode: "agent-job",
     compose_project: config.composeProject,
     branch: config.branch,
-    assigned_tunnel_port: config.tunnel?.localPort || null,
+    sha: queued.sha,
+    deploy_id: queued.deployId,
+    job_id: queued.jobId,
     tunnel_port_reallocated: reallocatedPort !== null,
-    adopted_existing_tunnel_route: adoptedTunnelRoute,
-    deploy_id: deploy.id,
-    log_file: job.logFile,
-    pid: job.pid,
   });
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
-
   return {
     success: true,
     data: {
-      deployId: deploy.id,
-      logFile: job.logFile,
+      deployId: queued.deployId,
+      logFile,
       branch: config.branch,
-      output: `Job wdrożeniowy został zakolejkowany.\nLog file: ${job.logFile}\nPID: ${job.pid}\n\nEtapy: clone/pull → Compose validate → build → start → health/routing.`,
+      output: `Wdrożenie ${queued.sha.slice(0, 7)} trafiło do kolejki agenta.\nLog file: ${logFile}\n\nEtapy: git fetch → Compose config → build → up → bramka zdrowia → rollback przy błędzie.`,
     },
   };
 }
@@ -323,7 +258,7 @@ export async function preflightDeploymentAction(input: Omit<DeploymentSetupInput
       exposure: parsed.exposure as DeploymentExposure,
       tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort } : null,
       build: generatedBuild(parsed.build),
-      ...(isAgentConfigured() ? { engine: "agent" as const } : {}),
+      engine: "agent",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -351,9 +286,7 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
       const conflict = await findHostnameConflict("new", parsed.hostname, []);
       if (conflict) return { success: false, error: conflict };
     }
-    if (generatedBuild(parsed.build) && !isAgentConfigured()) {
-      return { success: false, error: "Build bez własnego compose wymaga agenta wdrożeń (brak AGENT_TOKEN)." };
-    }
+    if (!isAgentConfigured()) return { success: false, error: "Agent wdrożeń nie jest skonfigurowany (brak AGENT_TOKEN)." };
 
     const project = await projects.createProject({
       name: parsed.name,
@@ -378,7 +311,7 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
       tunnel: parsed.exposure === "cloudflare" && parsed.hostname && parsed.localPort
         ? { enabled: true, hostname: parsed.hostname, localPort: parsed.localPort }
         : null,
-      ...(isAgentConfigured() ? { engine: "agent" as const } : {}),
+      engine: "agent",
       build: generatedBuild(parsed.build),
     });
     await ensureDeploymentService(project.id, project.name, config);
@@ -682,680 +615,48 @@ export async function updateProjectTunnelAction(
 // Deploy Operations
 // ========================================
 
-const RUNNER_URL = process.env.RUNNER_URL || "http://127.0.0.1:8787";
-const RUNNER_TOKEN = process.env.RUNNER_TOKEN;
-
-// Helper function to detect deployment errors in logs
-function detectDeploymentError(log: string): { hasError: boolean; errorMessage: string | null } {
-  const normalizedLog = log.toLowerCase();
-
-  // The background deploy wrapper writes an explicit terminal marker. It is
-  // authoritative: build output can contain harmless words such as "error"
-  // in dependency notices or compiler summaries.
-  if (/STATUS:\s*SUCCESS/i.test(log)) {
-    return { hasError: false, errorMessage: null };
-  }
-  if (/STATUS:\s*FAILED/i.test(log)) {
-    return { hasError: true, errorMessage: "Docker compose exited with non-zero code" };
-  }
-
-  // Docker/build error patterns
-  const errorPatterns = [
-    { pattern: /error[:\s]+.*build.*failed/i, message: "Build failed" },
-    { pattern: /exited with code [1-9]\d*/i, message: "Container exited with error" },
-    { pattern: /failed to (build|pull|create|start)/i, message: "Docker operation failed" },
-    { pattern: /error during connect/i, message: "Docker connection error" },
-    { pattern: /cannot connect to the docker daemon/i, message: "Docker daemon unreachable" },
-    { pattern: /no space left on device/i, message: "Disk full" },
-    { pattern: /error:\s*enoent/i, message: "File not found" },
-    { pattern: /npm err!/i, message: "NPM error" },
-    { pattern: /yarn error/i, message: "Yarn error" },
-    { pattern: /fatal:/i, message: "Fatal error" },
-    { pattern: /error: failed to solve/i, message: "Docker build failed" },
-    { pattern: /exec \/.*: no such file or directory/i, message: "Entrypoint not found" },
-  ];
-
-  // Success patterns that override errors (e.g., "0 errors" or build success messages)
-  const successPatterns = [
-    /successfully built/i,
-    /successfully tagged/i,
-    /container .+ started/i,
-    /Creating .+ \.\.\. done/i,
-    /0 error/i,
-  ];
-
-  for (const { pattern, message } of errorPatterns) {
-    if (pattern.test(log)) {
-      // Check if it's overridden by success patterns
-      const hasSuccessAfterError = successPatterns.some((sp) => sp.test(log));
-      if (!hasSuccessAfterError) {
-        return { hasError: true, errorMessage: message };
-      }
-    }
-  }
-
-  // Generic error check - but only if no success patterns found
-  if (normalizedLog.includes("error") && !normalizedLog.includes("0 error")) {
-    const hasSuccess = successPatterns.some((sp) => sp.test(log));
-    if (!hasSuccess) {
-      return { hasError: true, errorMessage: "Build completed with errors (check logs)" };
-    }
-  }
-
-  return { hasError: false, errorMessage: null };
-}
-
-/**
- * Internal deploy function that does not require PIN verification.
- * ONLY call this from trusted sources (webhook with verified signature, server-side code).
- * For user-initiated deploys, use deployProjectAction which requires PIN.
- */
-export async function internalDeployProject(
+/** Queue an agent deploy of the project's configured branch (UI and GitHub webhook). */
+export async function deployConfiguredProject(
   id: string,
   triggeredBy: string,
-  options?: {
-    customRepoPath?: string;
-    branch?: string;
-    commitSha?: string;
-  }
-): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; logFile?: string; branch?: string }>> {
-  const customRepoPath = options?.customRepoPath;
-  const branch = options?.branch;
-
-  if (!RUNNER_TOKEN) {
-    return { success: false, error: "Runner not configured (missing RUNNER_TOKEN)" };
-  }
-
-  console.log(
-    `[Deploy] Starting deployment for project ${id}, customPath: ${customRepoPath || "(none)"}, branch: ${branch || "(default)"}, triggeredBy: ${triggeredBy}`
-  );
-  console.log(`[Deploy] Runner URL: ${RUNNER_URL}`);
-
-  // Get project and its services
-  const project = await projects.getProjectById(id);
-  if (!project) {
-    return { success: false, error: "Project not found" };
-  }
-
-  // Existing projects are adopted lazily on their first project-level deploy.
-  // We preserve the legacy service record and only add the new canonical
-  // configuration. A non-Git directory (for example the old Drive import)
-  // still fails preflight instead of being overwritten.
-  const projectServices = await services.getServicesByProjectId(id);
-  // Managed projects use the durable GitHub → Compose job path. The legacy
-  // implementation below remains available only for projects that have not
-  // yet been migrated, so existing production stacks keep working.
-  let managedConfig = await getDeploymentConfig(id);
-  if (!managedConfig && project.github_url) {
-    const legacyDockerService = projectServices.find(
-      (service) => service.type === "docker" && Boolean(service.repo_path) && Boolean(service.compose_project)
-    );
-    if (legacyDockerService?.repo_path && legacyDockerService.compose_project) {
-      try {
-        managedConfig = await saveDeploymentConfig({
-          projectId: project.id,
-          githubUrl: project.github_url,
-          branch: "main",
-          repoPath: legacyDockerService.repo_path,
-          composeFile: null,
-          composeProject: legacyDockerService.compose_project,
-          profiles: [],
-          runtime: legacyDockerService.url ? "web" : "stack",
-          exposure: "internal",
-          tunnel: null,
-        });
-        await auditLogs.logAction(triggeredBy, "sync", "project", project.id, {
-          mode: "legacy-deployment-adoption",
-          service_id: legacyDockerService.id,
-          repo_path: legacyDockerService.repo_path,
-        });
-      } catch (error) {
-        // Keep the old deploy route usable if persistence is temporarily down.
-        console.warn("[Deploy] Legacy configuration adoption skipped:", error);
-      }
-    }
-  }
-  if (managedConfig && !customRepoPath) {
-    return queueConfiguredDeployment(id, triggeredBy, branch, options?.commitSha);
-  }
-
-  // Get project services to link deploy record
-  const primaryService = projectServices.find((s) => s.type === "docker") || projectServices[0];
-
-  // Use custom path if provided
-  let repoPath: string | null = customRepoPath?.trim() || null;
-  let detectedPath: string | undefined;
-
-  if (!repoPath) {
-    // Try to find repo path from services
-    for (const service of projectServices) {
-      if (service.repo_path) {
-        repoPath = service.repo_path;
-        detectedPath = repoPath;
-        console.log(`[Deploy] Found repo_path from service: ${repoPath}`);
-        break;
-      }
-    }
-  }
-
-  // If no repo path from services, try to infer from project name
-  if (!repoPath) {
-    const projectsDir = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/projects";
-    const possiblePaths = [
-      `${projectsDir}/${project.slug}`,
-      `${projectsDir}/${project.name}`,
-      `${projectsDir}/${project.name.replace(/\s+/g, "-")}`,
-    ];
-
-    console.log(`[Deploy] No service repo_path, trying paths:`, possiblePaths);
-
-    // Check which path exists
-    for (const path of possiblePaths) {
-      try {
-        const checkResponse = await fetch(`${RUNNER_URL}/shell`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RUNNER_TOKEN}`,
-          },
-          body: JSON.stringify({
-            command: `test -d ${shellQuote(path)} && echo "EXISTS" || echo "NOT_FOUND"`,
-          }),
-        });
-
-        if (checkResponse.ok) {
-          const result = await checkResponse.json();
-          console.log(`[Deploy] Check ${path}: ${result.stdout?.trim()}`);
-          if (result.stdout?.includes("EXISTS")) {
-            repoPath = path;
-            detectedPath = path;
-            break;
-          }
-        } else {
-          console.log(`[Deploy] Check ${path} failed: ${checkResponse.status}`);
-        }
-      } catch (e) {
-        console.error(`[Deploy] Error checking path ${path}:`, e);
-      }
-    }
-  }
-
-  if (!repoPath) {
-    return {
-      success: false,
-      error: "Could not find project directory. Please enter the repo path manually.",
-    };
-  }
-
-  if (branch && (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith("-") || branch.includes(".."))) {
-    return { success: false, error: "Invalid branch name" };
-  }
-
-  try {
-    repoPath = validateRepoPath(repoPath);
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Invalid repository path" };
-  }
-
-  console.log(`[Deploy] Using path: ${repoPath}`);
-  let output = `=== Deployment Info ===\nProject: ${project.name}\nPath: ${repoPath}\nMode: Background build (to avoid Cloudflare timeout)\nTriggered by: ${triggeredBy}\n\n`;
-
-  // Step 0: Check for docker-compose.yml
-  console.log(`[Deploy] Checking for docker-compose.yml...`);
-  try {
-    const checkComposeResponse = await fetch(`${RUNNER_URL}/shell`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        command: `ls -la ${shellQuote(repoPath)} 2>&1 | head -20`,
-      }),
-    });
-
-    if (checkComposeResponse.ok) {
-      const lsResult = await checkComposeResponse.json();
-      output += `=== Directory Contents ===\n${lsResult.stdout || lsResult.stderr || "No output"}\n\n`;
-      console.log(`[Deploy] Directory listing: ${lsResult.stdout?.substring(0, 200)}`);
-    }
-  } catch (e) {
-    console.error(`[Deploy] Error listing directory:`, e);
-  }
-
-  // Check for compose file
-  const checkComposeResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      command: `test -f ${shellQuote(`${repoPath}/docker-compose.yml`)} && echo "FOUND" || (test -f ${shellQuote(`${repoPath}/docker-compose.yaml`)} && echo "FOUND" || echo "NOT_FOUND")`,
-    }),
-  });
-
-  if (checkComposeResponse.ok) {
-    const checkResult = await checkComposeResponse.json();
-    console.log(`[Deploy] Compose file check: ${checkResult.stdout?.trim()}`);
-    if (checkResult.stdout?.includes("NOT_FOUND")) {
-      return {
-        success: false,
-        error: `No docker-compose.yml found in ${repoPath}`,
-        data: { output, detectedPath },
-      };
-    }
-  } else {
-    const errorText = await checkComposeResponse.text();
-    console.error(`[Deploy] Compose check failed: ${checkComposeResponse.status} - ${errorText}`);
-    return {
-      success: false,
-      error: `Runner error checking compose file: ${checkComposeResponse.status}`,
-      data: { output, detectedPath },
-    };
-  }
-
-  // Step 1a: Git Fetch (always fetch to get latest branches)
-  console.log(`[Deploy] Running git fetch...`);
-  const fetchResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      command: `cd ${shellQuote(repoPath)} && git fetch --all 2>&1`,
-    }),
-  });
-
-  if (fetchResponse.ok) {
-    const fetchResult = await fetchResponse.json();
-    output += `=== Git Fetch ===\n${fetchResult.stdout || fetchResult.stderr || "No output"}\n\n`;
-    console.log(`[Deploy] Git fetch result: ${fetchResult.stdout?.substring(0, 200)}`);
-    if (!fetchResult.success) {
-      return { success: false, error: `Git fetch failed: ${fetchResult.stderr || fetchResult.stdout || "unknown error"}` };
-    }
-  } else {
-    return { success: false, error: `Git fetch request failed (${fetchResponse.status})` };
-  }
-
-  // Step 1b: Git Checkout (if branch specified)
-  if (branch) {
-    console.log(`[Deploy] Checking out branch: ${branch}`);
-    const checkoutResponse = await fetch(`${RUNNER_URL}/shell`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        command: `cd ${shellQuote(repoPath)} && git checkout ${shellQuote(branch)} 2>&1`,
-      }),
-    });
-
-    if (!checkoutResponse.ok) {
-      const error = await checkoutResponse.text();
-      console.error(`[Deploy] Git checkout failed: ${error}`);
-      return { success: false, error: `Git checkout failed: ${error}` };
-    }
-
-    const checkoutResult = await checkoutResponse.json();
-    output += `=== Git Checkout (${branch}) ===\n${checkoutResult.stdout || checkoutResult.stderr || "No output"}\n\n`;
-    console.log(`[Deploy] Git checkout result: ${checkoutResult.stdout?.substring(0, 200)}`);
-  }
-
-  // Step 1c: Git Pull
-  console.log(`[Deploy] Running git pull...`);
-  const pullResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      command: `cd ${shellQuote(repoPath)} && git pull 2>&1`,
-    }),
-  });
-
-  if (!pullResponse.ok) {
-    const error = await pullResponse.text();
-    console.error(`[Deploy] Git pull failed: ${error}`);
-    return { success: false, error: `Git pull failed: ${error}` };
-  }
-
-  const pullResult = await pullResponse.json();
-  output += `=== Git Pull ===\n${pullResult.stdout || pullResult.stderr || "No output"}\n\n`;
-  console.log(`[Deploy] Git pull result: ${pullResult.stdout?.substring(0, 200)}`);
-  if (!pullResult.success) {
-    return { success: false, error: `Git pull failed: ${pullResult.stderr || pullResult.stdout || "unknown error"}` };
-  }
-
-  // Step 2: Check what services and profiles exist in compose file
-  console.log(`[Deploy] Checking compose services and profiles...`);
-  let profileFlags = "";
-
-  const profilesCheckResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      // Don't use 2>&1 here - we only want stdout (profile names), not stderr (warnings)
-      command: `cd "${repoPath}" && docker compose config --profiles 2>/dev/null`,
-    }),
-  });
-
-  if (profilesCheckResponse.ok) {
-    const profilesResult = await profilesCheckResponse.json();
-    // Filter out any lines that don't look like valid profile names
-    // Valid profile names are simple strings: lowercase letters, numbers, hyphens, underscores
-    const validProfilePattern = /^[a-z0-9][a-z0-9_-]*$/i;
-    const profiles = (profilesResult.stdout || "")
-      .trim()
-      .split("\n")
-      .map((line: string) => line.trim())
-      .filter((profile: string) => profile && validProfilePattern.test(profile))
-      // Some Compose files use `never` as a sentinel profile for services
-      // that must stay disabled (for example, a host-managed tunnel). It is
-      // not a deploy target: enabling it can activate an intentionally
-      // incomplete service and make the entire Compose project invalid.
-      .filter((profile: string) => profile.toLowerCase() !== "never");
-    if (profiles.length > 0) {
-      profileFlags = profiles.map((p: string) => `--profile ${p.trim()}`).join(" ");
-      output += `=== Profiles ===\n${profiles.join(", ")}\n\n`;
-      console.log(`[Deploy] Profiles found: ${profiles.join(", ")}`);
-    }
-  }
-
-  const servicesCheckResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      command: `cd "${repoPath}" && docker compose ${profileFlags} config --services 2>/dev/null`,
-    }),
-  });
-
-  if (servicesCheckResponse.ok) {
-    const servicesResult = await servicesCheckResponse.json();
-    output += `=== Available Services ===\n${servicesResult.stdout || servicesResult.stderr || "No services found"}\n\n`;
-    console.log(`[Deploy] Services: ${servicesResult.stdout?.trim()}`);
-  }
-
-  // Step 3: Docker Compose Build and Up (run in background to avoid Cloudflare timeout)
-  console.log(`[Deploy] Running docker compose in background...`);
-  // Use nohup to run in background, redirect output to a log file
-  // The command writes a completion marker at the end so we can detect when it's done
-  const logFile = `/tmp/deploy-${project.slug}-${Date.now()}.log`;
-  // Use simpler bash syntax with && and || to avoid variable capture issues
-  const composeCmd = `cd "${repoPath}" && nohup bash -c 'docker compose ${profileFlags} up -d --build 2>&1 && (echo ""; echo "===[DEPLOY_COMPLETE]==="; echo "STATUS: SUCCESS"; echo "TIMESTAMP: $(date -Iseconds)") || (echo ""; echo "===[DEPLOY_COMPLETE]==="; echo "STATUS: FAILED"; echo "TIMESTAMP: $(date -Iseconds)")' > "${logFile}" 2>&1 &`;
-  console.log(`[Deploy] Command: ${composeCmd}`);
-  console.log(`[Deploy] Log file: ${logFile}`);
-
-  // Create deploy record before starting
-  let deployRecord = null;
-  if (primaryService) {
-    try {
-      deployRecord = await deploys.createDeploy({
-        service_id: primaryService.id,
-        triggered_by: triggeredBy,
-        logs_object_key: logFile, // Store log file path for later retrieval
-      });
-      await deploys.startDeploy(deployRecord.id);
-      console.log(`[Deploy] Created deploy record: ${deployRecord.id}`);
-    } catch (e) {
-      console.error(`[Deploy] Failed to create deploy record:`, e);
-    }
-  }
-
-  const composeResponse = await fetch(`${RUNNER_URL}/shell`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RUNNER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      command: composeCmd,
-    }),
-  });
-
-  if (!composeResponse.ok) {
-    const error = await composeResponse.text();
-    console.error(`[Deploy] Docker compose failed to start: ${error}`);
-    output += `=== Docker Compose ===\nFailed to start: ${error}`;
-
-    // Mark deploy as failed
-    if (deployRecord) {
-      await deploys.completeDeploy(deployRecord.id, false, { error_message: error });
-    }
-
-    return { success: false, error: output };
-  }
-
-  // We don't wait for the build to complete - it runs in background
-  const composeResult = await composeResponse.json();
-  if (!composeResult.success) {
-    const error = composeResult.stderr || composeResult.stdout || "Failed to start background deployment";
-    if (deployRecord) {
-      await deploys.completeDeploy(deployRecord.id, false, { error_message: error });
-    }
-    return { success: false, error };
-  }
-
-  output += `=== Docker Compose ===\nBuild started in background.\nLog file: ${logFile}\n\n`;
-  output += `The build is running in the background. Check container status in a few minutes.\n`;
-  output += `To view build progress, SSH to Pi and run: tail -f ${logFile}\n`;
-  console.log(`[Deploy] Docker compose started in background`);
-
-  // Log the deployment
-  await auditLogs.logAction(triggeredBy, "deploy", "project", id, {
-    project: project.name,
-    repo_path: repoPath,
-    branch: branch || "default",
-    log_file: logFile,
-    background: true,
-    deploy_id: deployRecord?.id,
-  });
-
-  revalidatePath(`/projects/${id}`);
-  revalidatePath("/dashboard");
-
-  return {
-    success: true,
-    data: {
-      output,
-      detectedPath,
-      deployId: deployRecord?.id,
-      branch,
-    },
-  };
+  options?: { branch?: string; commitSha?: string }
+): Promise<ActionResult<{ output: string; deployId: string; logFile: string; branch: string }>> {
+  return queueConfiguredDeployment(id, triggeredBy, options?.branch, options?.commitSha);
 }
 
 export async function deployProjectAction(
   id: string,
-  customRepoPath?: string,
   branch?: string
-): Promise<ActionResult<{ output: string; detectedPath?: string; deployId?: string; logFile?: string; branch?: string }>> {
+): Promise<ActionResult<{ output: string; deployId?: string; logFile?: string; branch?: string }>> {
   try {
-    // Check demo mode
     const demoCheck = checkDemoModeBlocked();
     if (demoCheck.blocked) return demoCheck.result;
 
     const user = await requirePinVerification();
-
-    // Call internal deploy function with user email
-    return await internalDeployProject(id, user.email, { customRepoPath, branch });
+    return await deployConfiguredProject(id, user.email, { branch });
   } catch (error) {
     console.error("deployProjectAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Deployment failed" };
   }
 }
 
-/**
- * Check the status of a background deployment by reading the log file
- */
+/** Log of an agent deploy; deploy records keep `agent:<jobId>` as their log reference. */
 export async function checkDeployLogAction(
   logFile: string,
-  deployId?: string
+  _deployId?: string
 ): Promise<ActionResult<{ log: string; isComplete: boolean }>> {
   try {
     await requireAuth();
 
     const agentJobId = parseAgentLogRef(logFile);
-    if (agentJobId) {
-      const agentLog = await readAgentDeployLog(agentJobId);
-      return { success: true, data: { log: agentLog.log, isComplete: agentLog.isComplete } };
+    if (!agentJobId) {
+      return { success: true, data: { log: "Log tego wdrożenia pochodzi ze starego systemu wdrożeń i nie jest już dostępny.", isComplete: true } };
     }
-
-    if (!RUNNER_TOKEN) {
-      return { success: false, error: "Runner not configured" };
-    }
-
-    // Deployment logs are persistent under PROJECTS_DIR. Older /tmp logs are
-    // still accepted while historical entries are being migrated.
-    if (!isDeploymentLogPath(logFile)) {
-      return { success: false, error: "Invalid log file path" };
-    }
-
-    // Get the log file contents (last 300 lines to ensure we capture the completion marker)
-    const logResponse = await fetch(`${RUNNER_URL}/shell`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RUNNER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        command: `tail -300 ${shellQuote(logFile)} 2>&1 || echo "Log file not found or empty"`,
-      }),
-    });
-
-    if (!logResponse.ok) {
-      return { success: false, error: "Failed to read log file" };
-    }
-
-    const logResult = await logResponse.json();
-    const log = logResult.stdout || logResult.stderr || "No log output";
-
-    // Check for our completion marker in the log
-    // The deploy command writes "===[DEPLOY_COMPLETE]===" when docker compose finishes
-    const hasCompletionMarker = log.includes("===[DEPLOY_COMPLETE]===");
-
-    // A deployment is complete only after the wrapper writes its terminal
-    // marker. A quiet build is still a running build, especially while pnpm
-    // or Docker is downloading dependencies.
-    const isComplete = hasCompletionMarker;
-
-    // Check for explicit status in the completion marker
-    let markerIndicatesSuccess = true;
-    if (hasCompletionMarker) {
-      markerIndicatesSuccess = log.includes("STATUS: SUCCESS");
-    }
-
-    // If complete and we have a deploy ID, update the deploy status and send notifications
-    if (isComplete && deployId) {
-      try {
-        // Use improved error detection combined with marker status
-        const { hasError, errorMessage } = detectDeploymentError(log);
-        // If marker explicitly says FAILED, that overrides error detection
-        const deployFailed = !markerIndicatesSuccess || hasError;
-        const finalErrorMessage = !markerIndicatesSuccess ? "Docker compose exited with non-zero code" : errorMessage;
-
-        // Get the deploy record to check if we've already updated it
-        const existingDeploy = await deploys.getDeployById(deployId);
-        if (existingDeploy && existingDeploy.status !== "success" && existingDeploy.status !== "cancelled") {
-          await deploys.completeDeploy(deployId, !deployFailed, {
-            error_message: finalErrorMessage || undefined,
-          });
-
-          // Get service name for notification
-          const service = existingDeploy.service_id ? await services.getServiceById(existingDeploy.service_id) : null;
-          const serviceName = service?.name || "Unknown Service";
-
-          // Send notification
-          if (deployFailed) {
-            await notifyDeployFailed(serviceName, finalErrorMessage || "Unknown error");
-          } else {
-            await notifyDeploySuccess(serviceName);
-          }
-
-          revalidatePath("/dashboard");
-        }
-      } catch (e) {
-        console.error("[Deploy] Failed to update deploy status:", e);
-      }
-    }
-
-    return { success: true, data: { log, isComplete } };
+    const agentLog = await readAgentDeployLog(agentJobId);
+    return { success: true, data: { log: agentLog.log, isComplete: agentLog.isComplete } };
   } catch (error) {
     console.error("checkDeployLogAction error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to check log" };
-  }
-}
-
-/**
- * Check and update all stale "running" deploys
- * Call this periodically or when viewing dashboard
- */
-export async function refreshRunningDeploysAction(): Promise<ActionResult<{ updated: number }>> {
-  try {
-    await requireAuth();
-
-    if (!RUNNER_TOKEN) {
-      return { success: false, error: "Runner not configured" };
-    }
-
-    // Reconcile both active jobs and formerly false-failed records. An SSH
-    // request can time out after a detached job was successfully started.
-    const runningDeploys = (await deploys.getRecentDeploys(100)).filter(
-      (deploy) => deploy.status === "running" || (deploy.status === "failed" && Boolean(deploy.logs_object_key))
-    );
-
-    if (runningDeploys.length === 0) {
-      return { success: true, data: { updated: 0 } };
-    }
-
-    let updated = 0;
-
-    for (const deploy of runningDeploys) {
-      if (!deploy.logs_object_key || !isDeploymentLogPath(deploy.logs_object_key)) continue;
-
-      try {
-        const logResponse = await fetch(`${RUNNER_URL}/shell`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RUNNER_TOKEN}`,
-          },
-          body: JSON.stringify({ command: `tail -300 ${shellQuote(deploy.logs_object_key)} 2>/dev/null || true` }),
-        });
-        if (!logResponse.ok) continue;
-
-        const logResult = await logResponse.json();
-        const log = String(logResult.stdout || "");
-        if (!log.includes("===[DEPLOY_COMPLETE]===") && !log.includes("DEPLOY_FAILED")) continue;
-
-        const failed = log.includes("STATUS: FAILED") || log.includes("DEPLOY_FAILED");
-        const succeeded = log.includes("STATUS: SUCCESS") && !failed;
-        await deploys.completeDeploy(deploy.id, succeeded, {
-          error_message: failed ? "Deployment log reported failure" : undefined,
-        });
-        updated++;
-      } catch {
-        // A transient runner failure must not turn a still-running deployment into a false success.
-      }
-    }
-
-    if (updated > 0) {
-      revalidatePath("/dashboard");
-    }
-
-    return { success: true, data: { updated } };
-  } catch (error) {
-    console.error("refreshRunningDeploysAction error:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to refresh deploys" };
   }
 }
 

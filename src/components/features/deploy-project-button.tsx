@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Rocket,
   Loader2,
-  FolderOpen,
   RefreshCw,
   CheckCircle2,
   Clock,
@@ -42,7 +40,6 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
   const [isDeploying, setIsDeploying] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [showOutputDialog, setShowOutputDialog] = useState(false);
-  const [customPath, setCustomPath] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [branches, setBranches] = useState<Array<{ name: string; isDefault: boolean }>>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
@@ -218,34 +215,17 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
     toast.info(`Starting deployment for ${projectName}${branchInfo}...`);
 
     try {
-      // Pass custom path and branch if provided
-      const pathToUse = customPath.trim() || undefined;
-      const branchToUse = selectedBranch || undefined;
-      console.log(
-        "[Deploy] Starting deploy with path:",
-        pathToUse || "(auto-detect)",
-        "branch:",
-        branchToUse || "(default)"
-      );
-
-      const result = await deployProjectAction(projectId, pathToUse, branchToUse);
+      const result = await deployProjectAction(projectId, selectedBranch || undefined);
 
       if (result.success && result.data) {
-        let outputText = result.data.output;
-        // If detected path was returned, show it
-        if (result.data.detectedPath && !customPath) {
-          outputText = `Detected path: ${result.data.detectedPath}\n\n${outputText}`;
-        }
-        setOutput(outputText);
+        setOutput(result.data.output);
 
         // Store deploy ID for status updates
         if (result.data.deployId) {
           setDeployId(result.data.deployId);
         }
 
-        const managedLogFile = result.data.logFile;
-        const logMatch = outputText.match(/Log file: (\/[^\s]+\.log)/);
-        const nextLogFile = managedLogFile || logMatch?.[1];
+        const nextLogFile = result.data.logFile;
         if (nextLogFile) {
           setLogFile(nextLogFile);
           toast.success("Build started in background", {
@@ -321,7 +301,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
             <DialogDescription>
               {managedDeployment
                 ? `Managed deployment: ${managedDeployment.repoPath} · Compose ${managedDeployment.composeProject}`
-                : "Configure deployment settings. Leave path empty to auto-detect from service repo_path."}
+                : "Projekt nie ma konfiguracji wdrożenia — utwórz ją w „Deploy z GitHuba”."}
             </DialogDescription>
           </DialogHeader>
 
@@ -381,28 +361,13 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               </div>
             )}
 
-            {!managedDeployment && <div className="space-y-2">
-              <Label htmlFor="repoPath" className="flex items-center gap-2">
-                <FolderOpen className="h-4 w-4" />
-                Repository Path
-              </Label>
-              <Input
-                id="repoPath"
-                placeholder="/home/Marczelloo_pi/projects/my-project"
-                value={customPath}
-                onChange={(e) => setCustomPath(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                The path to the project directory on the Raspberry Pi. Must contain docker-compose.yml.
-              </p>
-            </div>}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleDeploy} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleDeploy} disabled={!managedDeployment} className="bg-primary hover:bg-primary/90">
               <Rocket className="h-4 w-4 mr-2" />
               Deploy
             </Button>

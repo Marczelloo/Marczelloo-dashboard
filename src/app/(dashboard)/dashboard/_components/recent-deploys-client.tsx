@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Rocket, CheckCircle2, XCircle, Clock, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Deploy, Service } from "@/types";
-import { refreshRunningDeploysAction, checkDeployLogAction } from "@/app/actions/projects";
+import { checkDeployLogAction } from "@/app/actions/projects";
 import { DeployLogsButton } from "./deploy-logs-button";
 import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 import { toast } from "sonner";
@@ -131,15 +131,8 @@ export function RecentDeploysClient({ deploys, services }: RecentDeploysClientPr
   }, [hasRunningDeploys, checkRunningDeploys]);
 
   async function handleRefresh() {
-    startTransition(async () => {
-      const result = await refreshRunningDeploysAction();
-      if (result.success) {
-        router.refresh();
-        if ((result.data?.updated ?? 0) > 0) {
-          toast.success(`Updated ${result.data?.updated} deploy(s)`);
-        }
-      }
-    });
+    // Agent jobs report their result through events; refreshing re-reads the deploy records.
+    startTransition(() => router.refresh());
   }
 
   async function handleClearAll() {

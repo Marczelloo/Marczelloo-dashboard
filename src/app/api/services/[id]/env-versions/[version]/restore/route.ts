@@ -3,9 +3,10 @@ import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { queueAgentEnvApply, recordEnvFileVersion } from "@/server/agent/env-apply";
 import { appImport, auditLogs } from "@/server/atlashub";
 import { services } from "@/server/data";
-import { getDeploymentConfig, runHostCommand } from "@/server/deployments";
+import { getDeploymentConfig } from "@/server/deployments";
+import { readAgentEnvFile } from "@/server/agent/client";
 import { AuthError, requirePinVerification } from "@/server/lib/auth";
-import { getEnvFilePath, shellQuote } from "@/server/runner/safe-paths";
+import { getEnvFilePath } from "@/server/deployments/paths";
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string; version: string }> }) {
   try {
@@ -26,12 +27,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (payload.version !== 2) return NextResponse.json({ success: false, error: "Wersji z importu nie da się przywrócić jako plik — zawiera zmienne z kilku źródeł." }, { status: 400 });
 
     const target = getEnvFilePath(config.repoPath, payload.fileName);
-    const read = await runHostCommand(`if [ -f ${shellQuote(target.filePath)} ]; then cat ${shellQuote(target.filePath)}; fi`, 30_000);
-    if (!read.success) return NextResponse.json({ success: false, error: "Nie udało się odczytać bieżącego pliku." }, { status: 502 });
+    const current = (await readAgentEnvFile(target.repoPath, target.filename)).content;
 
-    await recordEnvFileVersion({ projectId: config.projectId, fileName: target.filename, content: read.stdout, note: "Stan pliku przed przywróceniem", createdBy: user.email });
+    await recordEnvFileVersion({ projectId: config.projectId, fileName: target.filename, content: current, note: "Stan pliku przed przywróceniem", createdBy: user.email });
     const restored = await recordEnvFileVersion({ projectId: config.projectId, fileName: target.filename, content: payload.content, note: `Przywrócono wersję ${version}`, createdBy: user.email });
-    const queued = await queueAgentEnvApply({ config, serviceId: id, triggeredBy: user.email, fileName: target.filename, content: payload.content, previous: read.stdout === "" ? null : read.stdout });
+    const queued = await queueAgentEnvApply({ config, serviceId: id, triggeredBy: user.email, fileName: target.filename, content: payload.content, previous: current === "" ? null : current });
     await auditLogs.logAction(user.email, "rollback", "project", config.projectId, { env_file: target.filename, restored_version: version, env_version: restored, deploy_id: queued.deployId, job_id: queued.jobId });
     return NextResponse.json({ success: true, agent: { ...queued, version: restored } });
   } catch (error) {

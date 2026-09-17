@@ -1,224 +1,66 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui";
 import { LiveDeployLogs } from "@/components/features/live-deploy-logs";
 
-interface DeploymentStatus {
-  status: "idle" | "deploying" | "success" | "failed";
-  message?: string;
-  commit?: string;
-  timestamp?: string;
-  canReload?: boolean;
-  step?: string;
-  progress?: number;
-  jobId?: string;
-  logFile?: string;
-  rollback?: boolean;
+interface SelfDeployment {
+  commit: string | null;
+  activeJob: { jobId: string; kind: string; logFile: string } | null;
 }
 
-const SESSION_STORAGE_KEY = "deploy-pending-commit";
-
-export function DeploymentStatusBanner() {
-  const [status, setStatus] = useState<DeploymentStatus>({ status: "idle" });
-  const [visible, setVisible] = useState(false);
-  const [currentCommit, setCurrentCommit] = useState<string | null>(null);
-  const [hasCheckedVersion, setHasCheckedVersion] = useState(false);
+/**
+ * Shows a running agent job for the dashboard itself and offers a reload once
+ * a different release than the one this page was loaded with goes live.
+ */
+export function DeploymentStatusBanner({ loadedCommit }: { loadedCommit: string | null }) {
+  const [deployment, setDeployment] = useState<SelfDeployment | null>(null);
+  const [dismissedCommit, setDismissedCommit] = useState<string | null>(null);
 
   useEffect(() => {
-    const mounted = { current: true };
-
-    async function checkStatus() {
+    let mounted = true;
+    async function check() {
       try {
-        const response = await fetch("/api/deployment/status");
-        if (response.ok) {
-          const data = await response.json();
-          if (mounted.current) {
-            console.log("[DeploymentBanner] Status:", data.status, data.message);
-
-            // If success status has a commit, store it in sessionStorage
-            if (data.status === "success" && data.commit) {
-              const pendingCommit = sessionStorage.getItem(SESSION_STORAGE_KEY);
-              if (!pendingCommit) {
-                // First time seeing this success - store the commit
-                sessionStorage.setItem(SESSION_STORAGE_KEY, data.commit);
-              }
-            }
-
-            setStatus(data);
-
-            if (data.status === "success") {
-              setVisible(true);
-            } else if (data.status === "deploying") {
-              setVisible(true);
-            } else if (data.status === "failed") {
-              setVisible(true);
-              // Auto-dismiss failed status after 10 seconds
-              const timer = setTimeout(() => {
-                if (mounted.current) setVisible(false);
-              }, 10000);
-              return () => clearTimeout(timer);
-            } else {
-              setVisible(false);
-            }
-          }
-        }
-      } catch (e) {
-        console.error("[DeploymentBanner] Error checking status:", e);
+        const response = await fetch("/api/deployment/status", { cache: "no-store" });
+        if (response.ok && mounted) setDeployment((await response.json()) as SelfDeployment);
+      } catch {
+        // The dashboard restarts during its own deploy; the next poll catches up.
       }
     }
-
-    // Check immediately
-    checkStatus();
-
-    // Poll every 3 seconds when visible
-    const interval = setInterval(checkStatus, 3000);
+    void check();
+    const interval = setInterval(check, 10_000);
     return () => {
-      mounted.current = false;
+      mounted = false;
       clearInterval(interval);
     };
   }, []);
 
-  // Check current page version to see if we're on the new deployment
-  useEffect(() => {
-    const mounted = true;
-
-    async function checkVersion() {
-      try {
-        const response = await fetch("/api/version");
-        if (response.ok) {
-          const data = await response.json();
-          if (mounted && data.version?.commit) {
-            setCurrentCommit(data.version.commit);
-            setHasCheckedVersion(true);
-          }
-        }
-      } catch (e) {
-        console.error("[DeploymentBanner] Error checking version:", e);
-      }
-    }
-
-    checkVersion();
-  }, []);
-
-  // Auto-hide banner if we're on the new version
-  useEffect(() => {
-    if (!hasCheckedVersion || !currentCommit) return;
-
-    const pendingCommit = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (
-      pendingCommit &&
-      (currentCommit === pendingCommit || currentCommit.startsWith(pendingCommit) || pendingCommit.startsWith(currentCommit))
-    ) {
-      // We're on the new version! Clear the pending flag and hide banner
-      console.log("[DeploymentBanner] On new version, clearing status");
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      setVisible(false);
-      // Also clear the status file on server
-      fetch("/api/deployment/status", { method: "DELETE" }).catch(() => {});
-    }
-  }, [hasCheckedVersion, currentCommit]);
-
-  if (!visible) return null;
-
-  const getStatusColor = () => {
-    switch (status.status) {
-      case "deploying":
-        return "bg-blue-500/10 border-blue-500/20 text-blue-500";
-      case "success":
-        return "bg-green-500/10 border-green-500/20 text-green-500";
-      case "failed":
-        return "bg-red-500/10 border-red-500/20 text-red-500";
-      default:
-        return "bg-muted/10 border-border text-muted-foreground";
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (status.status) {
-      case "deploying":
-        return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
-      case "success":
-        return <CheckCircle className="h-3.5 w-3.5" />;
-      case "failed":
-        return <XCircle className="h-3.5 w-3.5" />;
-      default:
-        return null;
-    }
-  };
-
-  const handleReload = () => {
-    window.location.reload();
-  };
-
-  const handleDismiss = async () => {
-    setVisible(false);
-    // Clear the pending commit flag and status file
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    try {
-      await fetch("/api/deployment/status", { method: "DELETE" });
-    } catch (e) {
-      console.error("Failed to clear status:", e);
-    }
-  };
+  if (!deployment) return null;
+  const job = deployment.activeJob;
+  const newRelease = !job && loadedCommit && deployment.commit && deployment.commit !== loadedCommit && deployment.commit !== dismissedCommit;
+  if (!job && !newRelease) return null;
 
   return (
-    <div className={`mx-3 mt-2 rounded border px-3 py-2 ${getStatusColor()}`}>
+    <div className={`mx-3 mt-2 rounded border px-3 py-2 ${job ? "border-blue-500/20 bg-blue-500/10 text-blue-500" : "border-green-500/20 bg-green-500/10 text-green-500"}`}>
       <div className="flex items-start gap-2">
-        {getStatusIcon()}
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-medium uppercase">
-            {status.status === "deploying" && "Self-Deploy in Progress"}
-            {status.status === "success" && "Self-Deploy Complete"}
-            {status.status === "failed" && "Self-Deploy Failed"}
-          </p>
-          {status.message && (
-            <p className="text-[10px] opacity-80 truncate mt-0.5">{status.message}</p>
-          )}
-          {status.status === "deploying" && status.progress !== undefined && (
-            <div className="mt-1.5">
-              <div className="flex justify-between text-[9px] opacity-70">
-                <span>{status.step || "working"}</span>
-                <span>{status.progress}%</span>
-              </div>
-              <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-black/10">
-                <div className="h-full rounded-full bg-current transition-[width] duration-500" style={{ width: `${status.progress}%` }} />
-              </div>
-            </div>
-          )}
-          {status.commit && (
-            <p className="text-[9px] opacity-60 font-mono mt-0.5">{status.commit}</p>
-          )}
+        {job ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-medium uppercase">{job ? "Agent wdraża dashboard" : "Nowa wersja dashboardu"}</p>
+          {!job && deployment.commit && <p className="mt-0.5 font-mono text-[9px] opacity-60">{deployment.commit.slice(0, 8)}</p>}
         </div>
-        {status.canReload && status.status === "success" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-[10px] h-auto py-1"
-            onClick={handleReload}
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Reload
-          </Button>
-        )}
-        {status.status !== "deploying" && (
-          <button
-            onClick={handleDismiss}
-            className="text-[10px] opacity-60 hover:opacity-100"
-          >
-            ✕
-          </button>
+        {newRelease && (
+          <>
+            <Button size="sm" variant="ghost" className="h-auto px-2 py-1 text-[10px]" onClick={() => window.location.reload()}>
+              Przeładuj
+            </Button>
+            <button onClick={() => setDismissedCommit(deployment.commit)} className="text-[10px] opacity-60 hover:opacity-100" aria-label="Ukryj">
+              ✕
+            </button>
+          </>
         )}
       </div>
-      {status.logFile && (
-        <LiveDeployLogs
-          logFile={status.logFile}
-          isRunning={status.status === "deploying"}
-          defaultExpanded={status.status === "deploying"}
-          className="mt-2"
-        />
-      )}
+      {job && <LiveDeployLogs logFile={job.logFile} isRunning defaultExpanded={false} className="mt-2" />}
     </div>
   );
 }

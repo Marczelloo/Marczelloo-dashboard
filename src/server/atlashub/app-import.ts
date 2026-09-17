@@ -1,25 +1,13 @@
 import "server-only";
 
-import type { AppConfigRowInput, AppRouteRowInput, EnvVersionPayload } from "@/server/apps/import/persist-rows";
 import type { EnvFileVersionPayload } from "@/server/env/file-versions";
 import { decrypt, encrypt } from "@/server/lib/encryption";
 import * as db from "./client";
-import { jsonbColumns } from "./jsonb";
 
-interface AppConfigRow extends AppConfigRowInput {
-  id: string;
-  created_at: string;
-}
-
-export async function upsertAppConfig(input: AppConfigRowInput): Promise<{ id: string; created: boolean }> {
-  const row = jsonbColumns(input, ["config_files", "source", "processes"]);
-  const existing = await db.select<AppConfigRow>("app_configs", { filters: [{ operator: "eq", column: "project_id", value: input.project_id }], limit: 1 });
-  if (existing.data[0]) {
-    await db.updateById("app_configs", existing.data[0].id, row);
-    return { id: existing.data[0].id, created: false };
-  }
-  const inserted = await db.insert<AppConfigRow>("app_configs", row);
-  return { id: inserted.data[0].id, created: true };
+/** Env set captured by the one-time stage 1 import (kept for history; not restorable as a file). */
+export interface EnvVersionPayload {
+  version: 1;
+  entries: Array<{ key: string; value: string; perService: Record<string, string> | null; origin: string; sourcePath: string | null; services: string[]; secret: boolean }>;
 }
 
 export async function getLatestEnvVersion(projectId: string): Promise<{ version: number; fingerprint: string } | null> {
@@ -75,28 +63,4 @@ export async function getEnvVersionPayload(projectId: string, version: number): 
   });
   const row = response.data[0];
   return row ? (JSON.parse(await decrypt(row.payload_encrypted)) as EnvVersionPayload | EnvFileVersionPayload) : null;
-}
-
-export async function replaceImportedRoutes(rows: AppRouteRowInput[]): Promise<number> {
-  await db.deleteRows("app_routes", [{ operator: "eq", column: "source", value: "imported" }]);
-  if (!rows.length) return 0;
-  const inserted = await db.insert("app_routes", rows.map((row) => jsonbColumns(row, ["origin_request", "target"])));
-  return inserted.data.length;
-}
-
-export async function insertSnapshot(input: { projectId: string | null; kind: string; payload: unknown }): Promise<void> {
-  await db.insert("app_snapshots", {
-    project_id: input.projectId,
-    kind: input.kind,
-    payload_encrypted: await encrypt(JSON.stringify(input.payload)),
-  });
-}
-
-export async function listAppConfigs(): Promise<Array<{ project_id: string; compose_project: string; state: string; updated_at: string }>> {
-  const response = await db.select<{ project_id: string; compose_project: string; state: string; updated_at: string }>("app_configs", {
-    select: ["project_id", "compose_project", "state", "updated_at"],
-    order: { column: "compose_project", direction: "asc" },
-    limit: 200,
-  });
-  return response.data;
 }

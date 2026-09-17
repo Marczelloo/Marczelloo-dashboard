@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEnvFilePath, shellQuote, validateRepoPath } from "./safe-paths";
+import { getEnvFilePath, shellQuote, validateRepoPath } from "./paths";
 
 describe("safe-paths", () => {
   it("quotes single quotes for POSIX shells", () => {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isSecretKey } from "@/server/apps/import/env-plan";
+import { isSecretKey } from "@/server/env/secrets";
 import { parseEnvEntries } from "./dotenv";
 
 /** A whole env file as the editor saved it; version 1 payloads come from the stage 1 import. */
