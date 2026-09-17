@@ -4,27 +4,25 @@ import { Toaster as Sonner } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  return (
-    <Sonner
-      theme="dark"
-      className="toaster group"
-      toastOptions={{
-        classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-zinc-900 group-[.toaster]:text-zinc-100 group-[.toaster]:border-zinc-800 group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-zinc-400",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-zinc-800 group-[.toast]:text-zinc-400",
-          success: "group-[.toaster]:text-green-400 group-[.toaster]:border-green-800",
-          error: "group-[.toaster]:text-red-400 group-[.toaster]:border-red-800",
-          warning: "group-[.toaster]:text-yellow-400 group-[.toaster]:border-yellow-800",
-          info: "group-[.toaster]:text-blue-400 group-[.toaster]:border-blue-800",
-        },
-      }}
-      {...props}
-    />
-  );
-};
+const Toaster = (props: ToasterProps) => (
+  <Sonner
+    theme="dark"
+    position="bottom-right"
+    toastOptions={{
+      classNames: {
+        toast: "!rounded-lg !border !border-line-strong !bg-surface-raised !text-fg !shadow-overlay !font-sans",
+        title: "!text-[13px] !font-medium",
+        description: "!text-xs !text-fg-3",
+        actionButton: "!bg-accent-solid !text-white !rounded-sm",
+        cancelButton: "!bg-surface-hover !text-fg-2 !rounded-sm",
+        success: "[&_[data-icon]]:!text-ok",
+        error: "[&_[data-icon]]:!text-err",
+        warning: "[&_[data-icon]]:!text-warn",
+        info: "[&_[data-icon]]:!text-fg-2",
+      },
+    }}
+    {...props}
+  />
+);
 
 export { Toaster };
