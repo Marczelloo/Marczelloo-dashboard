@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:demo": "node scripts/dev-demo.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -27,6 +28,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.33.0",
+    "geist": "^1.7.2",
     "jose": "^6.2.12",
     "lucide-react": "^0.563.0",
     "next": "^16.1.6",

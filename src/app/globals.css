@@ -4,43 +4,51 @@
 
 @layer base {
   :root {
-    /* Marczelloo Dashboard Dark Theme with Red Accent */
-    --background: 0 0% 4%;
-    --foreground: 0 0% 95%;
+    /* Obsidian Console (docs/brand/brandboard.html). RGB channels so Tailwind opacity modifiers work. */
+    --canvas: 9 9 11;
+    --surface: 17 17 19;
+    --surface-raised: 24 24 27;
+    --surface-hover: 31 31 35;
+    --fg: 237 237 239;
+    --fg-2: 180 180 188;
+    --fg-3: 131 131 140;
+    --fg-4: 86 86 95;
+    --accent: 229 72 77;
+    --accent-solid: 207 51 57;
+    --accent-solid-hover: 217 59 65;
+    --ok: 61 214 140;
+    --warn: 245 165 36;
+    --err: 255 99 105;
+    --line-subtle: rgba(255, 255, 255, 0.055);
+    --line: rgba(255, 255, 255, 0.085);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 95%;
-
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-
-    /* Crimson Red Primary */
-    --primary: 0 72% 51%;
+    /* Legacy shadcn names (HSL channels) mapped onto the tokens. Removed in phase 8. */
+    --background: 240 10% 4%;
+    --foreground: 240 6% 93%;
+    --card: 240 6% 7%;
+    --card-foreground: 240 6% 93%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 240 6% 93%;
+    --primary: 358 62% 50%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 95%;
-
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 60%;
-
-    /* Red accent */
-    --accent: 0 72% 51%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 62% 50%;
+    --secondary: 240 6% 13%;
+    --secondary-foreground: 240 6% 93%;
+    --muted: 240 6% 13%;
+    --muted-foreground: 240 3% 53%;
+    --destructive: 358 100% 69%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 0 72% 51%;
-
-    /* Status colors */
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
-    --danger: 0 72% 51%;
-
-    --radius: 0.5rem;
+    --border: 240 4% 12%;
+    --input: 240 4% 16%;
+    --ring: 358 75% 59%;
+    --success: 151 65% 54%;
+    --warning: 37 91% 55%;
+    --danger: 358 100% 69%;
+    --radius: 10px;
   }
 
   * {
@@ -48,121 +56,103 @@
   }
 
   html {
-    @apply antialiased;
+    color-scheme: dark;
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
+    @apply bg-canvas font-sans text-fg;
+    font-feature-settings: "ss01", "cv11";
   }
 
-  /* Custom scrollbar for dark theme */
+  ::selection {
+    background: rgb(var(--accent) / 0.32);
+    color: #fff;
+  }
+
+  * {
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  }
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
-
   ::-webkit-scrollbar-track {
-    @apply bg-background;
+    background: transparent;
   }
-
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted rounded-full;
+    background: rgba(255, 255, 255, 0.08);
+    border: 3px solid rgb(var(--canvas));
+    border-radius: 10px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+    background: rgba(255, 255, 255, 0.16);
   }
 
-  /* Focus styles */
-  *:focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+  }
+
+  code,
+  kbd,
+  samp,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
-  /* Glass morphism effect */
-  .glass {
-    @apply bg-card/60 backdrop-blur-md border border-border/50;
+  /* Faint console grid behind the top of the app; masked so it fades out. */
+  .dot-grid {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: radial-gradient(ellipse 70% 100% at 60% 0%, #000, transparent 70%);
   }
 
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary to-red-400 bg-clip-text text-transparent;
+  /* Expanding ring behind a live status dot. */
+  .status-live::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgb(var(--accent));
+    animation: live 1.8s var(--ease-out) infinite;
   }
 
-  /* Crimson glow effect */
-  .glow {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
-  }
-
-  .glow-sm {
-    box-shadow: 0 0 10px hsl(var(--primary) / 0.2);
-  }
-
-  /* Status indicator dots */
-  .status-dot {
-    @apply w-2 h-2 rounded-full;
-  }
-
-  .status-dot-online {
-    @apply bg-success;
-    box-shadow: 0 0 8px hsl(var(--success) / 0.5);
-  }
-
-  .status-dot-warning {
-    @apply bg-warning;
-    box-shadow: 0 0 8px hsl(var(--warning) / 0.5);
-  }
-
-  .status-dot-offline {
-    @apply bg-danger;
-    box-shadow: 0 0 8px hsl(var(--danger) / 0.5);
-  }
-
-  /* Card hover effect */
+  /* Legacy helpers still used by pages that are not migrated yet. */
   .card-hover {
-    @apply transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
+    @apply transition-colors duration-quick ease-out hover:border-line-strong;
   }
-
-  /* Skeleton loader */
   .skeleton {
-    @apply bg-muted animate-pulse rounded;
+    @apply animate-shimmer rounded-md bg-[length:300%_100%];
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.085) 40%, rgba(255, 255, 255, 0.04) 80%);
   }
-
-  /* Shimmer effect for loading states */
-  .shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted-foreground) / 0.1) 50%,
-      hsl(var(--muted)) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+  .status-dot {
+    @apply h-2 w-2 rounded-full;
   }
-
-  /* Container */
-  .container-app {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  .status-dot-online {
+    @apply bg-ok;
+  }
+  .status-dot-warning {
+    @apply bg-warn;
+  }
+  .status-dot-offline {
+    @apply bg-err;
   }
 }
 
-@layer utilities {
-  /* Text balance for headings */
-  .text-balance {
-    text-wrap: balance;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
-
-  /* Hide scrollbar */
-  .no-scrollbar::-webkit-scrollbar {
+  .status-live::after {
     display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
 }
