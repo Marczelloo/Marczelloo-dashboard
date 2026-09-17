@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { ShellData } from "@/server/shell";
+import { CommandPalette } from "./command-palette";
 import { MobileDrawer } from "./mobile-drawer";
 import { SelfDeploymentProvider, useSelfDeployment } from "./self-deployment";
 import { Sidebar } from "./sidebar";
@@ -53,6 +54,7 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
           <TopBar onOpenMenu={() => setDrawerOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
           <main className="relative flex-1">{children}</main>
         </div>
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} projects={data.projects} />
       </div>
     </SelfDeploymentProvider>
   );
