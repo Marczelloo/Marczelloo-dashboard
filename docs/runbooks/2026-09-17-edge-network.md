@@ -47,6 +47,23 @@ statyczne i proxy MewBit przechodzą z systemowego Caddy do kontenera `mz-static
 - Kopie: `~/backups/edge-cutover-20260917/ingress-before-edge.json` (trasy sprzed
   zmiany) i `tunnel-docker-compose.host.yml`.
 
+## Bez portów na hoście (2026-09-17)
+
+- Konfiguracja wdrożenia pamięta usługę i port w kontenerze trasy
+  (`tunnel.service`, `tunnel.port`); cel trasy to kontener tej usługi, więc nie
+  jest potrzebny opublikowany port. Dla nowego projektu dashboard ustala je z
+  pliku Compose po pierwszym udanym deployu i dopiero wtedy tworzy trasę.
+- `EDGE_DROP_PORTS=true`: usługi w `mz-edge` dostają `ports: !reset []`, a
+  przydzielanie portów przy deployu jest pomijane.
+- Wykonane dla Tools, Portfolio, Drive, AtlasHub (panel, API, storage) i stacku
+  dashboardu (dashboard, demo, Portainer). Porty `127.0.0.1` zostały tylko dla
+  usług bez domeny: Postgres AtlasHuba, Lavalink i bot MewBit (do lokalnej administracji).
+- Publiczne kody wszystkich domen identyczne jak przed zmianą, webhook działa,
+  zdarzenia agenta przetwarzane (pusta kolejka).
+- Stary systemowy `cloudflared` (tunel `pit`) wyłączony (`disabled`).
+
+Przywrócenie portów: `EDGE_DROP_PORTS=false` w `.env` dashboardu i ponowny deploy projektów.
+
 ## Cofnięcie
 
 1. Przywrócić poprzedni `docker-compose.yml` tunelu (`network_mode: host`) i `docker compose up -d`.
