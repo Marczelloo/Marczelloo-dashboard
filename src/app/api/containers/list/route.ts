@@ -6,11 +6,37 @@
 
 import { NextResponse } from "next/server";
 import { getEndpoints, getContainers, getContainerStatus } from "@/server/portainer/client";
+import { isDemoMode } from "@/lib/demo-mode";
+import { mockContainers, mockEndpoints } from "@/lib/mock-data";
 import { requireAuth } from "@/server/lib/auth";
 
 export async function GET() {
   try {
     await requireAuth();
+
+    if (isDemoMode()) {
+      const endpoint = mockEndpoints[0];
+      // Mock containers carry no compose labels; their names follow "<project>-<service>".
+      const data = mockContainers.map((container) => {
+        const name = container.Names?.[0]?.replace(/^\//, "") ?? container.Id.slice(0, 12);
+        const [composeProject, ...rest] = name.split("-");
+        return {
+          id: container.Id,
+          name,
+          status: container.Status,
+          state: container.State,
+          image: container.Image,
+          ports: (container.Ports ?? []).map((port) => (port.PublicPort ? `${port.PublicPort}:${port.PrivatePort}/${port.Type}` : `${port.PrivatePort}/${port.Type}`)),
+          endpointId: endpoint.Id,
+          endpointName: endpoint.Name,
+          composeProject: rest.length ? composeProject : null,
+          composeService: rest.length ? rest.join("-") : null,
+          labels: {} as Record<string, string>,
+        };
+      });
+      return NextResponse.json({ success: true, data });
+    }
+
     // Get all endpoints
     const endpoints = await getEndpoints();
 
