@@ -29,7 +29,7 @@ describe("toAgentTarget", () => {
       branch: "main",
       composeFile: null,
       profiles: [],
-      tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false },
+      tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false, service: null },
       generatedCompose: null,
       edge: null,
     });

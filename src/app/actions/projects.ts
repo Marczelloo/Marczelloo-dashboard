@@ -17,6 +17,7 @@ import { validateRepoPath } from "@/server/deployments/paths";
 import {
   allocateDeploymentPort,
   deleteDeploymentConfig,
+  edgeSettings,
   getDeploymentConfig,
   listCloudflareTunnelRoutes,
   parseLocalPortFromService,
@@ -30,6 +31,7 @@ import {
 import { queueAgentDeployment, readAgentDeployLog } from "@/server/agent/deploy";
 import { isAgentConfigured } from "@/server/agent/client";
 import { hostnameConflict } from "@/server/deployments/hostname-guard";
+import { parseContainerService } from "@/server/deployments/edge";
 import { validateBuildSpec, type BuildSpec } from "@/server/deployments/detect";
 import { agentLogRef, parseAgentLogRef } from "@/server/agent/refs";
 
@@ -192,7 +194,8 @@ async function queueConfiguredDeployment(
   if (stored.engine !== "agent") return { success: false, error: "Projekt nie jest wdrażany przez agenta. Przełącz silnik wdrożeń na agenta." };
 
   let reallocatedPort: number | null = null;
-  if (stored.tunnel?.enabled) {
+  // Without host ports there is nothing to collide with.
+  if (stored.tunnel?.enabled && !edgeSettings().dropPorts) {
     try {
       const assignedPort = await allocateDeploymentPort(stored.tunnel.localPort, stored.composeProject);
       if (assignedPort !== stored.tunnel.localPort) {
@@ -524,7 +527,7 @@ export async function getProjectTunnelStatusAction(id: string): Promise<ActionRe
     const status = !ingress.configured || ingress.error
       ? "unavailable"
       : config?.tunnel?.enabled
-        ? actualRoute && actualRoute.localPort === config.tunnel.localPort ? "active" : "pending"
+        ? actualRoute && (actualRoute.localPort === config.tunnel.localPort || parseContainerService(actualRoute.service)) ? "active" : "pending"
         : "not_configured";
 
     return {
@@ -560,13 +563,15 @@ export async function updateProjectTunnelAction(
       if (conflict) return { success: false, error: conflict };
     }
     const localPort = parsed.enabled
-      ? await allocateDeploymentPort(parsed.localPort!, existing.composeProject)
+      ? edgeSettings().dropPorts ? parsed.localPort! : await allocateDeploymentPort(parsed.localPort!, existing.composeProject)
       : null;
     const previousTunnel = existing.tunnel?.enabled ? existing.tunnel : null;
-    await saveDeploymentConfig({
+    // The remembered service stays valid while the port is the same.
+    const keptTarget = previousTunnel?.localPort === localPort ? { service: previousTunnel?.service ?? null, port: previousTunnel?.port ?? null } : {};
+    const saved = await saveDeploymentConfig({
       ...existing,
       exposure: parsed.enabled ? "cloudflare" : "internal",
-      tunnel: hostname && localPort ? { enabled: true, hostname, localPort } : null,
+      tunnel: hostname && localPort ? { enabled: true, hostname, localPort, ...keptTarget } : null,
     });
     const nextProdUrl = hostname ? `https://${hostname}` : null;
 
@@ -586,6 +591,7 @@ export async function updateProjectTunnelAction(
           hostname,
           localPort,
           removeHostnames: previousTunnel && previousTunnel.hostname !== hostname ? [previousTunnel.hostname] : [],
+          config: saved,
         });
         changed = result.changed;
       }

@@ -4,8 +4,8 @@ import { agentPreflight, getAgentHost, getAgentStatus } from "@/server/agent/cli
 import { applyManagedRouteUpdate, getManagedTunnelSettings, listManagedRoutes } from "@/server/cloudflare/managed-tunnel";
 import { validateRepoPath } from "@/server/deployments/paths";
 import { getRepositoryCloneToken } from "@/server/github/client";
-import type { DeploymentConfig } from "./config";
-import { bindingForPort, containerService } from "./edge";
+import { saveDeploymentConfig, type DeploymentConfig } from "./config";
+import { bindingForPort, containerService, pickTunnelPort } from "./edge";
 import { pickDeploymentPort, portUsedByOthers } from "./ports";
 
 export const PROJECTS_DIR = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/projects";
@@ -14,9 +14,43 @@ export const PROJECTS_DIR = process.env.PROJECTS_DIR || "/home/Marczelloo_pi/pro
  * EDGE_NETWORK attaches routed containers to the shared network; TUNNEL_ORIGIN=edge
  * makes new routes target containers by name (set once cloudflared runs on that network).
  */
-export function edgeSettings(): { network: string | null; containerOrigins: boolean } {
+export function edgeSettings(): { network: string | null; containerOrigins: boolean; dropPorts: boolean } {
   const network = process.env.EDGE_NETWORK?.trim() || null;
-  return { network, containerOrigins: Boolean(network) && process.env.TUNNEL_ORIGIN === "edge" };
+  const containerOrigins = Boolean(network) && process.env.TUNNEL_ORIGIN === "edge";
+  // EDGE_DROP_PORTS=true: routed services stop publishing host ports at all.
+  return { network, containerOrigins, dropPorts: containerOrigins && process.env.EDGE_DROP_PORTS === "true" };
+}
+
+/**
+ * Remember which service and container port the project's route reaches, so
+ * the origin can be found without a published host port. Read from the
+ * repository's compose file (the dashboard-rendered one names its service "app").
+ */
+export async function ensureTunnelTarget(config: DeploymentConfig): Promise<DeploymentConfig> {
+  const tunnel = config.tunnel;
+  if (!tunnel?.enabled || (tunnel.service && tunnel.port) || !edgeSettings().containerOrigins) return config;
+  let target: { service: string; port: number } | null = null;
+  if (config.build && config.build.kind !== "compose") {
+    target = config.build.port ? { service: "app", port: config.build.port } : null;
+  } else {
+    const probe = await agentPreflight(config.repoPath, config.composeFile);
+    target = pickTunnelPort(probe.ports, tunnel.localPort);
+  }
+  if (!target) return config;
+  return saveDeploymentConfig({ ...config, tunnel: { ...tunnel, service: target.service, port: target.port } });
+}
+
+/** Container origin of the project's route: by remembered service, else by published loopback port. */
+export async function resolveTunnelOrigin(config: DeploymentConfig): Promise<string | null> {
+  const tunnel = config.tunnel;
+  if (!tunnel?.enabled) return null;
+  if (tunnel.service && tunnel.port) {
+    const containers = (await getAgentStatus()).projects[config.composeProject]?.containers ?? [];
+    const matching = containers.filter((container) => container.service === tunnel.service);
+    const container = matching.find((candidate) => candidate.status === "running") ?? matching[0];
+    return container ? containerService(container.name, tunnel.port) : null;
+  }
+  return resolveContainerOrigin(tunnel.localPort);
 }
 
 /** Container origin behind a published loopback port, e.g. 3202 → http://marczelloo-tools:3000. */
@@ -44,6 +78,8 @@ export interface CloudflareRouteUpdate {
   hostname: string | null;
   localPort: number | null;
   removeHostnames?: string[];
+  /** The project the route belongs to; with container origins its service is looked up. */
+  config?: DeploymentConfig;
 }
 
 async function projectContainers(composeProject: string): Promise<string[]> {
@@ -103,7 +139,7 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
   const tunnel = config.tunnel?.enabled ? config.tunnel : null;
   const [probe, portInUse] = await Promise.all([
     agentPreflight(repoPath, generated ? null : config.composeFile),
-    tunnel
+    tunnel && !edgeSettings().dropPorts
       ? Promise.all([getAgentHost(), projectContainers(config.composeProject)]).then(([host, own]) => portUsedByOthers(tunnel.localPort, host.publishedPorts, own))
       : Promise.resolve(false),
   ]);
@@ -146,10 +182,10 @@ export async function updateCloudflareTunnelRoute(update: CloudflareRouteUpdate)
   if (!getManagedTunnelSettings()) throw new Error("Cloudflare API nie jest skonfigurowane (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
   let service: string | null = null;
   if (update.hostname && update.localPort && edgeSettings().containerOrigins) {
-    service = await resolveContainerOrigin(update.localPort);
+    service = update.config ? await resolveTunnelOrigin(update.config) : await resolveContainerOrigin(update.localPort);
     if (!service) throw new Error(`Żaden kontener nie publikuje portu ${update.localPort}, więc trasy ${update.hostname} nie da się skierować na kontener.`);
   }
-  const { changed, dns } = await applyManagedRouteUpdate({ ...update, service });
+  const { changed, dns } = await applyManagedRouteUpdate({ hostname: update.hostname, localPort: update.localPort, removeHostnames: update.removeHostnames, service });
   if (dns.length) console.log(`[Cloudflare] ${dns.join(", ")}`);
   return { changed };
 }

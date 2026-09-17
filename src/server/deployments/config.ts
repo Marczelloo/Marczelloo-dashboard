@@ -10,7 +10,11 @@ export type DeploymentExposure = "internal" | "cloudflare";
 export interface CloudflareTunnelRoute {
   enabled: boolean;
   hostname: string;
+  /** Host port the app publishes; with the edge network, the port used to find the service. */
   localPort: number;
+  /** Compose service and container port the route reaches over the edge network. */
+  service?: string | null;
+  port?: number | null;
 }
 
 /**

@@ -5,7 +5,7 @@ import type { DeploymentConfig } from "@/server/deployments/config";
 import { resolveBranchHead } from "@/server/deployments/commit";
 import type { DeployTarget } from "@agent/types";
 import { edgeServicesForProject } from "@/server/deployments/edge";
-import { edgeSettings, listCloudflareTunnelRoutes, resolveContainerOrigin, updateCloudflareTunnelRoute } from "@/server/deployments/host";
+import { edgeSettings, listCloudflareTunnelRoutes, resolveTunnelOrigin, updateCloudflareTunnelRoute } from "@/server/deployments/host";
 import { getRepositoryCloneToken } from "@/server/github/client";
 import { enqueueAgentJob, getAgentHost, getAgentJob, getAgentStatus, readAgentJobLogToEnd } from "./client";
 import { agentLogRef } from "./refs";
@@ -23,10 +23,12 @@ export async function prepareTunnelProbe(config: DeploymentConfig, createMissing
   if (!config.tunnel?.enabled) return false;
   const ingress = await listCloudflareTunnelRoutes();
   if (!ingress.configured) return false;
-  const expected = edgeSettings().containerOrigins ? await resolveContainerOrigin(config.tunnel.localPort).catch(() => null) : null;
+  const { containerOrigins } = edgeSettings();
+  const expected = containerOrigins ? await resolveTunnelOrigin(config).catch(() => null) : null;
   const state = tunnelRouteState(ingress.routes, config.tunnel, expected);
   if (state === "matches") return true;
-  if (state === "missing" && createMissingRoute) {
+  // A container origin exists only after the first deploy; the route is added when it succeeds.
+  if (state === "missing" && createMissingRoute && !containerOrigins) {
     await updateCloudflareTunnelRoute({ hostname: config.tunnel.hostname, localPort: config.tunnel.localPort });
     return true;
   }
@@ -38,12 +40,12 @@ export async function prepareTunnelProbe(config: DeploymentConfig, createMissing
  * on every job, so a deploy, rollback or env apply never drops them from it.
  */
 export async function resolveEdge(config: DeploymentConfig): Promise<DeployTarget["edge"]> {
-  const { network } = edgeSettings();
+  const { network, dropPorts } = edgeSettings();
   if (!network) return null;
   const [ingress, host, status] = await Promise.all([listCloudflareTunnelRoutes(), getAgentHost(), getAgentStatus()]);
   if (ingress.error) throw new Error(`Nie można ustalić usług dla sieci ${network}: ${ingress.error}`);
   const containers = status.projects[config.composeProject]?.containers ?? [];
-  return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers) };
+  return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers), dropPorts };
 }
 
 export async function queueAgentDeployment(input: { config: DeploymentConfig; serviceId: string; triggeredBy: string; commitSha?: string }): Promise<{ deployId: string; jobId: string; sha: string }> {

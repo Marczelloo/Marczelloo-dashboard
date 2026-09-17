@@ -9,6 +9,8 @@ export function usesGeneratedCompose(config: DeploymentConfig): boolean {
 }
 
 export function toAgentTarget(config: DeploymentConfig, probe = false, edge: DeployTarget["edge"] = null): DeployTarget {
+  // Without host ports the rendered compose publishes nothing; the edge network reaches the app.
+  const publishPort = config.tunnel?.enabled && !edge?.dropPorts ? config.tunnel.localPort : null;
   return {
     projectId: config.projectId,
     composeProject: config.composeProject,
@@ -17,9 +19,9 @@ export function toAgentTarget(config: DeploymentConfig, probe = false, edge: Dep
     branch: config.branch,
     composeFile: config.composeFile,
     profiles: config.profiles,
-    tunnel: config.tunnel?.enabled ? { hostname: config.tunnel.hostname, localPort: config.tunnel.localPort, probe } : null,
+    tunnel: config.tunnel?.enabled ? { hostname: config.tunnel.hostname, localPort: config.tunnel.localPort, probe, service: config.tunnel.service ?? null } : null,
     generatedCompose: usesGeneratedCompose(config)
-      ? renderGeneratedCompose({ spec: config.build!, composeProject: config.composeProject, repoPath: config.repoPath, localPort: config.tunnel?.enabled ? config.tunnel.localPort : null })
+      ? renderGeneratedCompose({ spec: config.build!, composeProject: config.composeProject, repoPath: config.repoPath, localPort: publishPort })
       : null,
     edge,
   };

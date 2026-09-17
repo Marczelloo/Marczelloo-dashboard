@@ -52,6 +52,19 @@ export function edgeServicesForProject(routes: Array<{ service: string }>, bindi
   return [...services].sort();
 }
 
+/**
+ * Service and container port behind a project's tunnel port, with the same
+ * rule the agent uses: the only published port, else the one published on
+ * localPort, else the only port whose container side is localPort.
+ */
+export function pickTunnelPort(ports: Array<{ service: string; published: number | null; target: number }>, localPort: number): { service: string; port: number } | null {
+  const published = ports.filter((entry) => entry.published !== null);
+  const byPublished = published.filter((entry) => entry.published === localPort);
+  const byTarget = ports.filter((entry) => entry.target === localPort);
+  const chosen = published.length === 1 ? published[0] : byPublished.length === 1 ? byPublished[0] : byTarget.length === 1 ? byTarget[0] : null;
+  return chosen ? { service: chosen.service, port: chosen.target } : null;
+}
+
 export interface EdgeTranslation {
   hostname: string | null;
   from: string;

@@ -3,7 +3,7 @@ import "server-only";
 import type { AgentEvent } from "@agent/types";
 import { auditLogs, deploys, projects } from "@/server/atlashub";
 import { getDeploymentConfig } from "@/server/deployments/config";
-import { updateCloudflareTunnelRoute } from "@/server/deployments/host";
+import { ensureTunnelTarget, updateCloudflareTunnelRoute } from "@/server/deployments/host";
 import { notifyDeployFailed, notifyDeploySuccess } from "@/server/notifications";
 import { planDeployUpdate } from "./event-plan";
 
@@ -22,9 +22,10 @@ export async function handleAgentEvent(event: AgentEvent): Promise<void> {
   if (event.type === "job.finished") {
     if (event.status === "succeeded" && event.kind !== "apply-env") {
       // The route may still point at the previous port; switch it only now that the new version is healthy.
-      const config = await getDeploymentConfig(event.projectId);
-      if (config?.engine === "agent" && config.tunnel?.enabled) {
-        await updateCloudflareTunnelRoute({ hostname: config.tunnel.hostname, localPort: config.tunnel.localPort });
+      const stored = await getDeploymentConfig(event.projectId);
+      if (stored?.engine === "agent" && stored.tunnel?.enabled) {
+        const config = await ensureTunnelTarget(stored);
+        await updateCloudflareTunnelRoute({ hostname: config.tunnel!.hostname, localPort: config.tunnel!.localPort, config });
       }
     }
 

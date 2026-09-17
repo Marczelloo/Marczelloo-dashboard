@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { edgeServicesForProject, parseContainerService, translateIngress } from "./edge";
+import { edgeServicesForProject, parseContainerService, pickTunnelPort, translateIngress } from "./edge";
 
 const bindings = [
   { container: "atlashub-dashboard", hostPort: 3000, containerPort: 3001 },
@@ -34,6 +34,20 @@ describe("edgeServicesForProject", () => {
       { name: "atlashub-postgres", service: "postgres" },
     ];
     expect(edgeServicesForProject(routes, bindings, containers)).toEqual(["dashboard", "gateway", "minio"]);
+  });
+});
+
+describe("pickTunnelPort", () => {
+  it("follows the agent's rule for the tunnel service", () => {
+    expect(pickTunnelPort([{ service: "app", published: 3202, target: 3000 }], 9999)).toEqual({ service: "app", port: 3000 });
+    const stack = [
+      { service: "dashboard", published: 3100, target: 3100 },
+      { service: "demo", published: 3101, target: 3101 },
+      { service: "portainer", published: 9201, target: 9000 },
+    ];
+    expect(pickTunnelPort(stack, 3101)).toEqual({ service: "demo", port: 3101 });
+    expect(pickTunnelPort([{ service: "web", published: null, target: 3000 }, { service: "api", published: null, target: 4000 }], 4000)).toEqual({ service: "api", port: 4000 });
+    expect(pickTunnelPort(stack, 1234)).toBeNull();
   });
 });
 
