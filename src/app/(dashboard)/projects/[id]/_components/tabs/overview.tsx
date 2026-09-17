@@ -29,7 +29,7 @@ function Section({ title, icon: Icon, action, children }: { title: string; icon:
 }
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">{children}</div>;
+  return <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3.5 py-2.5 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">{children}</div>;
 }
 
 export function OverviewTab({ detail }: { detail: ProjectDetail }) {
@@ -65,7 +65,7 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
                     {service.name}
                   </Link>
                   {service.url && <span className="truncate font-mono text-[11.5px] text-fg-3">{service.url}</span>}
-                  <span className="ml-auto flex items-center gap-2">
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Chip mono>{service.type}</Chip>
                     {container && <Chip tone={container.status === "running" ? "ok" : "err"}>{container.status}</Chip>}
                   </span>
@@ -92,7 +92,7 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
                 <StatusDot status={DEPLOY_TONE[deploy.status]} />
                 <code className="text-[12.5px] text-fg-2">{deploy.commit_sha?.slice(0, 7) ?? "unknown"}</code>
                 <span className="min-w-0 truncate text-fg-3">{deploy.error_message ?? deploy.triggered_by}</span>
-                <span className="ml-auto flex items-center gap-2 text-[11.5px] text-fg-3">
+                <span className="ml-auto flex shrink-0 items-center gap-2 text-[11.5px] text-fg-3">
                   {formatRelativeTime(deploy.started_at)}
                   <Chip tone={DEPLOY_TONE[deploy.status]}>{deploy.status}</Chip>
                 </span>

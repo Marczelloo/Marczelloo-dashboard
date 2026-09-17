@@ -3,21 +3,27 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Header } from "@/components/layout";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  Button,
-  Input,
-  Label,
-  Badge,
-} from "@/components/ui";
+  FormActions,
+  FormLayout,
+  FormSection,
+} from "@/components/layout/form-layout";
+import { Button, Input, Label, Badge } from "@/components/ui";
+import { Panel } from "@/components/ui/card";
 import { PinDialog } from "@/components/pin-dialog";
 import { createServiceAction } from "@/app/actions/services";
-import { ArrowLeft, Plus, Server, Globe, Cloud, Loader2, Box, Check, Layers } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Server,
+  Globe,
+  Cloud,
+  Loader2,
+  Box,
+  Check,
+  Layers,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface DockerContainer {
@@ -49,20 +55,24 @@ export default function NewServicePage({ params }: NewServicePageProps) {
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [loadingContainers, setLoadingContainers] = useState(false);
   const [containersLoaded, setContainersLoaded] = useState(false);
-  const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
+  const [selectedContainer, setSelectedContainer] =
+    useState<DockerContainer | null>(null);
   const [showContainerPicker, setShowContainerPicker] = useState(false);
   const [addingBatch, setAddingBatch] = useState(false);
 
   // Group containers by compose project
-  const composeProjects = containers.reduce<Record<string, DockerContainer[]>>((acc, container) => {
-    if (container.composeProject) {
-      if (!acc[container.composeProject]) {
-        acc[container.composeProject] = [];
+  const composeProjects = containers.reduce<Record<string, DockerContainer[]>>(
+    (acc, container) => {
+      if (container.composeProject) {
+        if (!acc[container.composeProject]) {
+          acc[container.composeProject] = [];
+        }
+        acc[container.composeProject].push(container);
       }
-      acc[container.composeProject].push(container);
-    }
-    return acc;
-  }, {});
+      return acc;
+    },
+    {},
+  );
 
   const [formData, setFormData] = useState({
     name: "",
@@ -73,7 +83,8 @@ export default function NewServicePage({ params }: NewServicePageProps) {
     portainer_endpoint_id: 0,
     repo_path: "",
     compose_project: "",
-    deploy_strategy: "pull_restart" as "pull_restart" | "pull_rebuild" | "compose_up" | "manual",
+    deploy_strategy: "pull_restart" as
+      "pull_restart" | "pull_rebuild" | "compose_up" | "manual",
   });
 
   // Load containers when Docker type is selected
@@ -103,7 +114,9 @@ export default function NewServicePage({ params }: NewServicePageProps) {
     setSelectedContainer(container);
 
     // Try to derive repo path from compose project (common convention)
-    const repoPath = container.composeProject ? `/home/pi/projects/${container.composeProject}` : "";
+    const repoPath = container.composeProject
+      ? `/home/pi/projects/${container.composeProject}`
+      : "";
 
     setFormData({
       ...formData,
@@ -126,7 +139,9 @@ export default function NewServicePage({ params }: NewServicePageProps) {
     if (!projectContainers || projectContainers.length === 0) return;
 
     setAddingBatch(true);
-    toast.info(`Adding ${projectContainers.length} services from ${composeProjectName}...`);
+    toast.info(
+      `Adding ${projectContainers.length} services from ${composeProjectName}...`,
+    );
 
     const _firstContainer = projectContainers[0];
     const repoPath = `/home/Marczelloo_pi/projects/${composeProjectName}`;
@@ -163,7 +178,8 @@ export default function NewServicePage({ params }: NewServicePageProps) {
 
     if (successCount > 0) {
       toast.success(`Added ${successCount} services`, {
-        description: failCount > 0 ? `${failCount} failed` : `From ${composeProjectName}`,
+        description:
+          failCount > 0 ? `${failCount} failed` : `From ${composeProjectName}`,
       });
       router.push(`/projects/${projectId}`);
     } else {
@@ -183,11 +199,23 @@ export default function NewServicePage({ params }: NewServicePageProps) {
         url: formData.url || undefined,
         health_url: formData.health_url || undefined,
         portainer_endpoint_id:
-          formData.type === "docker" && formData.portainer_endpoint_id ? formData.portainer_endpoint_id : undefined,
-        container_id: formData.type === "docker" ? formData.container_id || undefined : undefined,
-        repo_path: formData.type === "docker" ? formData.repo_path || undefined : undefined,
-        compose_project: formData.type === "docker" ? formData.compose_project || undefined : undefined,
-        deploy_strategy: formData.type === "docker" ? formData.deploy_strategy : undefined,
+          formData.type === "docker" && formData.portainer_endpoint_id
+            ? formData.portainer_endpoint_id
+            : undefined,
+        container_id:
+          formData.type === "docker"
+            ? formData.container_id || undefined
+            : undefined,
+        repo_path:
+          formData.type === "docker"
+            ? formData.repo_path || undefined
+            : undefined,
+        compose_project:
+          formData.type === "docker"
+            ? formData.compose_project || undefined
+            : undefined,
+        deploy_strategy:
+          formData.type === "docker" ? formData.deploy_strategy : undefined,
       });
 
       if (!result.success) {
@@ -231,24 +259,46 @@ export default function NewServicePage({ params }: NewServicePageProps) {
 
   return (
     <>
-      <Header title="Add Service" description="Add a new service to this project">
-        <Link href={`/projects/${projectId}`}>
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-        </Link>
-      </Header>
+      <PageHeader
+        title="Add service"
+        description="Add a new service to this project"
+        actions={
+          <Link href={`/projects/${projectId}`}>
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </Link>
+        }
+      />
 
-      <div className="p-6 max-w-2xl">
+      <PageBody>
         <form onSubmit={handleSubmit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Service Details</CardTitle>
-              <CardDescription>Configure the service type and connection details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          <FormLayout
+            rail={
+              <Panel className="grid gap-2.5 p-3.5">
+                <p className="text-[11px] font-medium text-fg-4">
+                  SERVICE TYPE
+                </p>
+                <p className="text-[13px] text-fg-2">
+                  {formData.type === "docker"
+                    ? "A container running on the Pi."
+                    : formData.type === "vercel"
+                      ? "Deployed elsewhere on Vercel and monitored here."
+                      : "An external service that is only monitored."}
+                </p>
+              </Panel>
+            }
+          >
+            <FormSection
+              title="Service"
+              description="Configure the service type and its connection."
+            >
+              {error && (
+                <div className="rounded-md border border-err/25 bg-err/10 p-3 text-[13px] text-err">
+                  {error}
+                </div>
+              )}
 
               {/* Service Type Selection */}
               <div className="space-y-3">
@@ -259,7 +309,11 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                       key={option.value}
                       type="button"
                       onClick={() =>
-                        setFormData({ ...formData, type: option.value as "docker" | "vercel" | "external" })
+                        setFormData({
+                          ...formData,
+                          type: option.value as
+                            "docker" | "vercel" | "external",
+                        })
                       }
                       className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-center transition-colors ${
                         formData.type === option.value
@@ -268,8 +322,12 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                       }`}
                     >
                       {option.icon}
-                      <span className="font-medium text-sm">{option.label}</span>
-                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                      <span className="font-medium text-sm">
+                        {option.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {option.description}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -282,7 +340,9 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     placeholder="e.g., API Server, Web App, Database"
                     required
                   />
@@ -294,7 +354,9 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                     id="url"
                     type="url"
                     value={formData.url}
-                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, url: e.target.value })
+                    }
                     placeholder="https://example.com"
                   />
                 </div>
@@ -305,61 +367,74 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                     id="health_url"
                     type="url"
                     value={formData.health_url}
-                    onChange={(e) => setFormData({ ...formData, health_url: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, health_url: e.target.value })
+                    }
                     placeholder="https://example.com/health"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Optional endpoint for monitoring. Falls back to main URL if not set.
+                    Optional endpoint for monitoring. Falls back to main URL if
+                    not set.
                   </p>
                 </div>
               </div>
+            </FormSection>
+            {formData.type === "docker" && (
+              <FormSection
+                title="Docker"
+                description="Deployment details for the Pi container."
+              >
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowContainerPicker(!showContainerPicker)}
+                    disabled={loadingContainers}
+                  >
+                    {loadingContainers ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Box className="h-4 w-4" />
+                    )}
+                    {showContainerPicker
+                      ? "Hide Containers"
+                      : "Pick from Docker"}
+                  </Button>
+                </div>
 
-              {/* Docker-specific fields */}
-              {formData.type === "docker" && (
-                <div className="space-y-4 border-t pt-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Docker Configuration</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowContainerPicker(!showContainerPicker)}
-                      disabled={loadingContainers}
-                    >
-                      {loadingContainers ? <Loader2 className="h-4 w-4 animate-spin" /> : <Box className="h-4 w-4" />}
-                      {showContainerPicker ? "Hide Containers" : "Pick from Docker"}
-                    </Button>
-                  </div>
-
-                  {/* Container Picker */}
-                  {showContainerPicker && (
-                    <div className="space-y-4 p-4 rounded-lg border border-border bg-secondary/30 max-h-96 overflow-y-auto">
-                      {loadingContainers ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : containers.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No containers found. Make sure Portainer is connected.
-                        </p>
-                      ) : (
-                        <>
-                          {/* Batch Add by Compose Project */}
-                          {Object.keys(composeProjects).length > 0 && (
-                            <div className="space-y-2 pb-3 border-b border-border">
-                              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                <Layers className="h-3 w-3" />
-                                Quick Add All Services from Project
-                              </p>
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {Object.entries(composeProjects).map(([projectName, projectContainers]) => (
+                {/* Container Picker */}
+                {showContainerPicker && (
+                  <div className="space-y-4 p-4 rounded-lg border border-border bg-secondary/30 max-h-96 overflow-y-auto">
+                    {loadingContainers ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : containers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No containers found. Make sure Portainer is connected.
+                      </p>
+                    ) : (
+                      <>
+                        {/* Batch Add by Compose Project */}
+                        {Object.keys(composeProjects).length > 0 && (
+                          <div className="space-y-2 pb-3 border-b border-border">
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              Quick Add All Services from Project
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {Object.entries(composeProjects).map(
+                                ([projectName, projectContainers]) => (
                                   <Button
                                     key={projectName}
                                     type="button"
                                     variant="outline"
                                     size="sm"
                                     className="justify-start h-auto py-2"
-                                    onClick={() => addAllFromCompose(projectName)}
+                                    onClick={() =>
+                                      addAllFromCompose(projectName)
+                                    }
                                     disabled={addingBatch}
                                   >
                                     {addingBatch ? (
@@ -368,143 +443,188 @@ export default function NewServicePage({ params }: NewServicePageProps) {
                                       <Plus className="h-4 w-4 mr-2" />
                                     )}
                                     <div className="text-left">
-                                      <p className="font-medium">{projectName}</p>
+                                      <p className="font-medium">
+                                        {projectName}
+                                      </p>
                                       <p className="text-xs text-muted-foreground">
-                                        {projectContainers.length} service{projectContainers.length !== 1 ? "s" : ""}
+                                        {projectContainers.length} service
+                                        {projectContainers.length !== 1
+                                          ? "s"
+                                          : ""}
                                       </p>
                                     </div>
                                   </Button>
-                                ))}
-                              </div>
+                                ),
+                              )}
                             </div>
-                          )}
-
-                          {/* Individual container selection */}
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground">Or select individual container</p>
-                            {containers.map((container) => (
-                              <button
-                                key={container.id}
-                                type="button"
-                                onClick={() => selectContainer(container)}
-                                className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
-                                  selectedContainer?.id === container.id
-                                    ? "border-primary bg-primary/10"
-                                    : "border-border hover:border-primary/50 bg-background"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className={`h-2 w-2 rounded-full ${
-                                      container.status === "running"
-                                        ? "bg-success"
-                                        : container.status === "stopped"
-                                          ? "bg-muted-foreground"
-                                          : "bg-warning"
-                                    }`}
-                                  />
-                                  <div>
-                                    <p className="font-medium text-sm">{container.name}</p>
-                                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                      {container.composeProject && (
-                                        <span className="text-primary">[{container.composeProject}] </span>
-                                      )}
-                                      {container.image}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {container.ports.length > 0 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {container.ports[0]}
-                                    </Badge>
-                                  )}
-                                  {selectedContainer?.id === container.id && <Check className="h-4 w-4 text-primary" />}
-                                </div>
-                              </button>
-                            ))}
                           </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Selected container info */}
-                  {selectedContainer && (
-                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm">
-                      <p className="font-medium">Selected: {selectedContainer.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {selectedContainer.composeProject && (
-                          <span>Project: {selectedContainer.composeProject} • </span>
                         )}
-                        Image: {selectedContainer.image} • Endpoint: {selectedContainer.endpointName}
-                      </p>
-                    </div>
-                  )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="container_id">Container ID / Name</Label>
-                    <Input
-                      id="container_id"
-                      value={formData.container_id}
-                      onChange={(e) => setFormData({ ...formData, container_id: e.target.value })}
-                      placeholder="container-name or ID"
-                    />
+                        {/* Individual container selection */}
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Or select individual container
+                          </p>
+                          {containers.map((container) => (
+                            <button
+                              key={container.id}
+                              type="button"
+                              onClick={() => selectContainer(container)}
+                              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
+                                selectedContainer?.id === container.id
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:border-primary/50 bg-background"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`h-2 w-2 rounded-full ${
+                                    container.status === "running"
+                                      ? "bg-success"
+                                      : container.status === "stopped"
+                                        ? "bg-muted-foreground"
+                                        : "bg-warning"
+                                  }`}
+                                />
+                                <div>
+                                  <p className="font-medium text-sm">
+                                    {container.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                    {container.composeProject && (
+                                      <span className="text-primary">
+                                        [{container.composeProject}]{" "}
+                                      </span>
+                                    )}
+                                    {container.image}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {container.ports.length > 0 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {container.ports[0]}
+                                  </Badge>
+                                )}
+                                {selectedContainer?.id === container.id && (
+                                  <Check className="h-4 w-4 text-primary" />
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="repo_path">Repository Path</Label>
-                    <Input
-                      id="repo_path"
-                      value={formData.repo_path}
-                      onChange={(e) => setFormData({ ...formData, repo_path: e.target.value })}
-                      placeholder="/home/pi/projects/my-app"
-                    />
-                    <p className="text-xs text-muted-foreground">Local path to the git repository for deployments</p>
+                {/* Selected container info */}
+                {selectedContainer && (
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-sm">
+                    <p className="font-medium">
+                      Selected: {selectedContainer.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedContainer.composeProject && (
+                        <span>
+                          Project: {selectedContainer.composeProject} •{" "}
+                        </span>
+                      )}
+                      Image: {selectedContainer.image} • Endpoint:{" "}
+                      {selectedContainer.endpointName}
+                    </p>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="compose_project">Compose Project Name</Label>
-                    <Input
-                      id="compose_project"
-                      value={formData.compose_project}
-                      onChange={(e) => setFormData({ ...formData, compose_project: e.target.value })}
-                      placeholder="my-app"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="deploy_strategy">Deploy Strategy</Label>
-                    <select
-                      id="deploy_strategy"
-                      value={formData.deploy_strategy}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          deploy_strategy: e.target.value as "pull_restart" | "pull_rebuild" | "compose_up" | "manual",
-                        })
-                      }
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="pull_restart">Git Pull + Restart Container</option>
-                      <option value="pull_rebuild">Git Pull + Rebuild Image</option>
-                      <option value="compose_up">Docker Compose Up</option>
-                      <option value="manual">Manual Only</option>
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="container_id">Container ID / Name</Label>
+                  <Input
+                    id="container_id"
+                    value={formData.container_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, container_id: e.target.value })
+                    }
+                    placeholder="container-name or ID"
+                  />
                 </div>
-              )}
 
-              <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isLoading}>
-                  <Plus className="h-4 w-4" />
-                  {isLoading ? "Creating..." : "Create Service"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="repo_path">Repository Path</Label>
+                  <Input
+                    id="repo_path"
+                    value={formData.repo_path}
+                    onChange={(e) =>
+                      setFormData({ ...formData, repo_path: e.target.value })
+                    }
+                    placeholder="/home/pi/projects/my-app"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Local path to the git repository for deployments
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="compose_project">Compose Project Name</Label>
+                  <Input
+                    id="compose_project"
+                    value={formData.compose_project}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        compose_project: e.target.value,
+                      })
+                    }
+                    placeholder="my-app"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deploy_strategy">Deploy Strategy</Label>
+                  <select
+                    id="deploy_strategy"
+                    value={formData.deploy_strategy}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        deploy_strategy: e.target.value as
+                          | "pull_restart"
+                          | "pull_rebuild"
+                          | "compose_up"
+                          | "manual",
+                      })
+                    }
+                    className="flex h-8 w-full rounded-sm border border-line-strong bg-canvas px-2.5 text-[13px] text-fg transition-[border-color,box-shadow] duration-quick ease-out hover:border-white/20 focus-visible:border-accent/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/15"
+                  >
+                    <option value="pull_restart">
+                      Git Pull + Restart Container
+                    </option>
+                    <option value="pull_rebuild">
+                      Git Pull + Rebuild Image
+                    </option>
+                    <option value="compose_up">Docker Compose Up</option>
+                    <option value="manual">Manual Only</option>
+                  </select>
+                </div>
+              </FormSection>
+            )}
+
+            <FormActions>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => router.back()}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                <Plus className="h-4 w-4" />
+                {isLoading ? "Creating..." : "Create Service"}
+              </Button>
+            </FormActions>
+          </FormLayout>
         </form>
-      </div>
+      </PageBody>
 
       <PinDialog
         open={showPinDialog}

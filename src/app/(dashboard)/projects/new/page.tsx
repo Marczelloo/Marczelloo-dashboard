@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Header } from "@/components/layout";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { ProjectForm } from "../_components/project-form";
 import { GitHubRepoSelector } from "../_components/github-repo-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,10 +8,9 @@ import { PenLine, Github } from "lucide-react";
 export default function NewProjectPage() {
   return (
     <>
-      <Header title="New Project" description="Create a new project" />
-
-      <div className="p-6">
-        <div className="max-w-3xl mx-auto">
+      <PageHeader title="New project" description="Create a new project" />
+      <PageBody>
+        <div className="mx-auto max-w-[1024px]">
           <Tabs defaultValue="github" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 h-12">
               <TabsTrigger value="github" className="flex items-center gap-2 text-sm">
@@ -35,7 +34,7 @@ export default function NewProjectPage() {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
+      </PageBody>
     </>
   );
 }
