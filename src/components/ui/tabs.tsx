@@ -13,7 +13,7 @@ const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, R
     React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
     const indicator = useIndicator(localRef, '[data-state="active"]');
     return (
-      <TabsPrimitive.List ref={localRef} className={cn("relative flex items-center gap-0.5 overflow-x-auto border-b border-line", className)} {...props}>
+      <TabsPrimitive.List ref={localRef} className={cn("relative flex items-center gap-0.5 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)} {...props}>
         {children}
         {indicator && (
           <span
