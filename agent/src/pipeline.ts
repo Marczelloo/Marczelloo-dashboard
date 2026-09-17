@@ -1,5 +1,5 @@
 import path from "node:path";
-import { buildOverride, composeArgs, loopbackPortOverride, renderOverride, resolveComposeFile, type ComposeConfigJson } from "./compose";
+import { buildOverride, composeArgs, edgeAttachment, loopbackPortOverride, renderOverride, resolveComposeFile, type ComposeConfigJson } from "./compose";
 import { gitAuthEnv, gitCheckoutStep, gitSyncSteps, SHA, type CommandStep } from "./git";
 import { assessContainers, assessProbe, type ContainerSample } from "./health";
 import type { JobOutcome } from "./queue";
@@ -104,6 +104,15 @@ export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<strin
   return null;
 }
 
+/** The edge network is shared by every project, so it is created outside any Compose project. */
+async function ensureEdgeNetwork(job: Job, deps: PipelineDeps): Promise<void> {
+  const network = job.target.edge?.network;
+  if (!network) return;
+  const inspected = await deps.run({ ...dockerStep("Sieć edge", ["network", "inspect", "--format", "{{.Name}}", network], 30_000, true), allowFailure: true });
+  if (inspected.code === 0) return;
+  await runStep(deps, dockerStep(`Tworzenie sieci ${network}`, ["network", "create", network], 30_000));
+}
+
 async function upAndCheck(job: Job, files: string[], deps: PipelineDeps): Promise<string | null> {
   // --pull missing: a service with pull_policy "always" must not replace the image just built.
   await runStep(deps, dockerStep("Uruchomienie", [...composeArgs(job.target, files), "up", "-d", "--no-build", "--pull", "missing"], 10 * 60_000));
@@ -116,7 +125,8 @@ async function restoreRelease(job: Job, release: Release, deps: PipelineDeps): P
   const config = await composeConfig(job, composeFile, deps);
   const port = job.target.tunnel ? loopbackPortOverride(config, job.target.tunnel.localPort) : null;
   const file = overridePath(job, deps);
-  deps.writeFile(file, renderOverride(release.images, port));
+  deps.writeFile(file, renderOverride(release.images, port, edgeAttachment(config, job.target.edge, job.target.tunnel?.localPort ?? null)));
+  await ensureEdgeNetwork(job, deps);
   return upAndCheck(job, [composeFile, file], deps);
 }
 
@@ -203,12 +213,13 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
 
     const composeFile = prepareComposeFile(job, deps);
     const config = await composeConfig(job, composeFile, deps);
-    const override = buildOverride(config, { project: target.composeProject, sha: job.sha, tunnelPort: target.tunnel?.localPort ?? null });
+    const override = buildOverride(config, { project: target.composeProject, sha: job.sha, tunnelPort: target.tunnel?.localPort ?? null, edge: target.edge });
     images = override.images;
     const file = overridePath(job, deps);
     deps.writeFile(file, override.yaml);
     const files = [composeFile, file];
 
+    await ensureEdgeNetwork(job, deps);
     await runStep(deps, dockerStep("Walidacja Compose", [...composeArgs(target, files), "config", "-q"], 120_000));
     await runStep(deps, dockerStep("Build", [...composeArgs(target, files), "build"], 45 * 60_000));
 

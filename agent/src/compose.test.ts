@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOverride, composeArgs, imageRepository, loopbackPortOverride, renderOverride, resolveComposeFile } from "./compose";
+import { buildOverride, composeArgs, edgeAttachment, imageRepository, loopbackPortOverride, renderOverride, resolveComposeFile } from "./compose";
 import type { DeployTarget } from "./types";
 
 const target: DeployTarget = {
@@ -71,6 +71,26 @@ describe("renderOverride and buildOverride", () => {
       'services:\n  "app":\n    image: "marczelloo-tools-app:0123456789ab"\n    ports: !override\n      - "127.0.0.1:3202:3000/tcp"\n'
     );
     expect(renderOverride({}, null)).toBe("services: {}\n");
+  });
+
+  it("attaches edge services to the shared network and keeps their own networks", () => {
+    const config = { services: { app: { build: { context: "." }, networks: { default: null, backend: null } }, db: { image: "postgres:16" } } };
+    const result = buildOverride(config, { project: "p", sha: SHA, tunnelPort: null, edge: { network: "mz-edge", services: ["app"] } });
+    expect(result.yaml).toBe(
+      'services:\n  "app":\n    image: "p-app:0123456789ab"\n    networks:\n      "default": {}\n      "backend": {}\n      "mz-edge": {}\nnetworks:\n  "mz-edge":\n    external: true\n    name: "mz-edge"\n'
+    );
+  });
+
+  it("treats services without explicit networks as using the default one", () => {
+    expect(edgeAttachment({ services: { web: { image: "nginx" } } }, { network: "mz-edge", services: ["web"] })).toEqual({ network: "mz-edge", services: { web: ["default"] } });
+    expect(edgeAttachment({ services: { web: { image: "nginx" } } }, null)).toBeNull();
+    expect(() => edgeAttachment({ services: {} }, { network: "mz-edge", services: ["missing"] })).toThrow(/missing/);
+  });
+
+  it("always attaches the service that publishes the tunnel port", () => {
+    const config = { services: { app: { ports: [{ published: "3202", target: 3000, host_ip: "127.0.0.1" }] }, db: { image: "postgres" } } };
+    expect(edgeAttachment(config, { network: "mz-edge", services: [] }, 3202)).toEqual({ network: "mz-edge", services: { app: ["default"] } });
+    expect(edgeAttachment(config, { network: "mz-edge", services: ["app"] }, 3202)).toEqual({ network: "mz-edge", services: { app: ["default"] } });
   });
 
   it("pins only services that are built from source", () => {

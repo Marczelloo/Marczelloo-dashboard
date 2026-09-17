@@ -21,6 +21,11 @@ export interface DeployTarget {
    * (built from a template or a plain Dockerfile). Missing in older jobs.
    */
   generatedCompose?: string | null;
+  /**
+   * Shared Docker network the tunnel connector reaches containers on. Listed
+   * services join it in addition to their own networks. Missing in older jobs.
+   */
+  edge?: { network: string; services: string[] } | null;
 }
 
 export interface Job {

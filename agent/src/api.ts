@@ -28,6 +28,13 @@ export const deployTargetSchema = z.object({
     .object({ hostname: z.string().regex(/^[a-z0-9.-]+$/).max(253), localPort: z.number().int().min(1).max(65535), probe: z.boolean().default(false) })
     .nullable(),
   generatedCompose: z.string().min(1).max(200_000).nullable().default(null),
+  edge: z
+    .object({
+      network: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/),
+      services: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/)).max(20),
+    })
+    .nullable()
+    .default(null),
 });
 
 export const jobRequestSchema = z.discriminatedUnion("kind", [
