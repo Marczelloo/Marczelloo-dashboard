@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Bell, ExternalLink, CheckCircle, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -67,9 +67,9 @@ export function NotificationsDropdown() {
   return (
     <div className="relative">
       <Button variant="ghost" size="icon" className="relative" onClick={() => setOpen(!open)}>
-        <Bell className="h-4 w-4" />
+        <Bell className="size-4" strokeWidth={1.75} />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+          <span className="absolute right-1 top-1 grid min-w-[16px] place-items-center rounded-full bg-accent-solid px-1 font-mono text-[9.5px] leading-4 text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -81,11 +81,11 @@ export function NotificationsDropdown() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
 
           {/* Dropdown */}
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-border bg-card shadow-lg">
-            <div className="flex items-center justify-between border-b border-border p-3">
-              <h3 className="font-medium">Notifications</h3>
+          <div className="absolute right-0 top-full z-50 mt-2 w-[min(340px,calc(100vw-2rem))] animate-overlay-in overflow-hidden rounded-lg border border-line-strong bg-surface-raised shadow-overlay">
+            <div className="flex items-center justify-between border-b border-line-subtle px-3 py-2.5">
+              <h3 className="text-[13px] font-medium">Notifications</h3>
               {unreadCount > 0 && (
-                <button onClick={markAllRead} className="text-xs text-primary hover:underline">
+                <button onClick={markAllRead} className="text-xs text-fg-3 transition-colors duration-quick hover:text-fg">
                   Mark all read
                 </button>
               )}
@@ -94,10 +94,10 @@ export function NotificationsDropdown() {
             <div className="max-h-80 overflow-y-auto">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <Loader2 className="size-4 animate-spin text-fg-3" strokeWidth={1.75} />
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                <div className="py-8 text-center text-[13px] text-fg-3">No notifications</div>
               ) : (
                 notifications.map((notification) => (
                   <NotificationItem key={notification.id} notification={notification} onClose={() => setOpen(false)} />
@@ -105,14 +105,14 @@ export function NotificationsDropdown() {
               )}
             </div>
 
-            <div className="border-t border-border p-2">
+            <div className="border-t border-line-subtle p-1.5">
               <Link
                 href="/audit-log"
                 onClick={() => setOpen(false)}
-                className="flex items-center justify-center gap-1 rounded p-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                className="flex items-center justify-center gap-1.5 rounded-sm p-2 text-xs text-fg-3 transition-colors duration-quick hover:bg-white/[.04] hover:text-fg"
               >
                 View all activity
-                <ExternalLink className="h-3 w-3" />
+                <ExternalLink className="size-3" strokeWidth={1.75} />
               </Link>
             </div>
           </div>
@@ -126,27 +126,25 @@ function NotificationItem({ notification, onClose }: { notification: Notificatio
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
       case "deploy":
-        return <CheckCircle className="h-4 w-4 text-success" />;
+        return <CheckCircle className="size-4 text-ok" strokeWidth={1.75} />;
       case "alert":
-        return <AlertTriangle className="h-4 w-4 text-warning" />;
+        return <AlertTriangle className="size-4 text-warn" strokeWidth={1.75} />;
       default:
-        return <Bell className="h-4 w-4 text-muted-foreground" />;
+        return <Bell className="size-4 text-fg-3" strokeWidth={1.75} />;
     }
   };
 
   const content = (
     <div
-      className={`flex gap-3 p-3 hover:bg-secondary/50 transition-colors ${
-        !notification.read ? "bg-secondary/20" : ""
-      }`}
+      className={`flex gap-3 px-3 py-2.5 transition-colors duration-quick hover:bg-white/[.04] ${!notification.read ? "bg-white/[.02]" : ""}`}
     >
       <div className="flex-shrink-0 mt-0.5">{getIcon(notification.type)}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{notification.title}</p>
-        <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-        <p className="text-xs text-muted-foreground mt-1">{formatRelativeTime(notification.timestamp)}</p>
+        <p className="text-[13px] font-medium">{notification.title}</p>
+        <p className="line-clamp-2 text-xs text-fg-3">{notification.message}</p>
+        <p className="mt-1 font-mono text-[11px] text-fg-4">{formatRelativeTime(notification.timestamp)}</p>
       </div>
-      {!notification.read && <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1" />}
+      {!notification.read && <span className="mt-1.5 size-[7px] shrink-0 rounded-full bg-accent" />}
     </div>
   );
 
