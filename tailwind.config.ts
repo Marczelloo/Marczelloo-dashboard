@@ -13,7 +13,7 @@ const config: Config = {
         canvas: rgb("canvas"),
         surface: { DEFAULT: rgb("surface"), raised: rgb("surface-raised"), hover: rgb("surface-hover") },
         fg: { DEFAULT: rgb("fg"), 2: rgb("fg-2"), 3: rgb("fg-3"), 4: rgb("fg-4") },
-        accent: { DEFAULT: rgb("accent"), solid: rgb("accent-solid"), "solid-hover": rgb("accent-solid-hover"), foreground: "#ffffff" },
+        accent: { DEFAULT: rgb("accent"), solid: rgb("accent-solid"), "solid-hover": rgb("accent-solid-hover"), text: rgb("accent-text"), foreground: "#ffffff" },
         ok: rgb("ok"),
         warn: rgb("warn"),
         err: rgb("err"),

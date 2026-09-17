@@ -16,6 +16,8 @@
     --accent: 229 72 77;
     --accent-solid: 207 51 57;
     --accent-solid-hover: 217 59 65;
+    /* Readable crimson tint for text on dark surfaces (live states). */
+    --accent-text: 255 159 162;
     --ok: 61 214 140;
     --warn: 245 165 36;
     --err: 255 99 105;

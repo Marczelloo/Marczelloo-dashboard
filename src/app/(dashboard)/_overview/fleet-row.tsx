@@ -61,7 +61,7 @@ export function FleetRow({ row, enterDelay = 0 }: { row: Row; enterDelay?: numbe
         </div>
         <div className="hidden truncate text-[12.5px] text-fg-3 md:block">
           {attention?.kind === "deploying" ? (
-            <span className="text-[#ff9fa2]">deploying…</span>
+            <span className="text-accent-text">deploying…</span>
           ) : row.lastDeploy ? (
             <>
               {formatRelativeTime(row.lastDeploy.at)}

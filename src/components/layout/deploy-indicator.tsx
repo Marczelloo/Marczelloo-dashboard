@@ -30,7 +30,7 @@ export function DeployIndicator() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="flex h-[30px] items-center gap-2 whitespace-nowrap rounded-sm border border-accent/40 bg-accent/10 px-2.5 text-xs text-[#ffb3b5] transition-colors duration-quick hover:bg-accent/15">
+        <button type="button" className="flex h-[30px] items-center gap-2 whitespace-nowrap rounded-sm border border-accent/40 bg-accent/10 px-2.5 text-xs text-accent-text transition-colors duration-quick hover:bg-accent/15">
           <StatusDot status="live" size="sm" />
           <span className="hidden sm:inline">Deploying dashboard</span>
         </button>
