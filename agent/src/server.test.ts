@@ -2,6 +2,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { emptyState } from "./queue";
 import { createAgentServer, type ServerContext } from "./server";
+import { createHostOperations, type HostOperations } from "./host";
 import { assembleAgentStatus } from "./status";
 import type { AgentState, AgentStatus } from "./types";
 
@@ -20,6 +21,16 @@ const target = {
 };
 const deploy = { kind: "deploy", target, sha: "b".repeat(40), deployId: "22222222-2222-4222-8222-222222222222", triggeredBy: "tester", token: "ghs_x" };
 const applyEnv = { kind: "apply-env", target, deployId: deploy.deployId, triggeredBy: "tester", envFile: { name: ".env", content: "SECRET=value", previous: "SECRET=old" } };
+const host: HostOperations = {
+  listEnvFiles: async () => ({ files: [] }),
+  readEnvFile: async () => ({ exists: false, content: "" }),
+  preflight: async () => ({ repoState: "missing", composeFile: null, composeValid: null, services: [], profiles: [] }),
+  getHostInfo: async () => ({
+    hostname: "pi", uptimeSeconds: 1, loadavg: [0, 0, 0], cores: 4,
+    memory: { totalBytes: 1, availableBytes: 1 }, disk: null, temperatureC: null, docker: null, publishedPorts: [],
+  }),
+  restartContainer: async () => ({ ok: true }),
+};
 
 let stop: (() => void) | null = null;
 afterEach(() => {
@@ -27,7 +38,7 @@ afterEach(() => {
   stop = null;
 });
 
-async function start(initial: AgentState = emptyState(), getStatus?: (state: AgentState) => Promise<AgentStatus>) {
+async function start(initial: AgentState = emptyState(), getStatus?: (state: AgentState) => Promise<AgentStatus>, hostOperations: HostOperations = host) {
   let state = initial;
   const tokens = new Map<string, string | null>();
   const envFiles = new Map();
@@ -45,6 +56,7 @@ async function start(initial: AgentState = emptyState(), getStatus?: (state: Age
     now: () => "2026-09-16T10:00:00.000Z",
     newId: () => (ids++ === 0 ? JOB_ID : SECOND_JOB_ID),
     getStatus: getStatus ?? (async (current) => assembleAgentStatus(current, {}, null, null, "2026-09-16T10:00:00.000Z")),
+    host: hostOperations,
   };
   const server = createAgentServer(context);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
@@ -61,6 +73,24 @@ describe("agent HTTP API", () => {
     expect((await call("/health", {}, false)).status).toBe(200);
     expect((await call("/status", {}, false)).status).toBe(401);
     expect((await call("/jobs", { method: "POST", body: JSON.stringify(deploy) }, false)).status).toBe(401);
+    for (const [path, init] of [
+      ["/host", {}],
+      ["/env-files/list", { method: "POST", body: "{}" }],
+      ["/env-files/read", { method: "POST", body: "{}" }],
+      ["/preflight", { method: "POST", body: "{}" }],
+      ["/containers/restart", { method: "POST", body: "{}" }],
+    ] as Array<[string, RequestInit]>) {
+      expect((await call(path, init, false)).status).toBe(401);
+    }
+  });
+
+  it("returns 400 for invalid narrow-operation inputs", async () => {
+    const actualHost = createHostOperations("/projects");
+    const { call } = await start(emptyState(), undefined, actualHost);
+    expect((await call("/env-files/list", { method: "POST", body: JSON.stringify({ repoPath: "/projects/a/../b" }) })).status).toBe(400);
+    expect((await call("/env-files/read", { method: "POST", body: JSON.stringify({ repoPath: "/projects/app", filename: "../.env" }) })).status).toBe(400);
+    expect((await call("/preflight", { method: "POST", body: JSON.stringify({ repoPath: "/projects/app", composeFile: "../compose.yml" }) })).status).toBe(400);
+    expect((await call("/containers/restart", { method: "POST", body: JSON.stringify({ name: "bad name" }) })).status).toBe(400);
   });
 
   it("returns monitoring status with active and latest finished jobs", async () => {

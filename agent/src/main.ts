@@ -11,6 +11,7 @@ import { deliverEvents, httpEventSender } from "./reporter";
 import { createAgentServer } from "./server";
 import { FileStore } from "./store";
 import { createStatusReader } from "./status";
+import { createHostOperations } from "./host";
 import type { AgentState, EnvFile, Job } from "./types";
 
 function requireEnv(name: string): string {
@@ -43,7 +44,8 @@ const mutate = (change: (current: AgentState) => AgentState) => {
 };
 
 const getStatus = createStatusReader(projectsDir);
-createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, envFiles, now: iso, newId: randomUUID, getStatus }).listen(port, "0.0.0.0", () => {
+const host = createHostOperations(projectsDir);
+createAgentServer({ token: agentToken, allowedRoot: projectsDir, getState: () => state, mutate, store, tokens, envFiles, now: iso, newId: randomUUID, getStatus, host }).listen(port, "0.0.0.0", () => {
   console.log(`[agent] listening on :${port}, data in ${dataDir}`);
 });
 

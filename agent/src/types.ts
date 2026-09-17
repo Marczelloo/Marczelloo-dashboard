@@ -98,3 +98,40 @@ export interface AgentStatus {
   disk: { path: string; totalBytes: number; freeBytes: number } | null;
   buildCacheBytes: number | null;
 }
+
+export interface EnvFilesListRequest { repoPath: string }
+export interface EnvFilesListResponse { files: string[] }
+export interface EnvFilesReadRequest { repoPath: string; filename: string }
+export interface EnvFilesReadResponse { exists: boolean; content: string }
+
+export interface PreflightRequest { repoPath: string; composeFile: string | null }
+export interface PreflightResponse {
+  repoState: "missing" | "git" | "directory";
+  composeFile: string | null;
+  composeValid: boolean | null;
+  services: string[];
+  profiles: string[];
+}
+
+export interface PublishedPort {
+  container: string;
+  hostIp: string;
+  hostPort: number;
+  containerPort: number;
+  protocol: string;
+}
+
+export interface HostInfo {
+  hostname: string;
+  uptimeSeconds: number;
+  loadavg: [number, number, number];
+  cores: number;
+  memory: { totalBytes: number; availableBytes: number };
+  disk: { path: string; totalBytes: number; freeBytes: number } | null;
+  temperatureC: number | null;
+  docker: { running: number; stopped: number; images: number } | null;
+  publishedPorts: PublishedPort[];
+}
+
+export interface RestartContainerRequest { name: string }
+export interface RestartContainerResponse { ok: true }

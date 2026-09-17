@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { jobRequestSchema } from "./api";
 import { enqueue, rollbackRelease } from "./queue";
+import { HostOperationError, type HostOperations } from "./host";
 import type { FileStore } from "./store";
 import type { AgentState, AgentStatus, EnvFile, Job } from "./types";
 
@@ -16,6 +17,7 @@ export interface ServerContext {
   now(): string;
   newId(): string;
   getStatus(state: AgentState): Promise<AgentStatus>;
+  host: HostOperations;
 }
 
 function authorized(header: string | undefined, token: string): boolean {
@@ -61,6 +63,13 @@ export function createAgentServer(context: ServerContext): http.Server {
       if (!authorized(request.headers.authorization, context.token)) return send(response, 401, { error: "Unauthorized" });
 
       if (request.method === "GET" && url.pathname === "/status") return send(response, 200, await context.getStatus(context.getState()));
+
+      if (request.method === "GET" && url.pathname === "/host") return send(response, 200, await context.host.getHostInfo());
+
+      if (request.method === "POST" && url.pathname === "/env-files/list") return send(response, 200, await context.host.listEnvFiles(await readBody(request)));
+      if (request.method === "POST" && url.pathname === "/env-files/read") return send(response, 200, await context.host.readEnvFile(await readBody(request)));
+      if (request.method === "POST" && url.pathname === "/preflight") return send(response, 200, await context.host.preflight(await readBody(request)));
+      if (request.method === "POST" && url.pathname === "/containers/restart") return send(response, 200, await context.host.restartContainer(await readBody(request)));
 
       if (request.method === "POST" && url.pathname === "/jobs") {
         const parsed = jobRequestSchema.safeParse(await readBody(request));
@@ -116,6 +125,7 @@ export function createAgentServer(context: ServerContext): http.Server {
 
       return send(response, 404, { error: "Not found" });
     } catch (error) {
+      if (error instanceof HostOperationError) return send(response, error.status, { error: error.message });
       return send(response, 500, { error: error instanceof Error ? error.message : "Błąd agenta." });
     }
   });

@@ -18,6 +18,7 @@ services:
       AGENT_BUILD_CACHE_MAX: ${AGENT_BUILD_CACHE_MAX:-10GB}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/hostname:/etc/host-hostname:ro
       # Mounted under the same absolute path as on the host: Compose resolves
       # relative bind mounts and records config_files labels against it.
       - ${PROJECTS_DIR:-/home/Marczelloo_pi/projects}:${PROJECTS_DIR:-/home/Marczelloo_pi/projects}
