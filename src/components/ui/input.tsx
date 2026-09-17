@@ -3,19 +3,17 @@ import { cn } from "@/lib/utils";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
-  return (
-    <input
-      type={type}
-      className={cn(
-        "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
-      ref={ref}
-      {...props}
-    />
-  );
-});
+export const fieldClass =
+  "w-full rounded-sm border border-line-strong bg-canvas px-2.5 text-[13px] text-fg placeholder:text-fg-4 transition-[border-color,box-shadow] duration-quick ease-out hover:border-white/20 focus-visible:border-accent/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/15 aria-[invalid=true]:border-err/50 disabled:cursor-not-allowed disabled:opacity-50";
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => (
+  <input
+    type={type}
+    className={cn(fieldClass, "flex h-8 file:border-0 file:bg-transparent file:text-[13px] file:font-medium file:text-fg", className)}
+    ref={ref}
+    {...props}
+  />
+));
 Input.displayName = "Input";
 
 export { Input };
