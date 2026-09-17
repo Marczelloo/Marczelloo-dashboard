@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Marczelloo Dashboard">
-  <rect width="64" height="64" rx="14" fill="#dc2626" />
-  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="1.5" />
-  <path fill="#fff" d="M15 45V19h8l9 12.5L41 19h8v26h-8V31.5l-9 12-9-12V45H15Z" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="Marczelloo Dashboard">
+  <rect width="16" height="16" rx="3.8" fill="#111113"/>
+  <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" fill="none" stroke="#ededef" stroke-opacity=".22" stroke-width="1.6"/>
+  <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" fill="none" stroke="#ededef" stroke-width="1.6" stroke-dasharray="24.51 40.85"/>
+  <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="3" fill="none" stroke="#e5484d" stroke-width="1.6" stroke-dasharray="6.54 40.85" stroke-dashoffset="-25.74"/>
+  <path fill="#ededef" d="M5.4 10.3V5.7h1.25L8 7.6l1.35-1.9h1.25v4.6H9.4V7.75L8 9.6 6.6 7.75v2.55Z"/>
 </svg>
