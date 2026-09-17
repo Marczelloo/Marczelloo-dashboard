@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
 import { Badge, Button, Card, CardContent } from "@/components/ui";
 import { DeployProjectButton } from "@/components/features/deploy-project-button";
 import { ProjectDetailTabs } from "./_components/project-detail-tabs";
@@ -79,7 +77,6 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     <>
       <Header title={project.name} description={project.description || `/${project.slug}`}>
         <div className="flex items-center gap-2">
-          <PageInfoButton {...PAGE_INFO.projectDetail} />
           <Link href="/projects">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4" />

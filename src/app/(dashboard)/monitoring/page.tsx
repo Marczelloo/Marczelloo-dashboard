@@ -2,11 +2,10 @@ import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton, Button } from "@/components/ui";
 import { StatusDot } from "@/components/status-dot";
-import { RefreshCw, ExternalLink, AlertTriangle, Activity } from "lucide-react";
+import { RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { isDemoMode, checkDemoModeBlocked } from "@/lib/demo-mode";
 import { services, uptimeChecks } from "@/server/data";
@@ -31,31 +30,20 @@ async function runMonitoringChecks() {
 
 export default function MonitoringPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Activity className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Monitoring</h1>
-              <p className="text-sm text-muted-foreground">Domeny, kontenery, certyfikaty i dysk Pi</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <PageInfoButton {...PAGE_INFO.monitoring} />
-            <form action={runMonitoringChecks}>
-              <Button variant="outline" size="sm" type="submit">
+    <>
+      <PageHeader
+        title="Monitoring"
+        description="Domains, containers, certificates, and Pi disk"
+        actions={
+          <form action={runMonitoringChecks}>
+            <Button variant="secondary" size="sm" type="submit">
                 <RefreshCw className="h-4 w-4" />
                 Run Checks
-              </Button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 p-6 space-y-6">
+            </Button>
+          </form>
+        }
+      />
+      <PageBody className="space-y-6">
         <Suspense fallback={<StatsSkeleton />}>
           {isDemoMode() ? <MonitoringStats /> : <MonitorOverview />}
         </Suspense>
@@ -64,8 +52,8 @@ export default function MonitoringPage() {
         <Suspense fallback={<MonitoringListSkeleton />}>
           <MonitoringList />
         </Suspense>
-      </div>
-    </div>
+      </PageBody>
+    </>
   );
 }
 

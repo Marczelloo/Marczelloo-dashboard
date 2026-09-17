@@ -4,8 +4,6 @@ import { useState, useEffect, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
 import {
   Card,
   CardContent,
@@ -325,7 +323,6 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
         description={service ? `Created ${formatDateTime(service.created_at)}` : ""}
       >
         <div className="flex items-center gap-2">
-          <PageInfoButton {...PAGE_INFO.serviceDetail} />
           <Link href={backLink}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4" />

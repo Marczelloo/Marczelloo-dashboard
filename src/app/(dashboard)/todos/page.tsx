@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, Button, Input, Textarea, Badge, Skeleton } from "@/components/ui";
 import {
   Dialog,
@@ -13,7 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Check, Trash2, Edit2, Loader2, Calendar, Flag, RefreshCw, ListChecks } from "lucide-react";
+import { Plus, Check, Trash2, Edit2, Loader2, Calendar, Flag, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   getTodosAction,
@@ -174,32 +173,23 @@ export default function TodosPage() {
   const completedTodos = todos.filter((t) => t.status === "completed");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <ListChecks className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Todos</h1>
-              <p className="text-sm text-muted-foreground">General task list</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <PageInfoButton {...PAGE_INFO.todos} />
-            <Button variant="outline" size="sm" onClick={fetchTodos}>
+    <>
+      <PageHeader
+        title="Tasks"
+        description="General task list"
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={fetchTodos}>
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Button size="sm" onClick={openAddDialog}>
               <Plus className="h-4 w-4 mr-1" />
               Add Todo
             </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 p-6 space-y-6">
+          </>
+        }
+      />
+      <PageBody className="space-y-6">
         {/* Filter Tabs */}
         <div className="flex gap-2">
           {(["all", "active", "completed"] as const).map((f) => (
@@ -305,8 +295,6 @@ export default function TodosPage() {
             </CardContent>
           </Card>
         )}
-      </div>
-
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
@@ -367,6 +355,7 @@ export default function TodosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageBody>
+    </>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import {
   Card,
   CardContent,
@@ -26,7 +25,6 @@ import {
   Clock,
   Key,
   Github,
-  Settings,
 } from "lucide-react";
 import { PinDialog } from "@/components/pin-dialog";
 import { CloudflareTunnelSettings } from "./_components/cloudflare-tunnel-settings";
@@ -47,23 +45,9 @@ interface PortInfo {
 
 export default function SettingsPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Settings className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Settings</h1>
-              <p className="text-sm text-muted-foreground">Configure your dashboard connections</p>
-            </div>
-          </div>
-          <PageInfoButton {...PAGE_INFO.settings} />
-        </div>
-      </header>
-
-      <div className="flex-1 p-6 space-y-6 max-w-4xl">
+    <>
+      <PageHeader title="Settings" description="Configure your dashboard connections" />
+      <PageBody className="max-w-4xl space-y-6">
         <EnvironmentInfo />
         <GitHubSettings />
         <CloudflareTunnelSettings />
@@ -71,8 +55,8 @@ export default function SettingsPage() {
         <PortainerSettings />
         <PortTrackerSettings />
         <NotificationSettings />
-      </div>
-    </div>
+      </PageBody>
+    </>
   );
 }
 

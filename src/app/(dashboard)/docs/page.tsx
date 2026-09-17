@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@/components/ui";
 import {
   Database,
@@ -331,23 +330,20 @@ export default function DocsPage() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="shrink-0 border-b border-border/50 bg-card/30 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <PageHeader
+          title="Documentation"
+          description="Setup guides and reference for Marczelloo Dashboard"
+          actions={
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSidebarOpen(!sidebarOpen)}>
               {sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Documentation</h1>
-              <p className="text-xs text-muted-foreground">Setup guides and reference for Marczelloo Dashboard</p>
-            </div>
-          </div>
-          <PageInfoButton {...PAGE_INFO.docs} />
-        </header>
+          }
+        />
 
         {/* Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-8">
+        <div ref={contentRef} className="flex-1 overflow-y-auto">
+          <PageBody>
+            <div className="max-w-4xl mx-auto space-y-8">
             {/* Getting Started */}
             <Section id="overview" title="Overview" icon={Globe}>
               <p className="text-muted-foreground mb-4">
@@ -760,7 +756,8 @@ SMTP_PASS=app_password`}
               </ul>
 
             </Section>
-          </div>
+            </div>
+          </PageBody>
         </div>
       </main>
     </div>

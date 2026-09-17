@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Skeleton, Button } from "@/components/ui";
 import { services, projects } from "@/server/data";
-import { Plus, Server } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ServicesList } from "./_components/services-list";
 
 // Force dynamic rendering (no static prerendering)
@@ -36,31 +35,20 @@ async function ServicesContent() {
 
 export default function ServicesPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Server className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Services</h1>
-              <p className="text-sm text-muted-foreground">All services across your infrastructure</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <PageInfoButton {...PAGE_INFO.services} />
-            <Link href="/services/new">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Service
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 p-6">
+    <>
+      <PageHeader
+        title="Services"
+        description="All services across your infrastructure"
+        actions={
+          <Link href="/services/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Service
+            </Button>
+          </Link>
+        }
+      />
+      <PageBody>
         <Suspense
           fallback={
             <div className="space-y-4">
@@ -75,7 +63,7 @@ export default function ServicesPage() {
         >
           <ServicesContent />
         </Suspense>
-      </div>
-    </div>
+      </PageBody>
+    </>
   );
 }

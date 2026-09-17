@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, Button, Badge } from "@/components/ui";
 import {
   Cpu,
@@ -180,18 +179,9 @@ export default function PiMetricsPage() {
   // Loading State
   if (loading && !metrics) {
     return (
-      <div className="flex min-h-screen">
-        <main className="flex-1 flex flex-col min-w-0">
-          <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <div className="space-y-1">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            </div>
-          </header>
-          <div className="flex-1 overflow-y-auto p-6">
+      <>
+          <PageHeader title="Host" />
+          <PageBody>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-48 rounded-xl" />
@@ -202,9 +192,8 @@ export default function PiMetricsPage() {
                 <Skeleton key={i} className="h-64 rounded-xl" />
               ))}
             </div>
-          </div>
-        </main>
-      </div>
+          </PageBody>
+      </>
     );
   }
 
@@ -232,73 +221,26 @@ export default function PiMetricsPage() {
   if (!metrics) return null;
 
   const tempStatus = metrics.temperature !== null ? getTemperatureStatus(metrics.temperature) : null;
-  const overallHealth =
-    metrics.cpu.usage < 85 && metrics.memory.usagePercent < 85 && metrics.disk.usagePercent < 85
-      ? "healthy"
-      : metrics.cpu.usage < 95 && metrics.memory.usagePercent < 95 && metrics.disk.usagePercent < 95
-        ? "warning"
-        : "critical";
-
   return (
-    <div className="flex min-h-screen">
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Status Indicator */}
-              <div
-                className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-xl",
-                  overallHealth === "healthy" && "bg-green-500/10",
-                  overallHealth === "warning" && "bg-yellow-500/10",
-                  overallHealth === "critical" && "bg-red-500/10"
-                )}
-              >
-                <Server
-                  className={cn(
-                    "h-6 w-6",
-                    overallHealth === "healthy" && "text-green-500",
-                    overallHealth === "warning" && "text-yellow-500",
-                    overallHealth === "critical" && "text-red-500"
-                  )}
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-lg font-semibold">{metrics.hostname}</h1>
-                  <Badge
-                    variant={
-                      overallHealth === "healthy" ? "success" : overallHealth === "warning" ? "warning" : "danger"
-                    }
-                    className="text-xs"
-                  >
-                    {overallHealth === "healthy" ? "Healthy" : overallHealth === "warning" ? "Warning" : "Critical"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="font-mono">{metrics.network.ip}</span>
-                  <span>•</span>
-                  <span>Up {metrics.uptime}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
+    <>
+        <PageHeader
+          title="Host"
+          description={metrics.hostname}
+          actions={
+            <>
               {lastUpdated && (
                 <span className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</span>
               )}
-              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+              <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={loading}>
                 <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
                 Refresh
               </Button>
-              <PageInfoButton {...PAGE_INFO.pi} />
-            </div>
-          </div>
-        </header>
+            </>
+          }
+        />
 
         {/* Content */}
-        <div className="flex-1 p-6">
+        <PageBody>
           <div className="space-y-6">
             {/* Primary Metrics Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -590,8 +532,7 @@ export default function PiMetricsPage() {
               </CardContent>
             </Card>
           </div>
-        </div>
-      </main>
-    </div>
+        </PageBody>
+    </>
   );
 }

@@ -1,37 +1,19 @@
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
-import { PageInfoButton } from "@/components/layout/page-info-button";
-import { PAGE_INFO } from "@/lib/page-info";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { DashboardStats } from "./dashboard/_components/dashboard-stats";
 import { RecentActivity } from "./dashboard/_components/recent-activity";
 import { ServiceStatus } from "./dashboard/_components/service-status";
 import { QuickActions } from "./dashboard/_components/quick-actions";
 import { RecentDeploysServer } from "./dashboard/_components/recent-deploys";
 import { Skeleton } from "@/components/ui";
-import { LayoutDashboard } from "lucide-react";
 
 export default function DashboardPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="shrink-0 border-b border-border/50 bg-card/30 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <LayoutDashboard className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Overview of your projects and services</p>
-            </div>
-          </div>
-          <PageInfoButton {...PAGE_INFO.dashboard} />
-        </div>
-      </header>
-
-      {/* Content */}
-      <div className="flex-1 p-6 space-y-6">
+    <>
+      <PageHeader title="Dashboard" description="Overview of your projects and services" />
+      <PageBody className="space-y-6">
         {/* Stats Cards */}
         <Suspense fallback={<StatsSkeletons />}>
           <DashboardStats />
@@ -62,8 +44,8 @@ export default function DashboardPage() {
             <RecentActivity />
           </Suspense>
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </>
   );
 }
 
