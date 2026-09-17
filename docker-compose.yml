@@ -42,6 +42,7 @@ services:
       # Shared network cloudflared reaches containers on; TUNNEL_ORIGIN=edge routes by container name
       - EDGE_NETWORK=${EDGE_NETWORK:-}
       - TUNNEL_ORIGIN=${TUNNEL_ORIGIN:-loopback}
+      - EDGE_DROP_PORTS=${EDGE_DROP_PORTS:-false}
 
       # App Configuration
       - OWNER_EMAILS=${OWNER_EMAILS}
