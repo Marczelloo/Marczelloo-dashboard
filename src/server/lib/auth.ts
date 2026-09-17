@@ -50,6 +50,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Check if the current user's email is in the allowlist
  */
 export async function isAllowedUser(): Promise<boolean> {
+  // Demo mode has no owner allowlist: the demo user may read everything and
+  // every mutation is blocked separately (checkDemoModeBlocked).
+  if (isDemoMode()) return true;
   const user = await getCurrentUser();
   return Boolean(user && isOwnerEmail(user.email));
 }
