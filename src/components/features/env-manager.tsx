@@ -11,6 +11,12 @@ import {
   Input,
   Label,
   Badge,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui";
 import {
   Plus,
@@ -472,9 +478,9 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       isSecret: newIsSecret,
     };
 
-    // Check for duplicate
+    // Check for duplicate — reported as a toast so it is visible over the dialog
     if (workingVars.some((v) => v.key === newVar.key)) {
-      setError(`Variable ${newVar.key} already exists`);
+      toast.error(`${newVar.key} already exists in this file`);
       return;
     }
 
@@ -768,56 +774,59 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </div>
         )}
 
-        {/* Add Form */}
-        {showAddForm && (
-          <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Key</Label>
+        {/* Add dialog */}
+        <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add variable</DialogTitle>
+              <DialogDescription>
+                It is added to the working copy of {selectedFile}; nothing reaches the service until you save.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3.5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="env-key">Key</Label>
                 <Input
+                  id="env-key"
                   value={newKey}
-                  onChange={(e) =>
-                    setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))
-                  }
+                  onChange={(e) => setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
                   placeholder="DATABASE_URL"
                   className="font-mono"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newKey.trim()) handleAdd();
+                  }}
                 />
               </div>
-              <div>
-                <Label>Value</Label>
+              <div className="grid gap-1.5">
+                <Label htmlFor="env-value">Value</Label>
                 <Input
+                  id="env-value"
                   type={newIsSecret ? "password" : "text"}
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
-                  placeholder="Enter value..."
+                  placeholder="Enter value…"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newKey.trim()) handleAdd();
+                  }}
                 />
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={newIsSecret}
-                  onChange={(e) => setNewIsSecret(e.target.checked)}
-                  className="rounded"
-                />
-                Mask in UI
+              <label className="flex items-center gap-2 text-[13px] text-fg-2">
+                <input type="checkbox" checked={newIsSecret} onChange={(e) => setNewIsSecret(e.target.checked)} className="rounded" />
+                Mask the value in the dashboard
               </label>
-              <div className="flex-1" />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowAddForm(false)}
-              >
+            </div>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setShowAddForm(false)}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAdd} disabled={!newKey.trim()}>
+              <Button onClick={handleAdd} disabled={!newKey.trim()}>
                 <Plus className="h-4 w-4" />
-                Add
+                Add variable
               </Button>
-            </div>
-          </div>
-        )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Loading State */}
         {loading ? (

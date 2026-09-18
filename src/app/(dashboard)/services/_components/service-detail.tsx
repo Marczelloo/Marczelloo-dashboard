@@ -348,7 +348,7 @@ export function ServiceDetail({ serviceId, backHref, backLabel }: { serviceId: s
 
           <TabsContent value="overview" className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
             {managed ? (
-              <LogConsole sources={logSources} height="h-[300px]" />
+              <LogConsole sources={logSources} height="h-[min(42vh,320px)]" />
             ) : (
               <Panel>
                 <EmptyState
@@ -404,7 +404,7 @@ export function ServiceDetail({ serviceId, backHref, backLabel }: { serviceId: s
 
           {managed && (
             <TabsContent value="logs">
-              <LogConsole sources={logSources} height="h-[560px]" />
+              <LogConsole sources={logSources} />
             </TabsContent>
           )}
 

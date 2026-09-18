@@ -53,10 +53,11 @@ function parseLine(raw: string, source: string, index: number): LogLine | null {
  * Container logs for one service or merged across a whole project.
  * Merged output is ordered by timestamp, so a request crossing services reads in order.
  */
-export function LogConsole({ sources, className, height = "h-[440px]" }: { sources: LogSource[]; className?: string; height?: string }) {
+export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(100vh-430px),620px)]" }: { sources: LogSource[]; className?: string; height?: string }) {
   const [scope, setScope] = useState<string>("all");
   const [tail, setTail] = useState<(typeof TAILS)[number]>("300");
   const [filter, setFilter] = useState("");
+  const [level, setLevel] = useState<"all" | "warn" | "err">("all");
   const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,10 +110,16 @@ export function LogConsole({ sources, className, height = "h-[440px]" }: { sourc
     return () => clearInterval(timer);
   }, [live, load]);
 
+  const problems = useMemo(() => ({ warn: lines.filter((line) => line.tone !== "default").length, err: lines.filter((line) => line.tone === "err").length }), [lines]);
+
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return needle ? lines.filter((line) => line.text.toLowerCase().includes(needle)) : lines;
-  }, [filter, lines]);
+    return lines.filter((line) => {
+      if (level === "err" && line.tone !== "err") return false;
+      if (level === "warn" && line.tone === "default") return false;
+      return !needle || line.text.toLowerCase().includes(needle);
+    });
+  }, [filter, level, lines]);
 
   useEffect(() => {
     const node = scroller.current;
@@ -128,7 +135,7 @@ export function LogConsole({ sources, className, height = "h-[440px]" }: { sourc
   }
 
   return (
-    <Panel className={cn("flex flex-col overflow-hidden", className)}>
+    <Panel className={cn("flex flex-col self-start overflow-hidden", className)}>
       <div className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-3 py-2.5">
         <h2 className="flex items-center gap-2 text-[13.5px] font-semibold">
           <ScrollText className="size-4 text-fg-3" strokeWidth={1.75} />
@@ -144,6 +151,16 @@ export function LogConsole({ sources, className, height = "h-[440px]" }: { sourc
         )}
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter lines" className="h-[26px] w-[130px] flex-1 text-xs sm:flex-none" aria-label="Filter log lines" />
+          <SegmentedControl<"all" | "warn" | "err">
+            aria-label="Only problems"
+            value={level}
+            onChange={setLevel}
+            options={[
+              { value: "all", label: "All" },
+              { value: "warn", label: "Problems", count: problems.warn },
+              { value: "err", label: "Errors", count: problems.err },
+            ]}
+          />
           <SegmentedControl<(typeof TAILS)[number]> aria-label="Lines to read" value={tail} onChange={setTail} options={TAILS.map((value) => ({ value, label: value }))} />
           <Button variant={live ? "primary" : "secondary"} size="sm" onClick={() => setLive((value) => !value)} aria-pressed={live}>
             {live ? <Chip tone="live">live</Chip> : "Live"}
@@ -154,7 +171,7 @@ export function LogConsole({ sources, className, height = "h-[440px]" }: { sourc
         </div>
       </div>
 
-      <div ref={scroller} className={cn("flex-1 overflow-auto bg-canvas px-3 py-2 font-mono text-[11.5px] leading-[1.65]", height)}>
+      <div ref={scroller} className={cn("overflow-auto bg-canvas px-3 py-2 font-mono text-[11.5px] leading-[1.65]", height)}>
         {error ? (
           <p className="py-8 text-center text-[13px] text-err">{error}</p>
         ) : loading && !lines.length ? (
@@ -177,7 +194,7 @@ export function LogConsole({ sources, className, height = "h-[440px]" }: { sourc
       <div className="flex items-center justify-between gap-3 border-t border-line-subtle px-3 py-2 text-[11px] text-fg-3">
         <span className="tabular-nums">
           {visible.length} {visible.length === 1 ? "line" : "lines"}
-          {filter && lines.length !== visible.length ? ` of ${lines.length}` : ""}
+          {lines.length !== visible.length ? ` of ${lines.length}` : ""}
         </span>
         <span className="tabular-nums">{fetchedAt ? `read at ${fetchedAt}${live ? " · refreshing every 10 s" : ""}` : ""}</span>
       </div>

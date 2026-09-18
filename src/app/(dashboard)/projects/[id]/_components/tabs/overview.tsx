@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GitBranch, Globe, ListChecks, Plus, Rocket, Server } from "lucide-react";
+import { NewTaskButton } from "@/components/features/new-task-button";
 import { StatusDot } from "@/components/status-dot";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -113,12 +114,12 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
           title="Open tasks"
           icon={ListChecks}
           action={
-            <Button size="sm" variant="secondary" asChild>
-              <Link href={`/projects/${project.id}/work-items/new`}>
-                <Plus strokeWidth={1.75} />
-                New task
+            <span className="flex items-center gap-3">
+              <Link href={`/projects/${project.id}/work-items`} className="text-xs text-fg-3 hover:text-fg">
+                Board
               </Link>
-            </Button>
+              <NewTaskButton projectId={project.id} variant="secondary" />
+            </span>
           }
         >
           {open.length === 0 ? (

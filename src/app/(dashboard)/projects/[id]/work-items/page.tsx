@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { Button, Chip, EmptyState, Panel, SegmentedControl, Skeleton } from "@/components/ui";
 import { StatusDot } from "@/components/status-dot";
+import { newTaskDraft, TaskDialog } from "@/components/features/task-dialog";
 import { getWorkItemsByProjectAction, updateWorkItemAction } from "@/app/actions/work-items";
 import { AlertCircle, ArrowLeft, CheckCircle2, Circle, Clock, GripVertical, ListChecks, Plus } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types";
@@ -21,17 +22,19 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
   const [items, setItems] = useState<WorkItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "open" | "done">("all");
+  const [adding, setAdding] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    const result = await getWorkItemsByProjectAction(projectId);
+    if (result.success && result.data) {
+      setItems(result.data);
+    }
+    setIsLoading(false);
+  }, [projectId]);
 
   useEffect(() => {
-    async function loadItems() {
-      const result = await getWorkItemsByProjectAction(projectId);
-      if (result.success && result.data) {
-        setItems(result.data);
-      }
-      setIsLoading(false);
-    }
-    loadItems();
-  }, [projectId]);
+    void loadItems();
+  }, [loadItems]);
 
   const filteredItems = items.filter((item) => {
     if (filter === "open") return item.status !== "done";
@@ -97,11 +100,9 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
                 Back to project
               </Link>
             </Button>
-            <Button asChild>
-              <Link href={`/projects/${projectId}/work-items/new`}>
-                <Plus strokeWidth={1.75} />
-                New task
-              </Link>
+            <Button onClick={() => setAdding(true)}>
+              <Plus strokeWidth={1.75} />
+              New task
             </Button>
           </>
         }
@@ -171,17 +172,17 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
               title="No tasks yet"
               description="Track bugs, changes and todos here; drag a card between columns to change its status."
               action={
-                <Button size="sm" asChild>
-                  <Link href={`/projects/${projectId}/work-items/new`}>
-                    <Plus strokeWidth={1.75} />
-                    New task
-                  </Link>
+                <Button size="sm" onClick={() => setAdding(true)}>
+                  <Plus strokeWidth={1.75} />
+                  New task
                 </Button>
               }
             />
           </Panel>
         )}
       </PageBody>
+
+      {adding && <TaskDialog initial={newTaskDraft(projectId)} onClose={() => setAdding(false)} onSaved={() => void loadItems()} />}
     </>
   );
 }

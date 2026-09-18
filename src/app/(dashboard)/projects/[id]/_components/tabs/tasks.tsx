@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Columns3, ListChecks, Plus } from "lucide-react";
+import { Columns3, ListChecks } from "lucide-react";
+import { NewTaskButton } from "@/components/features/new-task-button";
 import { StatusDot } from "@/components/status-dot";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -25,11 +26,7 @@ export function TasksTab({ projectId, items }: { projectId: string; items: WorkI
           icon={ListChecks}
           title="No tasks yet"
           description="Track bugs, changes and todos for this project here; they also appear in the global Tasks view."
-          action={
-            <Button size="sm" variant="secondary" asChild>
-              <Link href={`/projects/${projectId}/work-items/new`}>New task</Link>
-            </Button>
-          }
+          action={<NewTaskButton projectId={projectId} variant="secondary" />}
         />
       </Panel>
     );
@@ -47,12 +44,7 @@ export function TasksTab({ projectId, items }: { projectId: string; items: WorkI
             Open board
           </Link>
         </Button>
-        <Button size="sm" asChild>
-          <Link href={`/projects/${projectId}/work-items/new`}>
-            <Plus strokeWidth={1.75} />
-            New task
-          </Link>
-        </Button>
+        <NewTaskButton projectId={projectId} />
       </div>
       <div className={cn("grid gap-4", groups.length > 1 && "md:grid-cols-2")}>
         {groups.map(({ status, label, items: group }) => {

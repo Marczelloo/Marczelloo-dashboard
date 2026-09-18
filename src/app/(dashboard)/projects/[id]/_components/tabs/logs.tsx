@@ -19,5 +19,5 @@ export function LogsTab({ services }: { services: Service[] }) {
     [services]
   );
 
-  return <LogConsole sources={sources} height="h-[560px]" />;
+  return <LogConsole sources={sources} />;
 }

@@ -5,30 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createTodoAction, deleteTodoAction, updateTodoAction } from "@/app/actions/todos";
-import { createWorkItemAction, deleteWorkItemAction, updateWorkItemAction } from "@/app/actions/work-items";
+import { deleteTodoAction, updateTodoAction } from "@/app/actions/todos";
+import { deleteWorkItemAction, updateWorkItemAction } from "@/app/actions/work-items";
+import { draftOf, newTaskDraft, TaskDialog, type TaskDraft } from "@/components/features/task-dialog";
 import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { StatusDot } from "@/components/status-dot";
-import {
-  Button,
-  Chip,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  EmptyState,
-  Input,
-  Panel,
-  SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@/components/ui";
+import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import { parseTaskKey, type TaskList, type TaskPriority, type TaskRow, type TaskStatus } from "@/lib/tasks";
@@ -43,30 +25,6 @@ type Filter = "all" | TaskStatus;
 
 const isOverdue = (task: TaskRow) => Boolean(task.dueDate) && task.status !== "done" && task.dueDate!.slice(0, 10) < new Date().toISOString().slice(0, 10);
 
-interface Draft {
-  key: string | null;
-  source: TaskRow["source"];
-  projectId: string;
-  kind: string;
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  status: TaskStatus;
-  dueDate: string;
-}
-
-const emptyDraft = (): Draft => ({
-  key: null,
-  source: "todo",
-  projectId: NO_PROJECT,
-  kind: "todo",
-  title: "",
-  description: "",
-  priority: "medium",
-  status: "open",
-  dueDate: "",
-});
-
 /** One list over general todos and project work items; the store a row belongs to only shows in its project chip. */
 export function TasksView({ data }: { data: TaskList }) {
   const router = useRouter();
@@ -74,8 +32,7 @@ export function TasksView({ data }: { data: TaskList }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [project, setProject] = useState<string>("all");
   const [query, setQuery] = useState("");
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<TaskDraft | null>(null);
 
   const counts = useMemo(
     () => ({
@@ -128,48 +85,13 @@ export function TasksView({ data }: { data: TaskList }) {
     refresh();
   }
 
-  function edit(task: TaskRow) {
-    setDraft({
-      key: task.id,
-      source: task.source,
-      projectId: task.projectId ?? NO_PROJECT,
-      kind: task.kind,
-      title: task.title,
-      description: task.description ?? "",
-      priority: task.priority,
-      status: task.status,
-      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
-    });
-  }
-
-  async function save() {
-    if (!draft) return;
-    if (!draft.title.trim()) {
-      toast.error("A task needs a title");
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await submit(draft);
-      if (!result.success) {
-        toast.error(result.error ?? "Could not save the task");
-        return;
-      }
-      toast.success(draft.key ? "Task saved" : "Task created");
-      setDraft(null);
-      refresh();
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <>
       <PageHeader
         title="Tasks"
         description="Everything on the list, from loose todos to work on a project"
         actions={
-          <Button onClick={() => setDraft(emptyDraft())}>
+          <Button onClick={() => setDraft(newTaskDraft())}>
             <Plus strokeWidth={1.75} />
             New task
           </Button>
@@ -224,7 +146,7 @@ export function TasksView({ data }: { data: TaskList }) {
               description={data.tasks.length ? "Loosen the filters to see the rest of the list." : "Track anything here; tasks on a project also show on its board."}
               action={
                 data.tasks.length ? undefined : (
-                  <Button size="sm" onClick={() => setDraft(emptyDraft())}>
+                  <Button size="sm" onClick={() => setDraft(newTaskDraft())}>
                     <Plus strokeWidth={1.75} />
                     New task
                   </Button>
@@ -275,7 +197,7 @@ export function TasksView({ data }: { data: TaskList }) {
                     <span className="hidden text-right text-[11.5px] text-fg-4 sm:block sm:w-[110px]">general</span>
                   )}
                   <span className="hidden w-[74px] text-right text-[11.5px] text-fg-4 lg:inline">{formatRelativeTime(task.updatedAt)}</span>
-                  <Button variant="ghost" size="icon-sm" aria-label={`Edit ${task.title}`} onClick={() => edit(task)}>
+                  <Button variant="ghost" size="icon-sm" aria-label={`Edit ${task.title}`} onClick={() => setDraft(draftOf(task))}>
                     <Pencil strokeWidth={1.75} />
                   </Button>
                   <Button variant="ghost" size="icon-sm" aria-label={`Delete ${task.title}`} onClick={() => void remove(task)}>
@@ -288,106 +210,7 @@ export function TasksView({ data }: { data: TaskList }) {
         </Panel>
       </PageBody>
 
-      <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{draft?.key ? "Edit task" : "New task"}</DialogTitle>
-            <DialogDescription>
-              {draft?.key ? "Changes are saved to the list this task lives on." : "Pick a project to put it on that board, or leave it general."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {draft && (
-            <div className="grid gap-3.5">
-              <Field label="Title" htmlFor="task-title">
-                <Input id="task-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="What needs to be done?" autoFocus />
-              </Field>
-              <Field label="Description" htmlFor="task-description">
-                <Textarea id="task-description" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} rows={3} />
-              </Field>
-
-              {!draft.key && (
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <Field label="Project" htmlFor="task-project">
-                    <Select value={draft.projectId} onValueChange={(value) => setDraft({ ...draft, projectId: value, source: value === NO_PROJECT ? "todo" : "work_item" })}>
-                      <SelectTrigger id="task-project">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_PROJECT}>No project</SelectItem>
-                        {data.projects.map((entry) => (
-                          <SelectItem key={entry.id} value={entry.id}>
-                            {entry.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  {draft.source === "work_item" && (
-                    <Field label="Type" htmlFor="task-kind">
-                      <Select value={draft.kind} onValueChange={(value) => setDraft({ ...draft, kind: value })}>
-                        <SelectTrigger id="task-kind">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">Todo</SelectItem>
-                          <SelectItem value="bug">Bug</SelectItem>
-                          <SelectItem value="change">Change</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  )}
-                </div>
-              )}
-
-              <div className="grid gap-3.5 sm:grid-cols-2">
-                <Field label="Priority" htmlFor="task-priority">
-                  <Select value={draft.priority} onValueChange={(value) => setDraft({ ...draft, priority: value as TaskPriority })}>
-                    <SelectTrigger id="task-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                {draft.key ? (
-                  <Field label="Status" htmlFor="task-status">
-                    <Select value={draft.status} onValueChange={(value) => setDraft({ ...draft, status: value as TaskStatus })}>
-                      <SelectTrigger id="task-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="in_progress">In progress</SelectItem>
-                        {draft.source === "work_item" && <SelectItem value="blocked">Blocked</SelectItem>}
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                ) : null}
-                {draft.source === "todo" && (
-                  <Field label="Due date" htmlFor="task-due" hint="Only general tasks carry a due date.">
-                    <Input id="task-due" type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} />
-                  </Field>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setDraft(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={() => void save()} loading={saving}>
-              {draft?.key ? "Save changes" : "Create task"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {draft && <TaskDialog initial={draft} projects={data.projects} onClose={() => setDraft(null)} onSaved={refresh} />}
     </>
   );
 }
@@ -403,46 +226,4 @@ function Summary({ label, value, detail, tone }: { label: string; value: number;
       <p className="mt-1 truncate text-[11px] text-fg-4">{detail}</p>
     </div>
   );
-}
-
-function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-fg-2">
-        {label}
-      </label>
-      {children}
-      {hint && <p className="text-[11.5px] text-fg-3">{hint}</p>}
-    </div>
-  );
-}
-
-/** Creates or updates in whichever store the task belongs to. */
-async function submit(draft: Draft): Promise<{ success: boolean; error?: string }> {
-  const description = draft.description.trim() || undefined;
-
-  if (draft.key) {
-    const { id } = parseTaskKey(draft.key);
-    if (draft.source === "todo") {
-      return updateTodoAction(id, {
-        title: draft.title,
-        description,
-        priority: draft.priority,
-        status: draft.status === "done" ? "completed" : draft.status === "in_progress" ? "in_progress" : "pending",
-        due_date: draft.dueDate || null,
-      });
-    }
-    return updateWorkItemAction(id, { title: draft.title, description, priority: draft.priority, status: draft.status });
-  }
-
-  if (draft.source === "todo") {
-    return createTodoAction({ title: draft.title, description, priority: draft.priority, due_date: draft.dueDate || undefined });
-  }
-  return createWorkItemAction({
-    project_id: draft.projectId,
-    type: draft.kind as "todo" | "bug" | "change",
-    title: draft.title,
-    description,
-    priority: draft.priority,
-  });
 }
