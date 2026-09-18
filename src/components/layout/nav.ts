@@ -1,4 +1,4 @@
-import { Activity, BookOpen, Cpu, FolderKanban, History, LayoutDashboard, ListChecks, Server, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, Cpu, FolderKanban, History, LayoutDashboard, ListChecks, Rocket, Server, Settings, Sparkles, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -19,6 +19,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/projects", label: "Projects", icon: FolderKanban, countKey: "projects" },
       { href: "/tasks", label: "Tasks", icon: ListChecks, countKey: "tasks" },
+      { href: "/deployments", label: "Deployments", icon: Rocket },
     ],
   },
   {

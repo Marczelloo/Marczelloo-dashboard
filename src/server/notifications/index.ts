@@ -4,6 +4,8 @@
 
 import "server-only";
 
+import { notificationEnabled } from "./preferences";
+
 // ========================================
 // Types
 // ========================================
@@ -90,6 +92,7 @@ export async function sendEmailNotification(to: string, payload: NotificationPay
 // ========================================
 
 export async function notifyServiceDown(serviceName: string, serviceUrl: string, error: string): Promise<void> {
+  if (!(await notificationEnabled("service_down"))) return;
   await sendDiscordNotification({
     title: "🔴 Service Down",
     message: `**${serviceName}** is not responding.`,
@@ -106,6 +109,7 @@ export async function notifyServiceRecovered(
   serviceUrl: string,
   downtimeMinutes: number
 ): Promise<void> {
+  if (!(await notificationEnabled("service_recovered"))) return;
   await sendDiscordNotification({
     title: "🟢 Service Recovered",
     message: `**${serviceName}** is back online.`,
@@ -118,6 +122,7 @@ export async function notifyServiceRecovered(
 }
 
 export async function notifyContainerUnhealthy(containerName: string, status: string): Promise<void> {
+  if (!(await notificationEnabled("container_unhealthy"))) return;
   await sendDiscordNotification({
     title: "⚠️ Container Unhealthy",
     message: `Container **${containerName}** is unhealthy.`,
@@ -127,6 +132,7 @@ export async function notifyContainerUnhealthy(containerName: string, status: st
 }
 
 export async function notifyDeployStarted(serviceName: string, triggeredBy: string): Promise<void> {
+  if (!(await notificationEnabled("deploy_started"))) return;
   await sendDiscordNotification({
     title: "🚀 Deploy Started",
     message: `Deployment for **${serviceName}** has started.`,
@@ -136,6 +142,7 @@ export async function notifyDeployStarted(serviceName: string, triggeredBy: stri
 }
 
 export async function notifyDeploySuccess(serviceName: string, commitSha?: string, duration?: number): Promise<void> {
+  if (!(await notificationEnabled("deploy_success"))) return;
   const fields = [];
   if (commitSha) {
     fields.push({ name: "Commit", value: commitSha.substring(0, 7), inline: true });
@@ -153,6 +160,7 @@ export async function notifyDeploySuccess(serviceName: string, commitSha?: strin
 }
 
 export async function notifyDeployFailed(serviceName: string, error: string): Promise<void> {
+  if (!(await notificationEnabled("deploy_failed"))) return;
   await sendDiscordNotification({
     title: "❌ Deploy Failed",
     message: `Deployment for **${serviceName}** failed.`,
@@ -162,6 +170,7 @@ export async function notifyDeployFailed(serviceName: string, error: string): Pr
 }
 
 export async function notifySslExpiring(serviceName: string, serviceUrl: string, daysLeft: number): Promise<void> {
+  if (!(await notificationEnabled("ssl_expiring"))) return;
   await sendDiscordNotification({
     title: "⚠️ SSL Certificate Expiring",
     message: `SSL certificate for **${serviceName}** expires in ${daysLeft} days.`,

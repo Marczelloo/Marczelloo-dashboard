@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Boxes, Cpu, Database, Globe, Loader2, Plug, Save, Timer } from "lucide-react";
+import { Boxes, Cpu, Database, Globe, Loader2, Plug, Timer } from "lucide-react";
 import { toast } from "sonner";
-import { usePinGuard } from "@/components/features/use-pin-guard";
-import { FormField } from "@/components/layout/form-layout";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, Input, Panel } from "@/components/ui";
+import { Button, Chip, Panel } from "@/components/ui";
 import { formatBytes, formatUptime, type HostSummary } from "@/lib/host";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -51,11 +49,8 @@ const state = (value: string | undefined) => (value === "configured" ? { tone: "
 
 /** What the dashboard needs in order to reach this host, and the one knob that belongs to it. */
 export function HostSettingsTab({ summary }: { summary: HostSummary }) {
-  const { run, dialog } = usePinGuard();
   const [info, setInfo] = useState<Info | null>(null);
-  const [minutes, setMinutes] = useState("");
   const [savedMinutes, setSavedMinutes] = useState("");
-  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
   const load = useCallback(async () => {
@@ -65,7 +60,6 @@ export function HostSettingsTab({ summary }: { summary: HostSummary }) {
     ]);
     if (infoResponse) setInfo(infoResponse as Info);
     if (intervalResponse?.success) {
-      setMinutes(String(intervalResponse.interval_minutes));
       setSavedMinutes(String(intervalResponse.interval_minutes));
     }
   }, []);
@@ -73,34 +67,6 @@ export function HostSettingsTab({ summary }: { summary: HostSummary }) {
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function saveInterval() {
-    const value = Number(minutes);
-    if (!Number.isFinite(value) || value < 1 || value > 60) {
-      toast.error("Pick between 1 and 60 minutes");
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await run(async () => {
-        const response = await fetch("/api/settings/monitoring-interval", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interval_ms: value * 60_000 }),
-        });
-        return (await response.json().catch(() => ({ success: false }))) as { success: boolean; error?: string; requirePin?: boolean };
-      });
-      if (!result) return;
-      if (!result.success) {
-        toast.error(result.error ?? "Could not save the interval");
-        return;
-      }
-      setSavedMinutes(String(value));
-      toast.success(`Checks every ${value} min`);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function testDocker() {
     setTesting(true);
@@ -195,21 +161,14 @@ export function HostSettingsTab({ summary }: { summary: HostSummary }) {
         </div>
       </Card>
 
-      <Card title="Monitoring" icon={Timer} description="How often the uptime loop checks the domains this host serves.">
-        <div className="grid gap-3.5 p-3.5">
-          <FormField label="Interval" htmlFor="interval" hint="Between 1 and 60 minutes. Each sweep is one round of checks against every domain.">
-            <div className="flex items-center gap-2">
-              <Input id="interval" type="number" min={1} max={60} value={minutes} onChange={(event) => setMinutes(event.target.value)} className="w-[110px]" />
-              <span className="text-[13px] text-fg-3">minutes</span>
-              <Button size="sm" onClick={() => void saveInterval()} loading={saving} disabled={minutes === savedMinutes} className="ml-auto">
-                <Save strokeWidth={1.75} />
-                Save
-              </Button>
-            </div>
-          </FormField>
-        </div>
-        <Fact label="In effect">{savedMinutes ? `every ${savedMinutes} min` : "—"}</Fact>
-        <Fact label="Incidents">
+      <Card title="Monitoring" icon={Timer} description="How often the loop checks the domains this host serves.">
+        <Fact label="Interval">{savedMinutes ? `every ${savedMinutes} min` : "—"}</Fact>
+        <Fact label="Change it">
+          <Link href="/settings#monitoring" className="hover:underline">
+            Settings
+          </Link>
+        </Fact>
+        <Fact label="Results">
           <Link href="/monitoring" className="hover:underline">
             Monitoring
           </Link>
@@ -231,7 +190,6 @@ export function HostSettingsTab({ summary }: { summary: HostSummary }) {
         <Fact label="Host readings">read live from the agent, kept only in this page</Fact>
       </Card>
 
-      {dialog}
     </div>
   );
 }

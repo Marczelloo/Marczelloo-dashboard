@@ -48,3 +48,4 @@ export { EmptyState } from "./empty-state";
 export { UptimeStrip, type UptimeState } from "./uptime-strip";
 export { Meter } from "./meter";
 export { Kbd } from "./kbd";
+export { Switch } from "./switch";
