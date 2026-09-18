@@ -42,7 +42,8 @@ export async function createWorkItemAction(input: CreateWorkItemInput) {
     await auditLogs.logAction(user.email, "create", "work_item", item.id, { type: item.type, title: item.title });
 
     revalidatePath(`/projects/${parsed.project_id}`);
-    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    revalidatePath("/");
 
     return { success: true as const, data: { id: item.id } };
   } catch (error) {
@@ -72,6 +73,7 @@ export async function updateWorkItemAction(id: string, input: UpdateWorkItemInpu
     await auditLogs.logAction(user.email, "update", "work_item", id, parsed);
 
     revalidatePath(`/projects/${item.project_id}`);
+    revalidatePath("/tasks");
 
     return { success: true as const };
   } catch (error) {
@@ -105,6 +107,7 @@ export async function deleteWorkItemAction(id: string) {
     await auditLogs.logAction(user.email, "delete", "work_item", id);
 
     revalidatePath(`/projects/${item.project_id}`);
+    revalidatePath("/tasks");
 
     return { success: true as const };
   } catch (error) {

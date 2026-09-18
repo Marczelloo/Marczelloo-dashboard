@@ -40,8 +40,8 @@ export async function createTodoAction(input: {
     if (demoCheck.blocked) return demoCheck.result;
 
     await generalTodos.createTodo(input);
-    revalidatePath("/todos");
-    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to create todo" };
@@ -64,8 +64,8 @@ export async function updateTodoAction(
     if (demoCheck.blocked) return demoCheck.result;
 
     await generalTodos.updateTodo(id, input);
-    revalidatePath("/todos");
-    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to update todo" };
@@ -79,8 +79,8 @@ export async function toggleTodoAction(id: string): Promise<ActionResult> {
     if (demoCheck.blocked) return demoCheck.result;
 
     await generalTodos.toggleTodoStatus(id);
-    revalidatePath("/todos");
-    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to toggle todo" };
@@ -94,8 +94,8 @@ export async function deleteTodoAction(id: string): Promise<ActionResult> {
     if (demoCheck.blocked) return demoCheck.result;
 
     await generalTodos.deleteTodo(id);
-    revalidatePath("/todos");
-    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to delete todo" };
