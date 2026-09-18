@@ -2,10 +2,11 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { Header } from "@/components/layout";
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Skeleton } from "@/components/ui";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
+import { Button, Chip, EmptyState, Panel, SegmentedControl, Skeleton } from "@/components/ui";
+import { StatusDot } from "@/components/status-dot";
 import { getWorkItemsByProjectAction, updateWorkItemAction } from "@/app/actions/work-items";
-import { ArrowLeft, Plus, CheckCircle2, Circle, Clock, AlertCircle, GripVertical } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Circle, Clock, GripVertical, ListChecks, Plus } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -85,66 +86,62 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
 
   return (
     <>
-      <Header title="Work Items" description="Manage tasks, bugs, and changes">
-        <div className="flex items-center gap-2">
-          <Link href={`/projects/${projectId}`}>
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-              Back
+      <PageHeader
+        title="Tasks"
+        description="Tasks, bugs and changes of this project"
+        actions={
+          <>
+            <Button variant="ghost" asChild>
+              <Link href={`/projects/${projectId}`}>
+                <ArrowLeft strokeWidth={1.75} />
+                Back to project
+              </Link>
             </Button>
-          </Link>
-          <Link href={`/projects/${projectId}/work-items/new`}>
-            <Button variant="default" size="sm">
-              <Plus className="h-4 w-4" />
-              New Item
+            <Button asChild>
+              <Link href={`/projects/${projectId}/work-items/new`}>
+                <Plus strokeWidth={1.75} />
+                New task
+              </Link>
             </Button>
-          </Link>
-        </div>
-      </Header>
+          </>
+        }
+      />
 
-      <div className="p-6 space-y-6">
-        {/* Filter tabs */}
-        <div className="flex items-center gap-2">
-          {(["all", "open", "done"] as const).map((f) => (
-            <Button key={f} variant={filter === f ? "default" : "ghost"} size="sm" onClick={() => setFilter(f)}>
-              {f === "all" && `All (${items.length})`}
-              {f === "open" && `Open (${items.filter((i) => i.status !== "done").length})`}
-              {f === "done" && `Done (${items.filter((i) => i.status === "done").length})`}
-            </Button>
-          ))}
-        </div>
+      <PageBody className="flex flex-col gap-4">
+        <SegmentedControl<"all" | "open" | "done">
+          aria-label="Filter tasks"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "all", label: "All", count: items.length },
+            { value: "open", label: "Open", count: items.filter((item) => item.status !== "done").length },
+            { value: "done", label: "Done", count: items.filter((item) => item.status === "done").length },
+          ]}
+        />
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-5 w-24" />
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Skeleton className="h-16" />
-                  <Skeleton className="h-16" />
-                </CardContent>
-              </Card>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-56 rounded-lg" />
             ))}
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <StatusColumn
                 status="open"
                 title="Open"
                 items={statusGroups.open}
                 projectId={projectId}
-                icon={<Circle className="h-4 w-4" />}
+                icon={<Circle className="size-4 text-fg-3" strokeWidth={1.75} />}
                 onStatusChange={handleStatusChange}
               />
               <StatusColumn
                 status="in_progress"
-                title="In Progress"
+                title="In progress"
                 items={statusGroups.in_progress}
                 projectId={projectId}
-                icon={<Clock className="h-4 w-4 text-warning" />}
+                icon={<Clock className="size-4 text-accent" strokeWidth={1.75} />}
                 onStatusChange={handleStatusChange}
               />
               <StatusColumn
@@ -152,7 +149,7 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
                 title="Blocked"
                 items={statusGroups.blocked}
                 projectId={projectId}
-                icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+                icon={<AlertCircle className="size-4 text-warn" strokeWidth={1.75} />}
                 onStatusChange={handleStatusChange}
               />
               <StatusColumn
@@ -160,7 +157,7 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
                 title="Done"
                 items={statusGroups.done}
                 projectId={projectId}
-                icon={<CheckCircle2 className="h-4 w-4 text-success" />}
+                icon={<CheckCircle2 className="size-4 text-ok" strokeWidth={1.75} />}
                 onStatusChange={handleStatusChange}
               />
             </div>
@@ -168,19 +165,23 @@ export default function WorkItemsPage({ params }: WorkItemsPageProps) {
         )}
 
         {!isLoading && items.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground mb-4">No work items yet</p>
-              <Link href={`/projects/${projectId}/work-items/new`}>
-                <Button>
-                  <Plus className="h-4 w-4" />
-                  Create First Item
+          <Panel>
+            <EmptyState
+              icon={ListChecks}
+              title="No tasks yet"
+              description="Track bugs, changes and todos here; drag a card between columns to change its status."
+              action={
+                <Button size="sm" asChild>
+                  <Link href={`/projects/${projectId}/work-items/new`}>
+                    <Plus strokeWidth={1.75} />
+                    New task
+                  </Link>
                 </Button>
-              </Link>
-            </CardContent>
-          </Card>
+              }
+            />
+          </Panel>
         )}
-      </div>
+      </PageBody>
     </>
   );
 }
@@ -195,34 +196,26 @@ interface StatusColumnProps {
 }
 
 function StatusColumn({ status, title, items, projectId, icon, onStatusChange: _onStatusChange }: StatusColumnProps) {
-  const typeIcons: Record<string, string> = {
-    todo: "📋",
-    bug: "🐛",
-    feature: "✨",
-    change: "🔄",
-  };
-
-  const priorityColors: Record<string, "secondary" | "default" | "warning" | "danger"> = {
-    low: "secondary",
-    medium: "default",
-    high: "warning",
-    critical: "danger",
+  const priorityTone: Record<string, "neutral" | "warn" | "err" | "idle"> = {
+    low: "idle",
+    medium: "neutral",
+    high: "warn",
+    critical: "err",
   };
 
   return (
-    <Card className="bg-secondary/30">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          {icon}
-          {title} ({items.length})
-        </CardTitle>
-      </CardHeader>
+    <Panel className="flex flex-col">
+      <div className="flex items-center gap-2 border-b border-line-subtle px-3 py-2.5">
+        {icon}
+        <h2 className="text-[13px] font-semibold">{title}</h2>
+        <span className="ml-auto font-mono text-[11px] text-fg-3">{items.length}</span>
+      </div>
       <Droppable droppableId={status}>
         {(provided, snapshot) => (
-          <CardContent
+          <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`space-y-3 min-h-[100px] transition-colors ${snapshot.isDraggingOver ? "bg-primary/10" : ""}`}
+            className={`flex min-h-[120px] flex-1 flex-col gap-2 p-2.5 transition-colors duration-quick ${snapshot.isDraggingOver ? "bg-accent/[.06]" : ""}`}
           >
             {items.map((item, index) => (
               <Draggable key={item.id} draggableId={item.id} index={index}>
@@ -230,30 +223,30 @@ function StatusColumn({ status, title, items, projectId, icon, onStatusChange: _
                   <div
                     ref={provided.innerRef}
                     {...provided.draggableProps}
-                    className={`rounded-lg bg-background border border-border p-3 transition-all ${
-                      snapshot.isDragging
-                        ? "shadow-lg border-primary ring-2 ring-primary/20"
-                        : "hover:border-primary/50"
+                    className={`rounded-md border bg-canvas p-2.5 transition-[border-color,box-shadow] duration-quick ease-out ${
+                      snapshot.isDragging ? "border-accent/50 shadow-overlay" : "border-line hover:border-line-strong"
                     }`}
                   >
                     <div className="flex items-start gap-2">
                       <div
                         {...provided.dragHandleProps}
-                        className="mt-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+                        aria-label="Drag to change status"
+                        className="mt-0.5 cursor-grab text-fg-4 transition-colors duration-quick hover:text-fg-2 active:cursor-grabbing"
                       >
-                        <GripVertical className="h-4 w-4" />
+                        <GripVertical className="size-4" strokeWidth={1.75} />
                       </div>
-                      <span className="text-sm">{typeIcons[item.type] || "📋"}</span>
+                      <StatusDot
+                        status={item.status === "blocked" ? "warn" : item.status === "in_progress" ? "live" : item.status === "done" ? "ok" : "idle"}
+                        className="mt-1.5"
+                      />
                       <Link
                         href={`/projects/${projectId}/work-items/${item.id}`}
-                        className="flex-1 min-w-0 hover:text-primary"
+                        className="min-w-0 flex-1"
                       >
-                        <p className="text-sm font-medium line-clamp-2">{item.title}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant={priorityColors[item.priority]} className="text-xs">
-                            {item.priority}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">{formatRelativeTime(item.updated_at)}</span>
+                        <p className="line-clamp-2 text-[13px] font-medium text-fg">{item.title}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Chip tone={priorityTone[item.priority]}>{item.priority}</Chip>
+                          <span className="text-[11px] text-fg-3">{formatRelativeTime(item.updated_at)}</span>
                         </div>
                       </Link>
                     </div>
@@ -262,10 +255,10 @@ function StatusColumn({ status, title, items, projectId, icon, onStatusChange: _
               </Draggable>
             ))}
             {provided.placeholder}
-            {items.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No items</p>}
-          </CardContent>
+            {items.length === 0 && <p className="py-4 text-center text-[11.5px] text-fg-4">Nothing here</p>}
+          </div>
         )}
       </Droppable>
-    </Card>
+    </Panel>
   );
 }
