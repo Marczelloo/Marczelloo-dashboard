@@ -80,3 +80,8 @@ export function getAgentHost(): Promise<HostInfo> {
 export function restartAgentContainer(name: string): Promise<{ ok: true }> {
   return agentFetch("/containers/restart", post({ name }), 100_000);
 }
+
+/** Runs one allowlisted command in the agent container; anything else is refused there. */
+export function runAgentCommand(command: string): Promise<{ command: string; code: number; stdout: string; stderr: string; durationMs: number }> {
+  return agentFetch("/exec", post({ command }), 35_000);
+}

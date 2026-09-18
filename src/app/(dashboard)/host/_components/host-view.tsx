@@ -6,6 +6,7 @@ import { StatusDot } from "@/components/status-dot";
 import { Button, EmptyState, Panel } from "@/components/ui";
 import { diskPercent, formatBytes, formatUptime, loadPercent, memoryPercent, type HostSummary } from "@/lib/host";
 import { HostTabs, type HostTab } from "./host-tabs";
+import { ConsoleTab } from "./tabs/console";
 import { ContainersTab } from "./tabs/containers";
 import { HostOverviewTab } from "./tabs/overview";
 import { PortsTab } from "./tabs/ports";
@@ -69,6 +70,7 @@ export function HostView({ initial, tab }: { initial: HostSummary; tab: HostTab 
             {tab === "resources" && <ResourcesTab summary={summary} history={history} />}
             {tab === "containers" && <ContainersTab />}
             {tab === "ports" && <PortsTab host={host} />}
+            {tab === "console" && <ConsoleTab />}
             {tab === "settings" && <HostSettingsTab summary={summary} />}
           </>
         ) : (

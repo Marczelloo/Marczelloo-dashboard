@@ -1,5 +1,7 @@
 /** Plausible container output for the public demo, where no docker host is reachable. */
 
+import { mockContainers } from "@/lib/mock-data";
+
 const LINES = [
   "GET /api/health 200 in 4ms",
   "GET /api/projects 200 in 38ms",
@@ -41,5 +43,61 @@ export function demoContainerStats(containerId: string) {
     memory_usage: memoryUsage,
     memory_limit: memoryLimit,
     memory_percent: Number(((memoryUsage / memoryLimit) * 100).toFixed(1)),
+  };
+}
+
+/** A docker inspect payload for the demo, built from the mock container list. */
+export function demoContainerInspect(containerId: string) {
+  const container = mockContainers.find((item) => item.Id === containerId || item.Id.startsWith(containerId)) ?? mockContainers[0];
+  const name = container.Names?.[0]?.replace(/^\//, "") ?? "container";
+  const created = new Date(container.Created * 1000).toISOString();
+  const [project, ...rest] = name.split("-");
+  const service = rest.join("-");
+
+  return {
+    Id: container.Id,
+    Created: created,
+    Path: "/bin/sh",
+    Args: ["-c", "node server.js"],
+    State: {
+      Status: container.State,
+      Running: container.State === "running",
+      Paused: false,
+      Restarting: false,
+      OOMKilled: false,
+      Dead: false,
+      Pid: container.State === "running" ? 1420 : 0,
+      ExitCode: container.State === "running" ? 0 : 1,
+      Error: container.State === "running" ? "" : "container exited",
+      StartedAt: created,
+      FinishedAt: container.State === "running" ? "0001-01-01T00:00:00Z" : new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    },
+    Image: `sha256:${container.Id.slice(0, 32)}`,
+    Name: `/${name}`,
+    RestartCount: 0,
+    Driver: "overlay2",
+    Platform: "linux",
+    Mounts: [
+      { Type: "bind", Source: `/home/pi/projects/${project}`, Destination: "/app", Mode: "rw", RW: true },
+      { Type: "volume", Source: `${project}_data`, Destination: "/data", Mode: "rw", RW: true },
+    ],
+    Config: {
+      Hostname: container.Id.slice(0, 12),
+      Env: ["NODE_ENV=production", "PORT=3000", "TZ=Europe/Warsaw"],
+      Cmd: ["node", "server.js"],
+      Image: container.Image,
+      WorkingDir: "/app",
+      Labels: service ? { "com.docker.compose.project": project, "com.docker.compose.service": service } : {},
+    },
+    NetworkSettings: {
+      IPAddress: "172.19.0.4",
+      Ports: Object.fromEntries(
+        (container.Ports ?? []).map((port) => [
+          `${port.PrivatePort}/${port.Type}`,
+          port.PublicPort ? [{ HostIp: "127.0.0.1", HostPort: String(port.PublicPort) }] : null,
+        ])
+      ),
+    },
+    HostConfig: { Memory: 512 * 1024 * 1024, CpuShares: 1024, RestartPolicy: { Name: "unless-stopped", MaximumRetryCount: 0 } },
   };
 }

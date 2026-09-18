@@ -2,19 +2,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Boxes, Database, Loader2, Plug, Save, Timer } from "lucide-react";
+import { Boxes, Cpu, Database, Globe, Loader2, Plug, Save, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { usePinGuard } from "@/components/features/use-pin-guard";
 import { FormField } from "@/components/layout/form-layout";
 import { StatusDot } from "@/components/status-dot";
 import { Button, Chip, Input, Panel } from "@/components/ui";
+import { formatBytes, formatUptime, type HostSummary } from "@/lib/host";
 import { formatRelativeTime } from "@/lib/utils";
-import type { HostSummary } from "@/lib/host";
 
 interface Info {
   atlashub: string;
   portainer: string;
   discord: string;
+  agent: string;
+  cloudflare: string;
+  edgeNetwork: string | null;
+  tunnelOrigin: string | null;
+  dropPorts: boolean;
+  projectsDir: string | null;
 }
 
 function Card({ title, icon: Icon, description, children }: { title: string; icon: typeof Plug; description?: string; children: React.ReactNode }) {
@@ -114,8 +120,47 @@ export function HostSettingsTab({ summary }: { summary: HostSummary }) {
   const atlas = state(info?.atlashub);
   const portainer = state(info?.portainer);
 
+  const host = summary.host;
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <Card title="This host" icon={Cpu} description="What the Pi reports about itself.">
+        <Fact label="Hostname">
+          <code className="text-[12px] text-fg-2">{host?.hostname ?? "—"}</code>
+        </Fact>
+        <Fact label="Uptime">{host ? formatUptime(host.uptimeSeconds) : "—"}</Fact>
+        <Fact label="Cores">{host?.cores ?? "—"}</Fact>
+        <Fact label="Memory">{host ? formatBytes(host.memory.totalBytes) : "—"}</Fact>
+        <Fact label="Disk">{host?.disk ? `${formatBytes(host.disk.totalBytes)} on ${host.disk.path}` : "—"}</Fact>
+        <Fact label="Docker">{host?.docker ? `${host.docker.running} running · ${host.docker.stopped} stopped · ${host.docker.images} images` : "—"}</Fact>
+        <Fact label="Projects directory">
+          <code className="text-[12px] text-fg-2">{info?.projectsDir ?? "set on the agent"}</code>
+        </Fact>
+      </Card>
+
+      <Card title="Routing" icon={Globe} description="How traffic reaches the services on this host.">
+        <Fact label="Cloudflare API">
+          <span className="flex items-center justify-end gap-2">
+            <StatusDot status={state(info?.cloudflare).tone} />
+            {state(info?.cloudflare).label}
+          </span>
+        </Fact>
+        <Fact label="Tunnel origin">
+          <code className="text-[12px] text-fg-2">{info?.tunnelOrigin ?? "—"}</code>
+        </Fact>
+        <Fact label="Edge network">
+          <code className="text-[12px] text-fg-2">{info?.edgeNetwork ?? "—"}</code>
+        </Fact>
+        <Fact label="Ports dropped behind the tunnel">
+          <Chip tone={info?.dropPorts ? "ok" : "idle"}>{info?.dropPorts ? "yes" : "no"}</Chip>
+        </Fact>
+        <Fact label="Published ports">
+          <Link href="/host?tab=ports" className="hover:underline">
+            {host?.publishedPorts.length ?? 0} on this host
+          </Link>
+        </Fact>
+      </Card>
+
       <Card title="Connections" icon={Plug} description="How the dashboard reaches this host and its data.">
         <Fact label="Deploy agent">
           <span className="flex items-center justify-end gap-2">

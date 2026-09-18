@@ -3,6 +3,8 @@ import http from "node:http";
 import { jobRequestSchema } from "./api";
 import { enqueue, rollbackRelease } from "./queue";
 import { HostOperationError, type HostOperations } from "./host";
+import { ConsoleError, runConsoleCommand, type ConsoleStep } from "./console";
+import { runCommand as runRaw } from "./exec";
 import type { FileStore } from "./store";
 import type { AgentState, AgentStatus, EnvFile, Job } from "./types";
 
@@ -70,6 +72,15 @@ export function createAgentServer(context: ServerContext): http.Server {
       if (request.method === "POST" && url.pathname === "/env-files/read") return send(response, 200, await context.host.readEnvFile(await readBody(request)));
       if (request.method === "POST" && url.pathname === "/preflight") return send(response, 200, await context.host.preflight(await readBody(request)));
       if (request.method === "POST" && url.pathname === "/containers/restart") return send(response, 200, await context.host.restartContainer(await readBody(request)));
+
+      if (request.method === "POST" && url.pathname === "/exec") {
+        try {
+          return send(response, 200, await runConsoleCommand(await readBody(request), context.allowedRoot, (step: ConsoleStep, onOutput) => runRaw(step as never, onOutput)));
+        } catch (error) {
+          if (error instanceof ConsoleError) return send(response, 400, { error: error.message });
+          throw error;
+        }
+      }
 
       if (request.method === "POST" && url.pathname === "/jobs") {
         const parsed = jobRequestSchema.safeParse(await readBody(request));

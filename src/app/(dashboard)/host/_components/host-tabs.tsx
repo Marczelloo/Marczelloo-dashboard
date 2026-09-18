@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export const HOST_TABS = ["overview", "resources", "containers", "ports", "settings"] as const;
+export const HOST_TABS = ["overview", "resources", "containers", "ports", "console", "settings"] as const;
 
 export type HostTab = (typeof HOST_TABS)[number];
 
@@ -10,6 +10,7 @@ const LABEL: Record<HostTab, string> = {
   resources: "Resources",
   containers: "Containers",
   ports: "Ports",
+  console: "Console",
   settings: "Settings",
 };
 

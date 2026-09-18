@@ -135,7 +135,7 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
   }
 
   return (
-    <Panel className={cn("flex flex-col self-start overflow-hidden", className)}>
+    <Panel className={cn("flex w-full flex-col self-start overflow-hidden", className)}>
       <div className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-3 py-2.5">
         <h2 className="flex items-center gap-2 text-[13.5px] font-semibold">
           <ScrollText className="size-4 text-fg-3" strokeWidth={1.75} />

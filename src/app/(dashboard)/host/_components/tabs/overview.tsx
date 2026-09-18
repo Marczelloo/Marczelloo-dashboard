@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Boxes, CheckCircle2, Container, HardDrive, Network, ScrollText, Settings2, Thermometer } from "lucide-react";
+import { Activity, Boxes, CheckCircle2, Container, HardDrive, Network, ScrollText, Settings2, Terminal, Thermometer } from "lucide-react";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, Meter, Panel } from "@/components/ui";
+import { Chip, Meter, Panel } from "@/components/ui";
 import { diskPercent, diskUsed, formatBytes, isPublic, loadPercent, memoryPercent, memoryUsed, type HostSummary } from "@/lib/host";
 import { formatRelativeTime } from "@/lib/utils";
 import { Sparkline } from "../sparkline";
@@ -21,6 +21,22 @@ function Card({ title, icon: Icon, action, children }: { title: string; icon: ty
       </div>
       {children}
     </Panel>
+  );
+}
+
+/** A press, not a paragraph: icon, what it does, where it goes. */
+function Action({ href, icon: Icon, label, hint }: { href: string; icon: typeof Activity; label: string; hint: string }) {
+  return (
+    <Link
+      href={href}
+      className="group/action flex min-w-0 flex-col gap-1.5 bg-surface px-3.5 py-3 transition-colors duration-quick ease-out hover:bg-surface-hover"
+    >
+      <span className="grid size-7 place-items-center rounded-md border border-line bg-surface-raised text-fg-3 transition-colors duration-quick group-hover/action:text-fg">
+        <Icon className="size-4" strokeWidth={1.75} />
+      </span>
+      <span className="truncate text-[13px] font-medium">{label}</span>
+      <span className="truncate text-[11px] text-fg-4">{hint}</span>
+    </Link>
   );
 }
 
@@ -122,31 +138,11 @@ export function HostOverviewTab({ summary, history }: { summary: HostSummary; hi
 
       <div className="flex flex-col gap-4">
         <Card title="Quick actions" icon={Settings2}>
-          <div className="grid gap-2 p-3.5">
-            <Button variant="secondary" size="sm" asChild>
-              <Link href="/host?tab=containers">
-                <Container strokeWidth={1.75} />
-                Start, stop or restart a container
-              </Link>
-            </Button>
-            <Button variant="secondary" size="sm" asChild>
-              <Link href="/audit-log">
-                <ScrollText strokeWidth={1.75} />
-                What happened on this host
-              </Link>
-            </Button>
-            <Button variant="secondary" size="sm" asChild>
-              <Link href="/monitoring">
-                <Activity strokeWidth={1.75} />
-                Uptime and incidents
-              </Link>
-            </Button>
-            <Button variant="secondary" size="sm" asChild>
-              <Link href="/host?tab=settings">
-                <Settings2 strokeWidth={1.75} />
-                Host settings
-              </Link>
-            </Button>
+          <div className="grid grid-cols-2 gap-px bg-line-subtle">
+            <Action href="/host?tab=containers" icon={Container} label="Containers" hint="start · stop · restart" />
+            <Action href="/host?tab=console" icon={Terminal} label="Console" hint="run a command" />
+            <Action href="/monitoring" icon={Activity} label="Monitoring" hint="uptime and incidents" />
+            <Action href="/audit-log" icon={ScrollText} label="Audit log" hint="what happened here" />
           </div>
         </Card>
 

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Container, Loader2, Play, RotateCcw, Search, Square } from "lucide-react";
+import { Container, Loader2, Play, RotateCcw, ScrollText, Search, Square } from "lucide-react";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Skeleton } from "@/components/ui";
+import { LogConsole } from "@/components/features/log-console";
+import { Button, Chip, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Panel, SegmentedControl, Skeleton } from "@/components/ui";
 
 interface HostContainer {
   id: string;
@@ -31,6 +32,7 @@ export function ContainersTab() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<string | null>(null);
+  const [logsFor, setLogsFor] = useState<HostContainer | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -151,6 +153,9 @@ export function ContainersTab() {
                     </Chip>
                   ))}
                   <span className="w-[92px] truncate text-right text-[11.5px] text-fg-3">{container.status}</span>
+                  <Button variant="ghost" size="icon-sm" aria-label={`Logs of ${container.name}`} onClick={() => setLogsFor(container)}>
+                    <ScrollText strokeWidth={1.75} />
+                  </Button>
                   {isRunning(container) ? (
                     <>
                       <Button variant="secondary" size="icon-sm" aria-label={`Restart ${container.name}`} onClick={() => void act(container, "restart")} disabled={pending !== null}>
@@ -171,6 +176,20 @@ export function ContainersTab() {
           </Panel>
         ))
       )}
+
+      <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
+        <DialogContent className="max-w-[min(1100px,92vw)]">
+          <DialogHeader>
+            <DialogTitle>{logsFor?.name}</DialogTitle>
+          </DialogHeader>
+          {logsFor && (
+            <LogConsole
+              sources={[{ id: logsFor.id, label: logsFor.name, endpointId: logsFor.endpointId, containerId: logsFor.id }]}
+              height="h-[clamp(240px,52vh,520px)]"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
