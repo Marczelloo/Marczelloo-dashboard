@@ -2,183 +2,79 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { Panel } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ExternalLink, Plus, Search, Server } from "lucide-react";
 import { StatusDot } from "@/components/status-dot";
-import { Server } from "lucide-react";
-import type { Service, Project } from "@/types";
+import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import type { ServiceList, ServiceRow } from "@/server/services/list";
 
-type ServiceCategory = "website" | "api" | "database" | "admin" | "other";
+type Filter = "all" | "docker" | "vercel" | "external";
+const STANDALONE = "standalone";
 
-// Detect service category from URL and name patterns
-function detectServiceCategory(service: Service): ServiceCategory {
-  const name = service.name.toLowerCase();
-  const url = service.url?.toLowerCase() || "";
+const toneOf = (row: ServiceRow) => (row.running === null ? "idle" : row.running ? "ok" : "err");
+const stateOf = (row: ServiceRow) => (row.type !== "docker" ? "external" : (row.containerStatus ?? "unknown"));
 
-  // Database patterns
-  if (
-    name.includes("postgres") ||
-    name.includes("mysql") ||
-    name.includes("mongo") ||
-    name.includes("redis") ||
-    name.includes("mariadb") ||
-    name.includes("minio") ||
-    name.includes("database") ||
-    name.includes("db") ||
-    url.includes(":5432") ||
-    url.includes(":3306") ||
-    url.includes(":27017") ||
-    url.includes(":6379")
-  ) {
-    return "database";
-  }
-
-  // Admin/Dashboard patterns
-  if (
-    name.includes("portainer") ||
-    name.includes("grafana") ||
-    name.includes("prometheus") ||
-    name.includes("traefik") ||
-    name.includes("adminer") ||
-    name.includes("pgadmin") ||
-    name.includes("kibana") ||
-    name.includes("dashboard") ||
-    name.includes("monitoring") ||
-    url.includes("portainer") ||
-    url.includes("grafana")
-  ) {
-    return "admin";
-  }
-
-  // API patterns
-  if (
-    name.includes("api") ||
-    name.includes("backend") ||
-    name.includes("server") ||
-    name.includes("hub") ||
-    url.includes("/api") ||
-    url.includes("/v1") ||
-    url.includes("/v2") ||
-    url.includes("/graphql") ||
-    url.includes("swagger") ||
-    url.includes(":3001") ||
-    url.includes(":8080") ||
-    url.includes(":4000")
-  ) {
-    return "api";
-  }
-
-  // Website patterns (default for things with URLs)
-  if (
-    service.url ||
-    name.includes("web") ||
-    name.includes("frontend") ||
-    name.includes("site") ||
-    name.includes("app") ||
-    service.type === "vercel"
-  ) {
-    return "website";
-  }
-
-  return "other";
+function Segment({ label, children, detail }: { label: string; children: React.ReactNode; detail?: string }) {
+  return (
+    <div className="min-w-0 px-[18px] py-3.5">
+      <p className="text-[11.5px] text-fg-3">{label}</p>
+      <div className="mt-1.5 text-[18px] font-semibold leading-tight tabular-nums">{children}</div>
+      {detail && <p className="mt-1 truncate text-[11px] text-fg-4">{detail}</p>}
+    </div>
+  );
 }
 
-function serviceStatus(service: Service) {
-  return service.type === "docker" ? "idle" : "ok";
-}
-
-interface ServicesListProps {
-  standaloneServices: Service[];
-  projectBoundServices: Service[];
-  projects: Project[];
-}
-
-export function ServicesList({
-  standaloneServices,
-  projectBoundServices,
-  projects,
-}: ServicesListProps) {
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [ownershipFilter, setOwnershipFilter] = useState<string>("all");
+/** Every service the dashboard knows, grouped by the project that owns it. */
+export function ServicesList({ data }: { data: ServiceList }) {
+  const [type, setType] = useState<Filter>("all");
+  const [project, setProject] = useState("all");
   const [query, setQuery] = useState("");
 
-  const projectMap = useMemo(
-    () =>
-      new Map<string, Project>(
-        projects.map((project) => [project.id, project]),
-      ),
-    [projects],
+  const counts = useMemo(
+    () => ({
+      all: data.rows.length,
+      docker: data.rows.filter((row) => row.type === "docker").length,
+      vercel: data.rows.filter((row) => row.type === "vercel").length,
+      external: data.rows.filter((row) => row.type === "external").length,
+      running: data.rows.filter((row) => row.running === true).length,
+      down: data.rows.filter((row) => row.running === false).length,
+    }),
+    [data.rows]
   );
-  const allServices = [...standaloneServices, ...projectBoundServices];
 
-  // Apply filters
-  const filteredServices = allServices.filter((service) => {
-    // Type filter
-    if (typeFilter !== "all" && service.type !== typeFilter) {
-      return false;
+  const groups = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const visible = data.rows.filter((row) => {
+      if (type !== "all" && row.type !== type) return false;
+      if (project === STANDALONE && row.projectId) return false;
+      if (project !== "all" && project !== STANDALONE && row.projectId !== project) return false;
+      return !needle || `${row.name} ${row.url ?? ""} ${row.composeProject ?? ""}`.toLowerCase().includes(needle);
+    });
+    const byProject = new Map<string, ServiceRow[]>();
+    for (const row of visible) {
+      const key = row.projectName ?? "Standalone";
+      byProject.set(key, [...(byProject.get(key) ?? []), row]);
     }
+    return [...byProject.entries()]
+      .map(([name, rows]) => ({ name, rows: [...rows].sort((a, b) => a.name.localeCompare(b.name)) }))
+      .sort((a, b) => (a.name === "Standalone" ? 1 : b.name === "Standalone" ? -1 : a.name.localeCompare(b.name)));
+  }, [data.rows, project, query, type]);
 
-    // Category filter
-    if (
-      categoryFilter !== "all" &&
-      detectServiceCategory(service) !== categoryFilter
-    ) {
-      return false;
-    }
+  const visibleCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
-    // Ownership filter
-    if (ownershipFilter === "standalone" && service.project_id) {
-      return false;
-    }
-    if (ownershipFilter === "project" && !service.project_id) {
-      return false;
-    }
-
-    return `${service.name} ${service.url ?? ""}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase());
-  });
-
-  const hasAnyServices = allServices.length > 0;
-  const hasFilters =
-    typeFilter !== "all" ||
-    categoryFilter !== "all" ||
-    ownershipFilter !== "all" ||
-    query;
-  const groupedServices = useMemo(() => {
-    const groups = new Map<string, Service[]>();
-    for (const service of filteredServices) {
-      const project = service.project_id
-        ? projectMap.get(service.project_id)
-        : undefined;
-      const groupName = project?.name ?? "Standalone";
-      groups.set(groupName, [...(groups.get(groupName) ?? []), service]);
-    }
-    return [...groups.entries()];
-  }, [filteredServices, projectMap]);
-
-  if (!hasAnyServices) {
+  if (data.rows.length === 0) {
     return (
       <Panel>
         <EmptyState
           icon={Server}
-          title="No services configured yet"
-          description="Create a standalone service or add services to your projects."
+          title="No services yet"
+          description="A service is one container, deployment or address this dashboard watches. Add one to a project, or on its own."
           action={
-            <Link href="/services/new">
-              <Button>Add service</Button>
-            </Link>
+            <Button size="sm" asChild>
+              <Link href="/services/new">
+                <Plus strokeWidth={1.75} />
+                Add service
+              </Link>
+            </Button>
           }
         />
       </Panel>
@@ -186,128 +82,95 @@ export function ServicesList({
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="flex flex-col gap-4">
+      <Panel className="grid grid-cols-2 divide-line-subtle md:grid-cols-4 md:divide-x [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-line-subtle md:[&>*:nth-child(n+3)]:border-t-0">
+        <Segment label="Services" detail={`${counts.docker} docker · ${counts.vercel + counts.external} elsewhere`}>
+          {counts.all}
+        </Segment>
+        <Segment label="Running" detail={data.live ? "Reported by the agent" : "The agent is not answering"}>
+          <span className="flex items-center gap-2">
+            <StatusDot status="ok" />
+            {counts.running}
+          </span>
+        </Segment>
+        <Segment label="Stopped" detail={counts.down ? "Needs a look" : "Nothing is down"}>
+          <span className="flex items-center gap-2">
+            {counts.down > 0 && <StatusDot status="err" />}
+            {counts.down}
+          </span>
+        </Segment>
+        <Segment label="Projects" detail="Services can also stand alone">
+          {data.projects.length}
+        </Segment>
+      </Panel>
+
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Filter by name or URL"
-          className="w-full sm:w-[220px]"
+        <SegmentedControl<Filter>
+          aria-label="Filter by type"
+          value={type}
+          onChange={setType}
+          options={[
+            { value: "all", label: "All", count: counts.all },
+            { value: "docker", label: "Docker", count: counts.docker },
+            { value: "vercel", label: "Vercel", count: counts.vercel },
+            { value: "external", label: "External", count: counts.external },
+          ]}
         />
-
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="docker">Docker</SelectItem>
-            <SelectItem value="vercel">Vercel</SelectItem>
-            <SelectItem value="external">External</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="website">Website</SelectItem>
-            <SelectItem value="api">API</SelectItem>
-            <SelectItem value="database">Database</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Ownership" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Services</SelectItem>
-            <SelectItem value="standalone">Standalone</SelectItem>
-            <SelectItem value="project">Project-bound</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setTypeFilter("all");
-              setCategoryFilter("all");
-              setOwnershipFilter("all");
-              setQuery("");
-            }}
-          >
-            Clear
-          </Button>
-        )}
-
-        <span className="ml-auto text-[12px] text-fg-3">
-          {filteredServices.length} of {allServices.length} services
-        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Search className="size-4 text-fg-4" strokeWidth={1.75} />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" className="h-8 w-[190px]" aria-label="Search services" />
+          <Select value={project} onValueChange={setProject}>
+            <SelectTrigger className="h-8 w-[190px]" aria-label="Filter by project">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All projects</SelectItem>
+              <SelectItem value={STANDALONE}>Standalone</SelectItem>
+              {data.projects.map((entry) => (
+                <SelectItem key={entry.id} value={entry.id}>
+                  {entry.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {filteredServices.length === 0 ? (
+      {visibleCount === 0 ? (
         <Panel>
-          <EmptyState
-            icon={Server}
-            title="No services match the filters"
-            description="Adjust or clear the filters to see services."
-          />
+          <EmptyState icon={Server} title="Nothing matches" description="Loosen the filters to see the rest of the services." />
         </Panel>
       ) : (
-        groupedServices.map(([groupName, group]) => (
-          <Panel key={groupName} className="overflow-hidden">
-            <div className="border-b border-line-subtle px-3.5 py-3">
-              <h2 className="text-[13.5px] font-semibold text-fg">
-                {groupName}
+        groups.map((group) => (
+          <Panel key={group.name}>
+            <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-3.5 py-2.5">
+              <h2 className="flex items-center gap-2 text-[13px] font-semibold">
+                <Server className="size-4 text-fg-3" strokeWidth={1.75} />
+                {group.name}
               </h2>
-              <p className="mt-0.5 text-[11.5px] text-fg-3">
-                {group.length} service{group.length === 1 ? "" : "s"}
-              </p>
+              <span className="font-mono text-[11px] text-fg-3">{group.rows.length}</span>
             </div>
-            <div className="divide-y divide-line-subtle">
-              {group.map((service) => (
-                <div
-                  key={service.id}
-                  className="flex flex-wrap items-center gap-3 px-3.5 py-3"
-                >
-                  <StatusDot
-                    status={serviceStatus(service)}
-                    label={
-                      service.type === "docker"
-                        ? "Container status unavailable"
-                        : "Available"
-                    }
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/services/${service.id}`}
-                      className="block truncate text-[13px] font-medium text-fg hover:text-accent-text"
-                    >
-                      {service.name}
-                    </Link>
-                    <p className="truncate font-mono text-[11.5px] text-fg-3">
-                      {service.url ?? "No URL configured"}
-                    </p>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <Chip mono>{service.type}</Chip>
-                    <Chip tone={service.type === "docker" ? "idle" : "ok"}>
-                      {service.type === "docker" ? "Unknown" : "External"}
-                    </Chip>
-                    <Button size="sm" variant="ghost" asChild>
-                      <Link href={`/services/${service.id}`}>View details</Link>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {group.rows.map((row) => (
+              <div key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-line-subtle">
+                <StatusDot status={toneOf(row)} />
+                <Link href={`/services/${row.id}`} className="min-w-0 truncate text-[13px] font-medium hover:underline">
+                  {row.name}
+                </Link>
+                {row.url ? (
+                  <a href={row.url} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1 truncate font-mono text-[11.5px] text-fg-3 hover:text-fg">
+                    {row.url}
+                    <ExternalLink className="size-3 shrink-0" strokeWidth={1.75} />
+                  </a>
+                ) : (
+                  <span className="truncate font-mono text-[11.5px] text-fg-4">{row.containerId ?? "no address"}</span>
+                )}
+                <span className="ml-auto flex shrink-0 items-center gap-2">
+                  {row.restarts > 0 && <Chip tone="warn">{row.restarts} restarts</Chip>}
+                  <Chip mono>{row.type}</Chip>
+                  <Chip tone={toneOf(row) === "idle" ? "idle" : toneOf(row)}>{stateOf(row)}</Chip>
+                </span>
+              </div>
+            ))}
           </Panel>
         ))
       )}

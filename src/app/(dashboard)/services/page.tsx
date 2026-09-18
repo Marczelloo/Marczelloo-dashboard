@@ -1,72 +1,32 @@
-import { Suspense } from "react";
 import Link from "next/link";
-import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { Skeleton, Button } from "@/components/ui";
-import { services, projects } from "@/server/data";
 import { Plus } from "lucide-react";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui";
+import { listServices } from "@/server/services/list";
 import { ServicesList } from "./_components/services-list";
 
-// Force dynamic rendering (no static prerendering)
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Services" };
 
-async function ServicesContent() {
-  const [allServices, allProjects] = await Promise.all([
-    services.getServices().catch((error) => {
-      console.error("[ServicesPage] Failed to load services:", error);
-      return [];
-    }),
-    projects.getProjects().catch((error) => {
-      console.error("[ServicesPage] Failed to load projects:", error);
-      return [];
-    }),
-  ]);
+export default async function ServicesPage() {
+  const data = await listServices().catch(() => ({ rows: [], projects: [], live: false }));
 
-  const standaloneServices = allServices.filter(
-    (service) => !service.project_id,
-  );
-  const projectBoundServices = allServices.filter(
-    (service) => !!service.project_id,
-  );
-
-  return (
-    <ServicesList
-      standaloneServices={standaloneServices}
-      projectBoundServices={projectBoundServices}
-      projects={allProjects}
-    />
-  );
-}
-
-export default function ServicesPage() {
   return (
     <>
       <PageHeader
         title="Services"
         description="Everything this dashboard watches or deploys"
         actions={
-          <Link href="/services/new">
-            <Button>
-              <Plus className="size-4" />
+          <Button asChild>
+            <Link href="/services/new">
+              <Plus strokeWidth={1.75} />
               Add service
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         }
       />
       <PageBody>
-        <Suspense
-          fallback={
-            <div className="grid gap-4">
-              <Skeleton className="h-14 rounded-lg" />
-              <div className="grid gap-4">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24 rounded-lg" />
-                ))}
-              </div>
-            </div>
-          }
-        >
-          <ServicesContent />
-        </Suspense>
+        <ServicesList data={data} />
       </PageBody>
     </>
   );
