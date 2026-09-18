@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demo-mode";
 import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
 import { getEnvFilePath, validateRepoPath } from "@/server/deployments/paths";
 import { parseEnvEntries } from "@/server/env/dotenv";
@@ -8,6 +9,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { repoPath, filename, action } = body;
+
+    if (isDemoMode()) {
+      // The demo has no Pi behind it; env files simply do not exist there.
+      return action === "list"
+        ? NextResponse.json({ success: true, files: [] })
+        : NextResponse.json({ success: false, error: "Env files are not available in the demo.", files: [] }, { status: 404 });
+    }
 
     if (action === "list") {
       await requireAuth();

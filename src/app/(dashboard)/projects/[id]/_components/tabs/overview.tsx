@@ -46,12 +46,17 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
           title={`Services (${services.length})`}
           icon={Server}
           action={
-            <Button size="sm" variant="secondary" asChild>
-              <Link href={`/projects/${project.id}/services/new`}>
-                <Plus strokeWidth={1.75} />
-                Add service
+            <span className="flex items-center gap-3">
+              <Link href={`/projects/${project.id}?tab=logs`} className="text-xs text-fg-3 hover:text-fg">
+                Logs
               </Link>
-            </Button>
+              <Button size="sm" variant="secondary" asChild>
+                <Link href={`/projects/${project.id}/services/new`}>
+                  <Plus strokeWidth={1.75} />
+                  Add service
+                </Link>
+              </Button>
+            </span>
           }
         >
           {services.length === 0 ? (

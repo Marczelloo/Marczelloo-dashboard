@@ -269,11 +269,12 @@ export async function getContainerLogs(
   endpointId: number,
   containerId: string,
   tail = 1000,
+  timestamps = false,
   isRetry = false
 ): Promise<ContainerLogs> {
   try {
     const config = await getConfig();
-    const url = `${config.url}/api/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=false`;
+    const url = `${config.url}/api/endpoints/${endpointId}/docker/containers/${containerId}/logs?stdout=true&stderr=true&tail=${tail}&timestamps=${timestamps}`;
 
     // Fetch raw binary data - Docker multiplexed streams are binary
     const response = await fetch(url, {
@@ -290,7 +291,7 @@ export async function getContainerLogs(
 
       const newToken = await refreshPortainerToken();
       if (newToken) {
-        return getContainerLogs(endpointId, containerId, tail, true);
+        return getContainerLogs(endpointId, containerId, tail, timestamps, true);
       }
     }
 

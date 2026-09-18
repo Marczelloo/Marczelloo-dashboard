@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, History, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button } from "@/components/ui";
+import { Button, Chip, Panel } from "@/components/ui";
 import { PinDialog } from "@/components/pin-dialog";
 
 interface EnvVersion {
@@ -15,7 +15,7 @@ interface EnvVersion {
   createdAt: string;
 }
 
-const dateFormat = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" });
+const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
 /** Env file versions of an agent-deployed project; restoring goes through the agent's health gate. */
 export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string; refreshKey: number }) {
@@ -54,10 +54,10 @@ export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string
         return;
       }
       if (!response.ok || !data.success) {
-        toast.error("Nie przywrócono wersji", { description: data.error });
+        toast.error("Version not restored", { description: data.error });
         return;
       }
-      toast.success(`Wersja ${version} w kolejce agenta`, { description: "Po zapisie agent sprawdzi zdrowie usług; przy błędzie wróci do obecnego pliku." });
+      toast.success(`Version ${version} queued`, { description: "The agent health-checks the services after writing and rolls back to the current file if they fail." });
       await load();
     } finally {
       setRestoring(null);
@@ -67,44 +67,47 @@ export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string
   if (!agent) return null;
 
   return (
-    <section className="rounded-lg border border-border/70">
+    <Panel>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium"
+        className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
         aria-expanded={open}
       >
-        <span className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          Historia wersji
-          <Badge variant="outline" className="tabular-nums">{versions.length}</Badge>
+        <span className="flex items-center gap-2 text-[13.5px] font-semibold">
+          <History className="size-4 text-fg-3" strokeWidth={1.75} />
+          Version history
+          <Chip mono>{versions.length}</Chip>
         </span>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`size-4 text-fg-3 transition-transform duration-base ease-out ${open ? "rotate-180" : ""}`} strokeWidth={1.75} />
       </button>
       {open && (
-        <div className="border-t border-border/70">
+        <div className="border-t border-line-subtle">
           {loading && !versions.length ? (
-            <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Wczytywanie…</div>
+            <p className="flex items-center gap-2 p-3.5 text-[13px] text-fg-3">
+              <Loader2 className="size-4 animate-spin" />
+              Loading…
+            </p>
           ) : !versions.length ? (
-            <p className="p-3 text-sm text-muted-foreground">Pierwsza wersja powstanie przy najbliższym zapisie.</p>
+            <p className="p-3.5 text-[13px] text-fg-3">The first version is written on the next save.</p>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul>
               {versions.map((item, index) => (
-                <li key={item.version} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <li key={item.version} className="flex items-center justify-between gap-3 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-line-subtle">
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2">
+                    <p className="flex flex-wrap items-center gap-2 text-[13px]">
                       <span className="font-medium tabular-nums">v{item.version}</span>
-                      {item.file && <code className="text-xs text-muted-foreground">{item.file}</code>}
-                      {index === 0 && <Badge variant="secondary">najnowsza</Badge>}
+                      {item.file && <code className="text-[11.5px] text-fg-3">{item.file}</code>}
+                      {index === 0 && <Chip tone="ok">current</Chip>}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {item.note ?? "—"} · {item.keyCount} kluczy · {item.createdBy} · {dateFormat.format(new Date(item.createdAt))}
+                    <p className="truncate text-[11.5px] text-fg-3">
+                      {item.note ?? "no note"} · {item.keyCount} keys · {item.createdBy} · {dateFormat.format(new Date(item.createdAt))}
                     </p>
                   </div>
                   {item.file && index > 0 && (
-                    <Button size="sm" variant="outline" onClick={() => void restore(item.version)} disabled={restoring !== null}>
-                      {restoring === item.version ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                      Przywróć
+                    <Button size="sm" variant="secondary" onClick={() => void restore(item.version)} disabled={restoring !== null}>
+                      {restoring === item.version ? <Loader2 className="animate-spin" /> : <RotateCcw strokeWidth={1.75} />}
+                      Restore
                     </Button>
                   )}
                 </li>
@@ -122,6 +125,6 @@ export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string
         }}
         onCancel={() => setPinFor(null)}
       />
-    </section>
+    </Panel>
   );
 }

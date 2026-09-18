@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ListChecks, Plus } from "lucide-react";
+import { Columns3, ListChecks, Plus } from "lucide-react";
 import { StatusDot } from "@/components/status-dot";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Panel } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import type { WorkItem } from "@/types";
 
@@ -35,9 +35,18 @@ export function TasksTab({ projectId, items }: { projectId: string; items: WorkI
     );
   }
 
+  // A lone group gets the full width; the rule across the app is that one column of content never sits in half a page.
+  const groups = GROUPS.map((group) => ({ ...group, items: items.filter((item) => item.status === group.status) })).filter((group) => group.items.length > 0);
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="secondary" asChild>
+          <Link href={`/projects/${projectId}/work-items`}>
+            <Columns3 strokeWidth={1.75} />
+            Open board
+          </Link>
+        </Button>
         <Button size="sm" asChild>
           <Link href={`/projects/${projectId}/work-items/new`}>
             <Plus strokeWidth={1.75} />
@@ -45,10 +54,8 @@ export function TasksTab({ projectId, items }: { projectId: string; items: WorkI
           </Link>
         </Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {GROUPS.map(({ status, label }) => {
-          const group = items.filter((item) => item.status === status);
-          if (group.length === 0) return null;
+      <div className={cn("grid gap-4", groups.length > 1 && "md:grid-cols-2")}>
+        {groups.map(({ status, label, items: group }) => {
           return (
             <Panel key={status}>
               <div className="flex items-center justify-between border-b border-line-subtle px-3.5 py-3">

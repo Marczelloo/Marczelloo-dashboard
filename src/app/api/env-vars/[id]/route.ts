@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { envVars, auditLogs } from "@/server/atlashub";
+import { envVars, auditLogs } from "@/server/data";
 import { requirePinVerification, AuthError } from "@/server/lib/auth";
 
 interface RouteParams {

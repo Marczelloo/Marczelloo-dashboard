@@ -32,6 +32,7 @@ import type {
   CreateWorkItemInput,
   UpdateWorkItemInput,
   CreateDeployInput,
+  CreateAuditLogInput,
   DeployStatus,
 } from "@/types";
 
@@ -330,6 +331,19 @@ export const auditLogs = {
 
   async getRecentAuditLogs(limit = 50): Promise<AuditLog[]> {
     return mockAuditLogs.slice(0, limit);
+  },
+
+  async createAuditLog(input: CreateAuditLogInput): Promise<AuditLog> {
+    // Nothing is written in the demo; the caller only needs a row back.
+    return {
+      id: `demo-${Date.now()}`,
+      at: new Date().toISOString(),
+      actor_email: input.actor_email,
+      action: input.action,
+      entity_type: input.entity_type,
+      entity_id: input.entity_id ?? null,
+      meta_json: input.meta_json ?? null,
+    };
   },
 
   async logAction(

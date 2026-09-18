@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demo-mode";
+import { demoContainerLogs } from "@/server/demo/container-logs";
 import { requireAuth } from "@/server/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
     await requireAuth();
     const body = await request.json();
-    const { endpointId, containerId, tail = 1000 } = body;
+    const { endpointId, containerId, tail = 1000, timestamps = false } = body;
 
     console.log(`[Logs API] Request: endpointId=${endpointId}, containerId=${containerId}, tail=${tail}`);
 
     if (!endpointId || !containerId) {
       return NextResponse.json({ error: "Missing required parameters: endpointId and containerId" }, { status: 400 });
+    }
+
+    if (isDemoMode()) {
+      return NextResponse.json({ logs: demoContainerLogs(String(containerId), Number(tail), Boolean(timestamps)), timestamp: new Date().toISOString() });
     }
 
     // Validate endpointId is a number
@@ -32,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     let result;
     try {
-      result = await portainer.getContainerLogs(endpointNum, containerId, tail);
+      result = await portainer.getContainerLogs(endpointNum, containerId, tail, Boolean(timestamps));
     } catch (portainerError) {
       console.error("[Logs API] Portainer error:", portainerError);
       const errorMessage = portainerError instanceof Error ? portainerError.message : "Portainer request failed";

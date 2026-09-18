@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as portainer from "@/server/portainer/client";
+import { isDemoMode } from "@/lib/demo-mode";
+import { demoContainerStats } from "@/server/demo/container-logs";
 import { requireAuth } from "@/server/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -10,6 +12,10 @@ export async function POST(request: NextRequest) {
 
     if (!endpointId || !containerId) {
       return NextResponse.json({ success: false, error: "Missing required parameters" }, { status: 400 });
+    }
+
+    if (isDemoMode()) {
+      return NextResponse.json({ success: true, data: demoContainerStats(String(containerId)) });
     }
 
     const data = await portainer.getContainerStats(endpointId, containerId);

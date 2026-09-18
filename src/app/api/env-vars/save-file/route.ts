@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findAgentProjectByRepoPath, queueAgentEnvApply, recordEnvFileVersion } from "@/server/agent/env-apply";
-import { auditLogs } from "@/server/atlashub";
+import { auditLogs } from "@/server/data";
 import { AuthError, requirePinVerification } from "@/server/lib/auth";
 import { getEnvFilePath } from "@/server/deployments/paths";
 import { readAgentEnvFile } from "@/server/agent/client";

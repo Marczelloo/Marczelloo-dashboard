@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export const PROJECT_TABS = ["overview", "deployments", "environment", "domains", "github", "code", "tasks", "settings"] as const;
+export const PROJECT_TABS = ["overview", "deployments", "logs", "environment", "domains", "github", "code", "tasks", "settings"] as const;
 
 export type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const LABEL: Record<ProjectTab, string> = {
   overview: "Overview",
   deployments: "Deployments",
+  logs: "Logs",
   environment: "Environment",
   domains: "Domains",
   github: "GitHub",

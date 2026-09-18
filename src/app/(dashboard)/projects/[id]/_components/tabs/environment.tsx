@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { KeyRound } from "lucide-react";
 import { EnvManager } from "@/components/features/env-manager";
 import { EnvVersionHistory } from "@/components/features/env-version-history";
@@ -9,7 +8,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { Service } from "@/types";
 
 export function EnvironmentTab({ service, repoPath }: { service: Service | null; repoPath: string | null }) {
-  const [refreshKey] = useState(0);
   if (!service) {
     return (
       <Panel>
@@ -18,9 +16,9 @@ export function EnvironmentTab({ service, repoPath }: { service: Service | null;
     );
   }
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    <div className="flex flex-col gap-4">
       <EnvManager serviceId={service.id} serviceName={service.name} repoPath={repoPath ?? undefined} />
-      <EnvVersionHistory serviceId={service.id} refreshKey={refreshKey} />
+      <EnvVersionHistory serviceId={service.id} refreshKey={0} />
     </div>
   );
 }

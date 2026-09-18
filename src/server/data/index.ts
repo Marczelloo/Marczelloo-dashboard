@@ -160,6 +160,8 @@ export const uptimeChecks = {
 // ========================================
 
 export const auditLogs = {
+  createAuditLog: (input: Parameters<typeof atlashub.auditLogs.createAuditLog>[0]) => getSource().auditLogs.createAuditLog(input),
+
   getAuditLogs: (...args: Parameters<typeof atlashub.auditLogs.getAuditLogs>) =>
     getSource().auditLogs.getAuditLogs(...args),
 

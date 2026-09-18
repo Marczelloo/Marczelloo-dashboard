@@ -12,6 +12,7 @@ import { DeploymentsTab } from "./_components/tabs/deployments";
 import { DomainsTab } from "./_components/tabs/domains";
 import { EnvironmentTab } from "./_components/tabs/environment";
 import { GitHubTab } from "./_components/tabs/github";
+import { LogsTab } from "./_components/tabs/logs";
 import { OverviewTab } from "./_components/tabs/overview";
 import { SettingsTab } from "./_components/tabs/settings";
 import { TasksTab } from "./_components/tabs/tasks";
@@ -50,6 +51,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       <ProjectTabs projectId={id} active={active} />
       {active === "overview" && <OverviewTab detail={detail} />}
       {active === "deployments" && <DeploymentsTab detail={detail} />}
+      {active === "logs" && <LogsTab services={detail.services} />}
       {active === "environment" && <EnvironmentTab service={detail.primaryService} repoPath={detail.config?.repoPath ?? null} />}
       {active === "domains" && <DomainsTab projectId={id} />}
       {active === "github" && <GitHubTab project={detail.project} />}

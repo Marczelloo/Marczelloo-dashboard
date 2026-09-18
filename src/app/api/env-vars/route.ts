@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { envVars, auditLogs } from "@/server/atlashub";
+import { envVars, auditLogs } from "@/server/data";
 import { AuthError, requireAuth, requirePinVerification } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -49,6 +49,10 @@ export async function POST(request: NextRequest) {
       value,
       is_secret: is_secret ?? true,
     });
+
+    if (!created) {
+      return NextResponse.json({ success: false, error: "The variable was not stored" }, { status: 500 });
+    }
 
     // Audit log
     await auditLogs.createAuditLog({
