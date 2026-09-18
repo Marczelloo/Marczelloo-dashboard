@@ -210,7 +210,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
       if (result.success) {
         toast.success(`Container ${action} successful`);
         if (action === "remove") {
-          router.push("/containers");
+          router.push("/host?tab=containers");
         } else {
           fetchInspect();
         }
@@ -245,7 +245,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
           <Card>
             <CardContent className="p-8 text-center">
               <p className="text-danger">{error || "Container not found"}</p>
-              <Button variant="outline" className="mt-4" onClick={() => router.push("/containers")}>
+              <Button variant="outline" className="mt-4" onClick={() => router.push("/host?tab=containers")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Containers
               </Button>
@@ -264,7 +264,7 @@ export default function ContainerDetailPage({ params }: PageProps) {
     <>
       <Header title={name} description={`Container ${containerId.slice(0, 12)}`}>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push("/containers")}>
+          <Button variant="outline" size="sm" onClick={() => router.push("/host?tab=containers")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
