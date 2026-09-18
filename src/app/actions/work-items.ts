@@ -1,6 +1,6 @@
 "use server";
 
-import { workItems, auditLogs, projects } from "@/server/atlashub";
+import { workItems, auditLogs, projects } from "@/server/data";
 import { requirePinVerification, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import { createIssue, isGitHubConfigured } from "@/server/github";

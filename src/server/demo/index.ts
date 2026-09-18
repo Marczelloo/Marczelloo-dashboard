@@ -230,8 +230,8 @@ export const workItems = {
     return mockWorkItems.find((w) => w.id === id) || null;
   },
 
-  async getWorkItemsByProjectId(projectId: string): Promise<WorkItem[]> {
-    return mockWorkItems.filter((w) => w.project_id === projectId);
+  async getWorkItemsByProjectId(projectId: string, type?: WorkItem["type"], status?: WorkItem["status"]): Promise<WorkItem[]> {
+    return mockWorkItems.filter((w) => w.project_id === projectId && (!type || w.type === type) && (!status || w.status === status));
   },
 
   async getOpenWorkItemsByProjectId(projectId: string): Promise<WorkItem[]> {

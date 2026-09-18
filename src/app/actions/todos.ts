@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { generalTodos } from "@/server/atlashub";
+import { generalTodos } from "@/server/data";
 import { checkDemoModeBlocked } from "@/lib/demo-mode";
 import type { TodoPriority, TodoStatus } from "@/server/atlashub/general-todos";
 

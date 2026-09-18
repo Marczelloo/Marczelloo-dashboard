@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { projects } from "@/server/atlashub";
+import { projects } from "@/server/data";
 import { requireAuth } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from "@/components/ui";
-import { Server, ExternalLink, FolderKanban, Globe, Database, Settings, Code, Filter } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Panel } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StatusDot } from "@/components/status-dot";
+import { Server } from "lucide-react";
 import type { Service, Project } from "@/types";
 
 type ServiceCategory = "website" | "api" | "database" | "admin" | "other";
@@ -82,80 +93,8 @@ function detectServiceCategory(service: Service): ServiceCategory {
   return "other";
 }
 
-const categoryConfig: Record<ServiceCategory, { icon: typeof Globe; label: string; color: string }> = {
-  website: { icon: Globe, label: "Website", color: "bg-green-500/10 text-green-500 border-green-500/20" },
-  api: { icon: Code, label: "API", color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20" },
-  database: { icon: Database, label: "Database", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
-  admin: { icon: Settings, label: "Admin", color: "bg-pink-500/10 text-pink-500 border-pink-500/20" },
-  other: { icon: Server, label: "Other", color: "bg-gray-500/10 text-gray-500 border-gray-500/20" },
-};
-
-const typeColors: Record<string, string> = {
-  docker: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  vercel: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  external: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-};
-
-function ServiceCard({ service, project }: { service: Service; project?: Project }) {
-  const category = detectServiceCategory(service);
-  const CategoryIcon = categoryConfig[category].icon;
-
-  return (
-    <Card className="transition-all hover:border-primary/30">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <CategoryIcon className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">{service.name}</CardTitle>
-              {project && (
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                >
-                  <FolderKanban className="h-3 w-3" />
-                  {project.name}
-                </Link>
-              )}
-              {!project && <span className="text-xs text-muted-foreground">Standalone service</span>}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1 items-end">
-            <Badge variant="outline" className={typeColors[service.type] || ""}>
-              {service.type}
-            </Badge>
-            <Badge variant="outline" className={categoryConfig[category].color}>
-              {categoryConfig[category].label}
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          {service.url ? (
-            <a
-              href={service.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <ExternalLink className="h-3 w-3" />
-              {new URL(service.url).hostname}
-            </a>
-          ) : (
-            <span className="text-xs text-muted-foreground">No URL configured</span>
-          )}
-          <Link href={`/services/${service.id}`}>
-            <Button variant="outline" size="sm">
-              View Details
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function serviceStatus(service: Service) {
+  return service.type === "docker" ? "idle" : "ok";
 }
 
 interface ServicesListProps {
@@ -164,12 +103,23 @@ interface ServicesListProps {
   projects: Project[];
 }
 
-export function ServicesList({ standaloneServices, projectBoundServices, projects }: ServicesListProps) {
+export function ServicesList({
+  standaloneServices,
+  projectBoundServices,
+  projects,
+}: ServicesListProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [ownershipFilter, setOwnershipFilter] = useState<string>("all");
+  const [query, setQuery] = useState("");
 
-  const projectMap = new Map<string, Project>(projects.map((p) => [p.id, p]));
+  const projectMap = useMemo(
+    () =>
+      new Map<string, Project>(
+        projects.map((project) => [project.id, project]),
+      ),
+    [projects],
+  );
   const allServices = [...standaloneServices, ...projectBoundServices];
 
   // Apply filters
@@ -180,7 +130,10 @@ export function ServicesList({ standaloneServices, projectBoundServices, project
     }
 
     // Category filter
-    if (categoryFilter !== "all" && detectServiceCategory(service) !== categoryFilter) {
+    if (
+      categoryFilter !== "all" &&
+      detectServiceCategory(service) !== categoryFilter
+    ) {
       return false;
     }
 
@@ -192,37 +145,58 @@ export function ServicesList({ standaloneServices, projectBoundServices, project
       return false;
     }
 
-    return true;
+    return `${service.name} ${service.url ?? ""}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase());
   });
 
   const hasAnyServices = allServices.length > 0;
-  const hasFilters = typeFilter !== "all" || categoryFilter !== "all" || ownershipFilter !== "all";
+  const hasFilters =
+    typeFilter !== "all" ||
+    categoryFilter !== "all" ||
+    ownershipFilter !== "all" ||
+    query;
+  const groupedServices = useMemo(() => {
+    const groups = new Map<string, Service[]>();
+    for (const service of filteredServices) {
+      const project = service.project_id
+        ? projectMap.get(service.project_id)
+        : undefined;
+      const groupName = project?.name ?? "Standalone";
+      groups.set(groupName, [...(groups.get(groupName) ?? []), service]);
+    }
+    return [...groups.entries()];
+  }, [filteredServices, projectMap]);
 
   if (!hasAnyServices) {
     return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>No services configured yet.</p>
-        <p className="mt-2 text-sm">Create a standalone service or add services to your projects.</p>
-        <Link href="/services/new" className="mt-4 inline-block">
-          <Button>
-            <Server className="h-4 w-4 mr-2" />
-            Create Service
-          </Button>
-        </Link>
-      </div>
+      <Panel>
+        <EmptyState
+          icon={Server}
+          title="No services configured yet"
+          description="Create a standalone service or add services to your projects."
+          action={
+            <Link href="/services/new">
+              <Button>Add service</Button>
+            </Link>
+          }
+        />
+      </Panel>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 p-4 bg-secondary/30 rounded-lg">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Filters:</span>
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filter by name or URL"
+          className="w-full sm:w-[220px]"
+        />
 
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[130px] h-8">
+          <SelectTrigger className="w-[130px]">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -234,7 +208,7 @@ export function ServicesList({ standaloneServices, projectBoundServices, project
         </Select>
 
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[140px] h-8">
+          <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -248,7 +222,7 @@ export function ServicesList({ standaloneServices, projectBoundServices, project
         </Select>
 
         <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
-          <SelectTrigger className="w-[140px] h-8">
+          <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Ownership" />
           </SelectTrigger>
           <SelectContent>
@@ -266,33 +240,76 @@ export function ServicesList({ standaloneServices, projectBoundServices, project
               setTypeFilter("all");
               setCategoryFilter("all");
               setOwnershipFilter("all");
+              setQuery("");
             }}
           >
             Clear
           </Button>
         )}
 
-        <span className="ml-auto text-sm text-muted-foreground">
+        <span className="ml-auto text-[12px] text-fg-3">
           {filteredServices.length} of {allServices.length} services
         </span>
       </div>
 
-      {/* Services Grid */}
       {filteredServices.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Server className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p>No services match the selected filters.</p>
-        </div>
+        <Panel>
+          <EmptyState
+            icon={Server}
+            title="No services match the filters"
+            description="Adjust or clear the filters to see services."
+          />
+        </Panel>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredServices.map((service) => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              project={service.project_id ? projectMap.get(service.project_id) : undefined}
-            />
-          ))}
-        </div>
+        groupedServices.map(([groupName, group]) => (
+          <Panel key={groupName} className="overflow-hidden">
+            <div className="border-b border-line-subtle px-3.5 py-3">
+              <h2 className="text-[13.5px] font-semibold text-fg">
+                {groupName}
+              </h2>
+              <p className="mt-0.5 text-[11.5px] text-fg-3">
+                {group.length} service{group.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div className="divide-y divide-line-subtle">
+              {group.map((service) => (
+                <div
+                  key={service.id}
+                  className="flex flex-wrap items-center gap-3 px-3.5 py-3"
+                >
+                  <StatusDot
+                    status={serviceStatus(service)}
+                    label={
+                      service.type === "docker"
+                        ? "Container status unavailable"
+                        : "Available"
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/services/${service.id}`}
+                      className="block truncate text-[13px] font-medium text-fg hover:text-accent-text"
+                    >
+                      {service.name}
+                    </Link>
+                    <p className="truncate font-mono text-[11.5px] text-fg-3">
+                      {service.url ?? "No URL configured"}
+                    </p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <Chip mono>{service.type}</Chip>
+                    <Chip tone={service.type === "docker" ? "idle" : "ok"}>
+                      {service.type === "docker" ? "Unknown" : "External"}
+                    </Chip>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link href={`/services/${service.id}`}>View details</Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        ))
       )}
     </div>
   );

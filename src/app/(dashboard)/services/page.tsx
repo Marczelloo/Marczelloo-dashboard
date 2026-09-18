@@ -21,8 +21,12 @@ async function ServicesContent() {
     }),
   ]);
 
-  const standaloneServices = allServices.filter((service) => !service.project_id);
-  const projectBoundServices = allServices.filter((service) => !!service.project_id);
+  const standaloneServices = allServices.filter(
+    (service) => !service.project_id,
+  );
+  const projectBoundServices = allServices.filter(
+    (service) => !!service.project_id,
+  );
 
   return (
     <ServicesList
@@ -38,12 +42,12 @@ export default function ServicesPage() {
     <>
       <PageHeader
         title="Services"
-        description="All services across your infrastructure"
+        description="Everything this dashboard watches or deploys"
         actions={
           <Link href="/services/new">
             <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Service
+              <Plus className="size-4" />
+              Add service
             </Button>
           </Link>
         }
@@ -51,11 +55,11 @@ export default function ServicesPage() {
       <PageBody>
         <Suspense
           fallback={
-            <div className="space-y-4">
+            <div className="grid gap-4">
               <Skeleton className="h-14 rounded-lg" />
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-40 rounded-lg" />
+                  <Skeleton key={i} className="h-24 rounded-lg" />
                 ))}
               </div>
             </div>

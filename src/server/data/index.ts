@@ -119,7 +119,8 @@ export const workItems = {
 
   getWorkItemById: (id: string) => getSource().workItems.getWorkItemById(id),
 
-  getWorkItemsByProjectId: (projectId: string) => getSource().workItems.getWorkItemsByProjectId(projectId),
+  getWorkItemsByProjectId: (...args: Parameters<typeof atlashub.workItems.getWorkItemsByProjectId>) =>
+    getSource().workItems.getWorkItemsByProjectId(...args),
 
   getOpenWorkItemsByProjectId: (projectId: string) => getSource().workItems.getOpenWorkItemsByProjectId(projectId),
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { services } from "@/server/atlashub";
+import { services } from "@/server/data";
 import { getCurrentUser, isAllowedUser } from "@/server/lib/auth";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

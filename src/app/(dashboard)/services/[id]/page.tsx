@@ -3,31 +3,43 @@
 import { useState, useEffect, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Header } from "@/components/layout";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  FormActions,
+  FormField,
+  FormLayout,
+  FormSection,
+} from "@/components/layout/form-layout";
+import { PageBody, PageHeader } from "@/components/layout/page-header";
+import { StatusDot } from "@/components/status-dot";
+import {
   Button,
   Input,
-  Label,
-  Badge,
   Skeleton,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
-import { updateServiceAction, deleteServiceAction } from "@/app/actions/services";
+import { Chip } from "@/components/ui/chip";
+import { Panel } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  updateServiceAction,
+  deleteServiceAction,
+} from "@/app/actions/services";
 import {
   ArrowLeft,
   Save,
   Trash2,
   RefreshCw,
   Server,
-  Globe,
-  Cloud,
   Container,
   FileText,
   Activity,
@@ -37,10 +49,8 @@ import {
   Cpu,
   Loader2,
   Settings,
-  ExternalLink,
 } from "lucide-react";
 import type { Service } from "@/types";
-import { formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ContainerStats {
@@ -80,7 +90,8 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
     container_id: "",
     repo_path: "",
     compose_project: "",
-    deploy_strategy: "pull_restart" as "pull_restart" | "pull_rebuild" | "compose_up" | "manual",
+    deploy_strategy: "pull_restart" as
+      "pull_restart" | "pull_rebuild" | "compose_up" | "manual",
   });
 
   // Docker management state
@@ -88,10 +99,15 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
   const [logsLoading, setLogsLoading] = useState(false);
   const [stats, setStats] = useState<ContainerStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [containerStatus, setContainerStatus] = useState<"running" | "stopped" | "unknown">("unknown");
+  const [containerStatus, setContainerStatus] = useState<
+    "running" | "stopped" | "unknown"
+  >("unknown");
   const [containerAction, setContainerAction] = useState<string | null>(null);
 
-  const hasDockerConfig = service?.type === "docker" && service?.container_id && service?.portainer_endpoint_id;
+  const hasDockerConfig =
+    service?.type === "docker" &&
+    service?.container_id &&
+    service?.portainer_endpoint_id;
 
   const fetchLogs = useCallback(async () => {
     if (!service?.container_id || !service?.portainer_endpoint_id) return;
@@ -143,7 +159,9 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
     }
   }, [service?.container_id, service?.portainer_endpoint_id]);
 
-  const performContainerAction = async (action: "start" | "stop" | "restart") => {
+  const performContainerAction = async (
+    action: "start" | "stop" | "restart",
+  ) => {
     if (!service?.container_id || !service?.portainer_endpoint_id) return;
     setContainerAction(action);
     try {
@@ -217,10 +235,20 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
         type: formData.type,
         url: formData.url || undefined,
         health_url: formData.health_url || undefined,
-        container_id: formData.type === "docker" ? formData.container_id || undefined : undefined,
-        repo_path: formData.type === "docker" ? formData.repo_path || undefined : undefined,
-        compose_project: formData.type === "docker" ? formData.compose_project || undefined : undefined,
-        deploy_strategy: formData.type === "docker" ? formData.deploy_strategy : undefined,
+        container_id:
+          formData.type === "docker"
+            ? formData.container_id || undefined
+            : undefined,
+        repo_path:
+          formData.type === "docker"
+            ? formData.repo_path || undefined
+            : undefined,
+        compose_project:
+          formData.type === "docker"
+            ? formData.compose_project || undefined
+            : undefined,
+        deploy_strategy:
+          formData.type === "docker" ? formData.deploy_strategy : undefined,
       });
 
       if (!result.success) {
@@ -266,29 +294,29 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
     }
   };
 
-  const typeIcons = {
-    docker: <Server className="h-5 w-5" />,
-    vercel: <Cloud className="h-5 w-5" />,
-    external: <Globe className="h-5 w-5" />,
-  };
-
-  const backLink = service?.project_id ? `/projects/${service.project_id}` : "/services";
+  const backLink = service?.project_id
+    ? `/projects/${service.project_id}`
+    : "/services";
 
   if (isLoading) {
     return (
       <>
-        <Header title="Service" description="Loading...">
-          <Link href="/services">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-        </Header>
-        <div className="p-6 max-w-2xl space-y-4">
+        <PageHeader
+          title="Service"
+          description="Loading…"
+          actions={
+            <Link href="/services">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft />
+                Back
+              </Button>
+            </Link>
+          }
+        />
+        <PageBody className="grid max-w-4xl gap-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-32 w-full" />
-        </div>
+        </PageBody>
       </>
     );
   }
@@ -296,126 +324,169 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
   if (error === "Service not found") {
     return (
       <>
-        <Header title="Service Not Found" description="The requested service does not exist">
-          <Link href="/services">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Services
-            </Button>
-          </Link>
-        </Header>
-        <div className="p-6">
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Server className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground">Service not found</p>
-            </CardContent>
-          </Card>
-        </div>
+        <PageHeader
+          title="Service not found"
+          description="The requested service does not exist"
+          actions={
+            <Link href="/services">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft />
+                Back to services
+              </Button>
+            </Link>
+          }
+        />
+        <PageBody>
+          <Panel>
+            <EmptyState icon={Server} title="Service not found" />
+          </Panel>
+        </PageBody>
       </>
     );
   }
 
   return (
     <>
-      <Header
+      <PageHeader
         title={formData.name || "Service"}
-        description={service ? `Created ${formatDateTime(service.created_at)}` : ""}
-      >
-        <div className="flex items-center gap-2">
-          <Link href={backLink}>
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </Link>
-        </div>
-      </Header>
-
-      <div className="p-6">
-        {/* Service Status Bar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          {typeIcons[formData.type]}
-          <Badge variant="secondary">{formData.type}</Badge>
-          {hasDockerConfig && (
-            <Badge variant={containerStatus === "running" ? "default" : "secondary"}>{containerStatus}</Badge>
-          )}
-          {service?.project_id && (
-            <Link href={`/projects/${service.project_id}`}>
-              <Badge variant="outline" className="hover:bg-secondary cursor-pointer">
-                Project-bound
-              </Badge>
-            </Link>
-          )}
-          {!service?.project_id && (
-            <Badge variant="outline" className="text-primary border-primary/20">
-              Standalone
-            </Badge>
-          )}
-          {formData.url && (
-            <a
-              href={formData.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              {formData.url}
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-
-          {/* Docker Quick Actions */}
-          {hasDockerConfig && (
-            <div className="flex items-center gap-2 ml-auto">
-              {containerStatus === "running" ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => performContainerAction("stop")}
-                    disabled={containerAction !== null}
-                  >
-                    {containerAction === "stop" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Square className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => performContainerAction("restart")}
-                    disabled={containerAction !== null}
-                  >
-                    {containerAction === "restart" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-4 w-4" />
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => performContainerAction("start")}
-                  disabled={containerAction !== null}
-                >
-                  {containerAction === "start" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/containers/${service?.portainer_endpoint_id}/${service?.container_id}`}>
-                  <Container className="h-4 w-4" />
-                </Link>
+        description={
+          formData.url || formData.container_id || "External service"
+        }
+        actions={
+          <>
+            <Link href={backLink}>
+              <Button variant="ghost" size="sm">
+                <ArrowLeft />
+                Back
               </Button>
+            </Link>
+            {hasDockerConfig && (
+              <>
+                {containerStatus === "running" ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="icon-sm"
+                      onClick={() => performContainerAction("stop")}
+                      disabled={containerAction !== null}
+                    >
+                      {containerAction === "stop" ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Square />
+                      )}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon-sm"
+                      onClick={() => performContainerAction("restart")}
+                      disabled={containerAction !== null}
+                    >
+                      {containerAction === "restart" ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <RotateCcw />
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => performContainerAction("start")}
+                    disabled={containerAction !== null}
+                  >
+                    {containerAction === "start" ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Play />
+                    )}
+                  </Button>
+                )}
+                <Button variant="secondary" size="icon-sm" asChild>
+                  <Link
+                    href={`/containers/${service?.portainer_endpoint_id}/${service?.container_id}`}
+                  >
+                    <Container />
+                  </Link>
+                </Button>
+              </>
+            )}
+            {formData.url && (
+              <Button variant="secondary" size="sm" asChild>
+                <a
+                  href={formData.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open
+                </a>
+              </Button>
+            )}
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDelete}
+              loading={isDeleting}
+              disabled={isSaving}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </>
+        }
+      />
+
+      <PageBody className="grid gap-4">
+        <Panel className="grid grid-cols-2 divide-line-subtle md:grid-cols-4 md:divide-x [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-line-subtle md:[&>*:nth-child(n+3)]:border-t-0">
+          <div className="min-w-0 px-[18px] py-3.5">
+            <p className="text-[11.5px] text-fg-3">Status</p>
+            <p className="mt-1.5 flex items-center gap-2 text-[18px] font-semibold leading-tight">
+              <StatusDot
+                status={
+                  hasDockerConfig
+                    ? containerStatus === "running"
+                      ? "ok"
+                      : containerStatus === "stopped"
+                        ? "err"
+                        : "idle"
+                    : "ok"
+                }
+              />
+              {hasDockerConfig ? containerStatus : "External"}
+            </p>
+            <p className="mt-1 truncate text-[11px] text-fg-4">
+              {hasDockerConfig ? "Container state" : "External service"}
+            </p>
+          </div>
+          <div className="min-w-0 px-[18px] py-3.5">
+            <p className="text-[11.5px] text-fg-3">Type</p>
+            <div className="mt-1.5">
+              <Chip mono>{formData.type}</Chip>
             </div>
-          )}
-        </div>
+            <p className="mt-1 truncate text-[11px] text-fg-4">
+              Service configuration
+            </p>
+          </div>
+          <div className="min-w-0 px-[18px] py-3.5">
+            <p className="text-[11.5px] text-fg-3">Last deploy</p>
+            <p className="mt-1.5 text-[18px] font-semibold leading-tight tabular-nums">
+              —
+            </p>
+            <p className="mt-1 truncate text-[11px] text-fg-4">
+              No deploy data available
+            </p>
+          </div>
+          <div className="min-w-0 px-[18px] py-3.5">
+            <p className="text-[11.5px] text-fg-3">Open logs</p>
+            <p className="mt-1.5 text-[18px] font-semibold leading-tight tabular-nums">
+              {logs ? logs.split("\n").filter(Boolean).length : "—"}
+            </p>
+            <p className="mt-1 truncate text-[11px] text-fg-4">
+              {logs ? "Lines loaded" : "Not available"}
+            </p>
+          </div>
+        </Panel>
 
         <Tabs defaultValue="settings" className="space-y-4">
           <TabsList>
@@ -439,201 +510,258 @@ export default function ServiceDetailPage({ params }: ServiceDetailPageProps) {
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <form onSubmit={handleSubmit} className="max-w-2xl">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Edit Service</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {error && error !== "Service not found" && (
-                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-                  )}
-                  {success && <div className="rounded-lg bg-success/10 p-3 text-sm text-success">{success}</div>}
+            <form onSubmit={handleSubmit}>
+              <FormLayout>
+                {error && error !== "Service not found" && (
+                  <p className="rounded-md border border-err/25 bg-err/10 p-3 text-[13px] text-err">
+                    {error}
+                  </p>
+                )}
+                {success && (
+                  <p className="rounded-md border border-ok/25 bg-ok/10 p-3 text-[13px] text-ok">
+                    {success}
+                  </p>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Service Name *</Label>
+                <FormSection
+                  title="Service"
+                  description="Names and addresses used across the dashboard."
+                >
+                  <FormField label="Service name" htmlFor="name">
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       required
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="url">URL</Label>
+                  <FormField label="URL" htmlFor="url">
                     <Input
                       id="url"
                       type="url"
                       value={formData.url}
-                      onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, url: e.target.value })
+                      }
                       placeholder="https://example.com"
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="health_url">Health Check URL</Label>
+                  <FormField label="Health check URL" htmlFor="health_url">
                     <Input
                       id="health_url"
                       type="url"
                       value={formData.health_url}
-                      onChange={(e) => setFormData({ ...formData, health_url: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, health_url: e.target.value })
+                      }
                       placeholder="https://example.com/health"
                     />
-                  </div>
+                  </FormField>
+                </FormSection>
 
-                  {formData.type === "docker" && (
-                    <>
-                      <div className="border-t pt-4">
-                        <h3 className="font-medium mb-4">Docker Configuration</h3>
-
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="container_id">Container ID / Name</Label>
-                            <Input
-                              id="container_id"
-                              value={formData.container_id}
-                              onChange={(e) => setFormData({ ...formData, container_id: e.target.value })}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="repo_path">Repository Path</Label>
-                            <Input
-                              id="repo_path"
-                              value={formData.repo_path}
-                              onChange={(e) => setFormData({ ...formData, repo_path: e.target.value })}
-                              placeholder="/home/pi/projects/my-app"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="compose_project">Compose Project Name</Label>
-                            <Input
-                              id="compose_project"
-                              value={formData.compose_project}
-                              onChange={(e) => setFormData({ ...formData, compose_project: e.target.value })}
-                              placeholder="my-app"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="deploy_strategy">Deploy Strategy</Label>
-                            <select
-                              id="deploy_strategy"
-                              value={formData.deploy_strategy}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  deploy_strategy: e.target.value as
-                                    | "pull_restart"
-                                    | "pull_rebuild"
-                                    | "compose_up"
-                                    | "manual",
-                                })
-                              }
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            >
-                              <option value="pull_restart">Git Pull + Restart Container</option>
-                              <option value="pull_rebuild">Git Pull + Rebuild Image</option>
-                              <option value="compose_up">Docker Compose Up</option>
-                              <option value="manual">Manual Only</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex justify-between pt-4">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={handleDelete}
-                      disabled={isDeleting || isSaving}
+                {formData.type === "docker" && (
+                  <FormSection
+                    title="Docker"
+                    description="Where this service runs and how it is deployed."
+                  >
+                    <FormField
+                      label="Container ID / name"
+                      htmlFor="container_id"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      {isDeleting ? "Deleting..." : "Delete"}
-                    </Button>
+                      <Input
+                        id="container_id"
+                        value={formData.container_id}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            container_id: e.target.value,
+                          })
+                        }
+                      />
+                    </FormField>
 
-                    <Button type="submit" disabled={isSaving || isDeleting}>
-                      <Save className="h-4 w-4" />
-                      {isSaving ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    <FormField label="Repository path" htmlFor="repo_path">
+                      <Input
+                        id="repo_path"
+                        value={formData.repo_path}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            repo_path: e.target.value,
+                          })
+                        }
+                        placeholder="/home/pi/projects/my-app"
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Compose project name"
+                      htmlFor="compose_project"
+                    >
+                      <Input
+                        id="compose_project"
+                        value={formData.compose_project}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            compose_project: e.target.value,
+                          })
+                        }
+                        placeholder="my-app"
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Deploy strategy"
+                      htmlFor="deploy_strategy"
+                    >
+                      <Select
+                        value={formData.deploy_strategy}
+                        onValueChange={(value) =>
+                          setFormData({
+                            ...formData,
+                            deploy_strategy:
+                              value as typeof formData.deploy_strategy,
+                          })
+                        }
+                      >
+                        <SelectTrigger id="deploy_strategy">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pull_restart">
+                            Git pull + restart container
+                          </SelectItem>
+                          <SelectItem value="pull_rebuild">
+                            Git pull + rebuild image
+                          </SelectItem>
+                          <SelectItem value="compose_up">
+                            Docker Compose up
+                          </SelectItem>
+                          <SelectItem value="manual">Manual only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                  </FormSection>
+                )}
+
+                <FormActions note="Changes are saved to this service.">
+                  <Button
+                    type="submit"
+                    loading={isSaving}
+                    disabled={isDeleting}
+                  >
+                    <Save />
+                    Save changes
+                  </Button>
+                </FormActions>
+              </FormLayout>
             </form>
           </TabsContent>
 
           {/* Logs Tab (Docker only) */}
           {hasDockerConfig && (
             <TabsContent value="logs">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Container Logs</CardTitle>
-                  <Button variant="outline" size="sm" onClick={fetchLogs} disabled={logsLoading}>
-                    {logsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <Panel className="overflow-hidden">
+                <div className="flex items-center justify-between border-b border-line-subtle px-3.5 py-3">
+                  <h2 className="text-[13.5px] font-semibold">
+                    Container logs
+                  </h2>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={fetchLogs}
+                    disabled={logsLoading}
+                  >
+                    {logsLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
                   </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-secondary/50 rounded-lg p-4 font-mono text-xs max-h-[500px] overflow-auto whitespace-pre-wrap">
+                </div>
+                <div className="p-3.5">
+                  <div className="max-h-[500px] overflow-auto whitespace-pre-wrap rounded-md border border-line-subtle bg-surface-raised p-3 font-mono text-[11.5px]">
                     {logsLoading ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <Loader2 className="size-5 animate-spin text-fg-3" />
                       </div>
                     ) : logs ? (
                       logs
                     ) : (
-                      <span className="text-muted-foreground">Click refresh to load logs</span>
+                      <span className="text-fg-3">
+                        Click refresh to load logs
+                      </span>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </Panel>
             </TabsContent>
           )}
 
           {/* Stats Tab (Docker only) */}
           {hasDockerConfig && (
             <TabsContent value="stats">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Performance</CardTitle>
-                  <Button variant="outline" size="sm" onClick={fetchStats} disabled={statsLoading}>
-                    {statsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <Panel className="overflow-hidden">
+                <div className="flex items-center justify-between border-b border-line-subtle px-3.5 py-3">
+                  <h2 className="text-[13.5px] font-semibold">Performance</h2>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={fetchStats}
+                    disabled={statsLoading}
+                  >
+                    {statsLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
                   </Button>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <div className="p-3.5">
                   {containerStatus !== "running" ? (
-                    <p className="text-center text-muted-foreground py-8">Container is not running</p>
+                    <p className="py-8 text-center text-fg-3">
+                      Container is not running
+                    </p>
                   ) : statsLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <Loader2 className="size-5 animate-spin text-fg-3" />
                     </div>
                   ) : stats ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="text-center p-6 bg-secondary/50 rounded-lg">
-                        <Cpu className="h-10 w-10 mx-auto mb-3 text-primary" />
-                        <p className="text-3xl font-bold">{stats.cpu_percent.toFixed(1)}%</p>
-                        <p className="text-sm text-muted-foreground">CPU Usage</p>
+                      <div className="rounded-md border border-line-subtle bg-surface-raised p-5 text-center">
+                        <Cpu className="mx-auto mb-3 size-7 text-accent" />
+                        <p className="text-2xl font-semibold tabular-nums">
+                          {stats.cpu_percent.toFixed(1)}%
+                        </p>
+                        <p className="text-[12px] text-fg-3">CPU usage</p>
                       </div>
-                      <div className="text-center p-6 bg-secondary/50 rounded-lg">
-                        <Activity className="h-10 w-10 mx-auto mb-3 text-primary" />
-                        <p className="text-3xl font-bold">{stats.memory_percent.toFixed(1)}%</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatBytes(stats.memory_usage)} / {formatBytes(stats.memory_limit)}
+                      <div className="rounded-md border border-line-subtle bg-surface-raised p-5 text-center">
+                        <Activity className="mx-auto mb-3 size-7 text-accent" />
+                        <p className="text-2xl font-semibold tabular-nums">
+                          {stats.memory_percent.toFixed(1)}%
+                        </p>
+                        <p className="text-[12px] text-fg-3">
+                          {formatBytes(stats.memory_usage)} /{" "}
+                          {formatBytes(stats.memory_limit)}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">Click refresh to load stats</p>
+                    <p className="py-8 text-center text-fg-3">
+                      Click refresh to load stats
+                    </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </Panel>
             </TabsContent>
           )}
         </Tabs>
-      </div>
+      </PageBody>
     </>
   );
 }
