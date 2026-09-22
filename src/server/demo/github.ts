@@ -1,4 +1,5 @@
 /** Deterministic GitHub-shaped fixtures for the public demo. */
+import { createHash } from "node:crypto";
 import type {
   GitHubBranch,
   GitHubCommit,
@@ -309,11 +310,9 @@ function dateAt(now: Date, daysAgo: number, hour = 10) {
   ).toISOString();
 }
 
+/** A stable, real-looking 40-character hex sha for a seed and position. */
 function sha(seed: string, index: number) {
-  return `${seed}${index.toString(16).padStart(2, "0")}${"a1b2c3d4e5f60718293"}`.slice(
-    0,
-    40,
-  );
+  return createHash("sha1").update(`${seed}:${index}`).digest("hex");
 }
 
 function createRepository(
