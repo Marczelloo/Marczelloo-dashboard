@@ -1,333 +1,137 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Tag, RefreshCw, Sparkles, ChevronDown, AlertCircle, Rocket } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { Tag } from "lucide-react";
 import { toast } from "sonner";
+import { FormField } from "@/components/layout/form-layout";
+import { Button, Input, SegmentedControl, Switch, Textarea } from "@/components/ui";
+import { CodePanel } from "./code-panel";
 
-interface ReleaseCreatorProps {
-  githubUrl: string;
-  defaultExpanded?: boolean;
-  onReleaseCreated?: (release: { tag_name: string; html_url: string }) => void;
+type Bump = "patch" | "minor" | "major";
+
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  const match = /github\.com[/:]([^/]+)\/([^/?#]+)/.exec(url);
+  return match ? { owner: match[1], repo: match[2].replace(/\.git$/, "") } : null;
 }
 
-export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCreated }: ReleaseCreatorProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [loading, setLoading] = useState(false);
+function bump(tag: string | null, kind: Bump): string {
+  const match = /v?(\d+)\.(\d+)\.(\d+)/.exec(tag ?? "");
+  const [major, minor, patch] = match ? [Number(match[1]), Number(match[2]), Number(match[3])] : [0, 0, 0];
+  if (kind === "major") return `v${major + 1}.0.0`;
+  if (kind === "minor") return `v${major}.${minor + 1}.0`;
+  return `v${major}.${minor}.${patch + 1}`;
+}
+
+function ReleaseForm({ owner, repo, onCreated }: { owner: string; repo: string; onCreated?: (release: { tag_name: string; html_url: string }) => void }) {
+  const [latest, setLatest] = useState<string | null>(null);
+  const [kind, setKind] = useState<Bump>("patch");
   const [tagName, setTagName] = useState("");
-  const [releaseName, setReleaseName] = useState("");
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [autoNotes, setAutoNotes] = useState(true);
   const [prerelease, setPrerelease] = useState(false);
-  const [autoGenerate, setAutoGenerate] = useState(true);
-  const [latestTag, setLatestTag] = useState<string | null>(null);
-  const [fetchingLatest, setFetchingLatest] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
-    const patterns = [/github\.com\/([^\/]+)\/([^\/\?#]+)/, /github\.com:([^\/]+)\/([^\/\?#\.]+)/];
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) {
-        return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
-      }
-    }
-    return null;
-  };
+  useEffect(() => {
+    void (async () => {
+      const response = await fetch(`/api/github/repos/${owner}/${repo}/releases?latest=true`).catch(() => null);
+      const result = response?.ok ? ((await response.json()) as { data?: { tag_name?: string } | null }) : null;
+      const tag = result?.data?.tag_name ?? null;
+      setLatest(tag);
+      setTagName(bump(tag, "patch"));
+    })();
+  }, [owner, repo]);
 
-  const parsed = useMemo(() => parseGitHubUrl(githubUrl), [githubUrl]);
+  function choose(next: Bump) {
+    setKind(next);
+    setTagName(bump(latest, next));
+  }
 
-  const fetchLatestRelease = useCallback(async () => {
-    if (!parsed) return;
-
-    setFetchingLatest(true);
-    try {
-      const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/releases?latest=true`);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data?.tag_name) {
-          setLatestTag(data.data.tag_name);
-          // Suggest next version
-          const versionMatch = data.data.tag_name.match(/v?(\d+)\.(\d+)\.(\d+)/);
-          if (versionMatch) {
-            const [, major, minor, patch] = versionMatch;
-            const nextVersion = `v${major}.${minor}.${parseInt(patch) + 1}`;
-            if (!tagName) {
-              setTagName(nextVersion);
-              setReleaseName(nextVersion);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch latest release:", err);
-    } finally {
-      setFetchingLatest(false);
-    }
-  }, [parsed, tagName]);
-
-  const handleCreateRelease = async () => {
-    if (!parsed || !tagName) {
-      toast.error("Tag name is required");
+  async function create() {
+    if (!tagName.trim()) {
+      toast.error("Give the release a tag");
       return;
     }
-
-    setLoading(true);
+    setSaving(true);
     try {
-      const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/releases`, {
+      const response = await fetch(`/api/github/repos/${owner}/${repo}/releases`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tagName,
-          name: releaseName || tagName,
-          description: !autoGenerate ? description : undefined,
+          tagName: tagName.trim(),
+          name: name.trim() || tagName.trim(),
+          description: autoNotes ? undefined : description,
           prerelease,
-          autoGenerateNotes: autoGenerate,
-          previousTag: latestTag || undefined,
+          autoGenerateNotes: autoNotes,
+          previousTag: latest ?? undefined,
         }),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create release");
+      const result = (await response.json().catch(() => ({}))) as { data?: { tag_name: string; html_url: string }; error?: string };
+      if (!response.ok || !result.data) {
+        toast.error(result.error ?? "GitHub did not create the release");
+        return;
       }
-
-      const data = await response.json();
-      toast.success(`Release ${tagName} created successfully!`);
-
-      // Reset form
-      setTagName("");
-      setReleaseName("");
+      toast.success(`Released ${result.data.tag_name}`);
+      setLatest(result.data.tag_name);
+      setTagName(bump(result.data.tag_name, kind));
+      setName("");
       setDescription("");
-      setLatestTag(tagName);
-
-      if (onReleaseCreated && data.data) {
-        onReleaseCreated({
-          tag_name: data.data.tag_name,
-          html_url: data.data.html_url,
-        });
-      }
-    } catch (err) {
-      console.error("Failed to create release:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to create release");
+      onCreated?.(result.data);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  };
-
-  const suggestBumpVersion = (type: "patch" | "minor" | "major") => {
-    const currentTag = latestTag || tagName || "v0.0.0";
-    const versionMatch = currentTag.match(/v?(\d+)\.(\d+)\.(\d+)/);
-
-    if (versionMatch) {
-      let [, major, minor, patch] = versionMatch.map(Number);
-
-      switch (type) {
-        case "patch":
-          patch++;
-          break;
-        case "minor":
-          minor++;
-          patch = 0;
-          break;
-        case "major":
-          major++;
-          minor = 0;
-          patch = 0;
-          break;
-      }
-
-      const newVersion = `v${major}.${minor}.${patch}`;
-      setTagName(newVersion);
-      setReleaseName(newVersion);
-    }
-  };
-
-  if (!parsed) {
-    return null;
   }
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="text-base flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => {
-              setIsExpanded(!isExpanded);
-              if (!isExpanded && !latestTag) {
-                fetchLatestRelease();
-              }
-            }}
-          >
-            <Rocket className="h-4 w-4 text-accent-text" />
-            Create Release
-            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-fg-3" />
-            </motion.div>
-          </CardTitle>
-          {latestTag && (
-            <Chip tone="neutral" className="text-xs">
-              Latest: {latestTag}
-            </Chip>
-          )}
-        </div>
-      </CardHeader>
+    <div className="grid gap-3.5 p-3.5">
+      <p className="text-[12px] text-fg-3">
+        Latest: <code className="text-fg-2">{latest ?? "none yet"}</code>
+      </p>
+      <SegmentedControl<Bump>
+        aria-label="Version bump"
+        value={kind}
+        onChange={choose}
+        options={[
+          { value: "patch", label: "Patch" },
+          { value: "minor", label: "Minor" },
+          { value: "major", label: "Major" },
+        ]}
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormField label="Tag" htmlFor="release-tag">
+          <Input id="release-tag" value={tagName} onChange={(event) => setTagName(event.target.value)} className="font-mono" />
+        </FormField>
+        <FormField label="Title" htmlFor="release-name">
+          <Input id="release-name" value={name} onChange={(event) => setName(event.target.value)} placeholder={tagName || "Same as the tag"} />
+        </FormField>
+      </div>
+      <label className="flex items-center justify-between gap-3 text-[13px]">
+        <span>
+          Write notes from merged pull requests
+          <span className="block text-[11.5px] text-fg-3">GitHub lists what changed since {latest ?? "the first commit"}.</span>
+        </span>
+        <Switch checked={autoNotes} onChange={setAutoNotes} aria-label="Generate notes" />
+      </label>
+      {!autoNotes && <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} placeholder="What changed, in markdown" aria-label="Release notes" />}
+      <label className="flex items-center justify-between gap-3 text-[13px]">
+        Pre-release
+        <Switch checked={prerelease} onChange={setPrerelease} aria-label="Pre-release" />
+      </label>
+      <Button onClick={() => void create()} loading={saving} disabled={!tagName.trim()}>
+        <Tag strokeWidth={1.75} />
+        Create {tagName || "release"}
+      </Button>
+    </div>
+  );
+}
 
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="space-y-4 pt-0">
-              {/* Version Bump Suggestions */}
-              {latestTag && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-fg-3">Quick bump:</span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => suggestBumpVersion("patch")}
-                  >
-                    Patch
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => suggestBumpVersion("minor")}
-                  >
-                    Minor
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => suggestBumpVersion("major")}
-                  >
-                    Major
-                  </Button>
-                </div>
-              )}
-
-              {/* Tag Name */}
-              <div className="space-y-2">
-                <Label htmlFor="tagName">Tag Name *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="tagName"
-                    value={tagName}
-                    onChange={(e) => setTagName(e.target.value)}
-                    placeholder="v1.0.0"
-                    className="flex-1"
-                  />
-                  <Button variant="secondary" size="icon" onClick={fetchLatestRelease} disabled={fetchingLatest}>
-                    <RefreshCw className={`h-4 w-4 ${fetchingLatest ? "animate-spin" : ""}`} />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Release Name */}
-              <div className="space-y-2">
-                <Label htmlFor="releaseName">Release Name</Label>
-                <Input
-                  id="releaseName"
-                  value={releaseName}
-                  onChange={(e) => setReleaseName(e.target.value)}
-                  placeholder={tagName || "Release title"}
-                />
-              </div>
-
-              {/* Auto Generate Toggle */}
-              <button
-                type="button"
-                onClick={() => setAutoGenerate(!autoGenerate)}
-                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${autoGenerate ? "border-accent/50 bg-accent/10" : "border-line bg-surface-raised/20"}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-4 w-4 text-accent-text" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium">Auto-generate release notes</p>
-                    <p className="text-xs text-fg-3">Create notes from commits since last release</p>
-                  </div>
-                </div>
-                <div
-                  className={`h-5 w-9 rounded-full transition-colors ${autoGenerate ? "bg-accent" : "bg-surface-raised"} relative`}
-                >
-                  <div
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${autoGenerate ? "translate-x-4" : "translate-x-0.5"}`}
-                  />
-                </div>
-              </button>
-
-              {/* Manual Description */}
-              {!autoGenerate && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2"
-                >
-                  <Label htmlFor="description">Release Notes</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What's new in this release..."
-                    rows={4}
-                    className="font-mono text-sm"
-                  />
-                </motion.div>
-              )}
-
-              {/* Pre-release Toggle */}
-              <button
-                type="button"
-                onClick={() => setPrerelease(!prerelease)}
-                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${prerelease ? "border-warn/50 bg-warn/10" : "border-line"}`}
-              >
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-4 w-4 text-warn" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium">Mark as pre-release</p>
-                    <p className="text-xs text-fg-3">This is not production-ready</p>
-                  </div>
-                </div>
-                <div
-                  className={`h-5 w-9 rounded-full transition-colors ${prerelease ? "bg-warn" : "bg-surface-raised"} relative`}
-                >
-                  <div
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${prerelease ? "translate-x-4" : "translate-x-0.5"}`}
-                  />
-                </div>
-              </button>
-
-              {/* Create Button */}
-              <Button onClick={handleCreateRelease} disabled={!tagName || loading} className="w-full">
-                {loading ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Release...
-                  </>
-                ) : (
-                  <>
-                    <Tag className="h-4 w-4 mr-2" />
-                    Create Release {tagName && <span className="ml-1 font-mono">{tagName}</span>}
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+/** Tag a new version on GitHub, with the next number suggested. */
+export function ReleaseCreator({ githubUrl, onReleaseCreated }: { githubUrl: string; onReleaseCreated?: (release: { tag_name: string; html_url: string }) => void }) {
+  const parsed = useMemo(() => parseGitHubUrl(githubUrl), [githubUrl]);
+  if (!parsed) return null;
+  return (
+    <CodePanel title="New release" icon={Tag} defaultOpen={false}>
+      <ReleaseForm owner={parsed.owner} repo={parsed.repo} onCreated={onReleaseCreated} />
+    </CodePanel>
   );
 }

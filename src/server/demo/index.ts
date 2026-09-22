@@ -209,7 +209,7 @@ export const deploys = {
     return false;
   },
 
-  async clearCompletedDeploys(): Promise<number> {
+  async clearCompletedDeploys(_serviceIds?: string[]): Promise<number> {
     return 0;
   },
 };

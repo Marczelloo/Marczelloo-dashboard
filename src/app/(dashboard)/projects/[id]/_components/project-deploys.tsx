@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GitCommitHorizontal, Rocket, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { DeployLogsButton } from "@/components/features/deploy-logs-button";
+import { usePinGuard } from "@/components/features/use-pin-guard";
+import { StatusDot } from "@/components/status-dot";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,243 +17,112 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Rocket, RefreshCw, FileText, Loader2, Trash2 } from "lucide-react";
+  Button,
+  Chip,
+  EmptyState,
+  Panel,
+  PanelHeader,
+} from "@/components/ui";
+import type { Tone } from "@/lib/tone";
 import { formatRelativeTime } from "@/lib/utils";
-import { checkDeployLogAction } from "@/app/actions/projects";
-import { toast } from "sonner";
-import type { Deploy, Service } from "@/types";
+import type { Deploy, DeployStatus, Service } from "@/types";
 
-interface ProjectDeploysClientProps {
-  deploys: Deploy[];
-  services: Service[];
+const TONE: Record<DeployStatus, Tone> = { pending: "live", running: "live", success: "ok", failed: "err", cancelled: "idle" };
+
+function duration(deploy: Deploy): string {
+  if (!deploy.finished_at) return "";
+  const seconds = Math.max(0, Math.round((Date.parse(deploy.finished_at) - Date.parse(deploy.started_at)) / 1000));
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-const statusColors: Record<string, "idle" | "live" | "ok" | "err"> = {
-  pending: "idle",
-  running: "live",
-  success: "ok",
-  failed: "err",
-  cancelled: "idle",
-};
-
-export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClientProps) {
+/** This project's deploys, newest first, with their logs. */
+export function ProjectDeploysClient({ projectId, deploys, services }: { projectId: string; deploys: Deploy[]; services: Service[] }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [isClearing, setIsClearing] = useState(false);
-  const [logDialog, setLogDialog] = useState<{
-    open: boolean;
-    log: string;
-    serviceName: string;
-    isLoading: boolean;
-  }>({
-    open: false,
-    log: "",
-    serviceName: "",
-    isLoading: false,
-  });
+  const { run, dialog } = usePinGuard();
+  const [clearing, setClearing] = useState(false);
+  const serviceName = new Map(services.map((service) => [service.id, service.name]));
+  const finished = deploys.filter((deploy) => deploy.status !== "running" && deploy.status !== "pending").length;
 
-  const serviceMap = new Map(services.map((s) => [s.id, s]));
-
-  async function handleClearAll() {
-    setIsClearing(true);
+  async function clearHistory() {
+    setClearing(true);
     try {
-      const response = await fetch("/api/deploys/clear", { method: "POST" });
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`Cleared ${result.deleted} deployment(s)`);
-        router.refresh();
-      } else {
-        toast.error("Failed to clear deployments", { description: result.error });
+      const result = await run(async () => {
+        const response = await fetch("/api/deploys/clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+        return (await response.json().catch(() => ({ success: false }))) as { success: boolean; deleted?: number; error?: string; requirePin?: boolean };
+      });
+      if (!result) return;
+      if (!result.success) {
+        toast.error(result.error ?? "Could not clear the history");
+        return;
       }
-    } catch {
-      toast.error("Failed to clear deployments");
+      toast.success(`Cleared ${result.deleted ?? 0} deploy${result.deleted === 1 ? "" : "s"}`);
+      router.refresh();
     } finally {
-      setIsClearing(false);
+      setClearing(false);
     }
-  }
-
-  async function handleCheckStatus(deploy: Deploy) {
-    if (!deploy.logs_object_key) {
-      toast.error("No log file available");
-      return;
-    }
-
-    const result = await checkDeployLogAction(deploy.logs_object_key, deploy.id);
-    if (result.success) {
-      if (result.data?.isComplete) {
-        toast.success("Build completed!");
-        startTransition(() => {
-          router.refresh();
-        });
-      } else {
-        toast.info("Build still in progress...");
-      }
-    } else {
-      toast.error(result.error || "Failed to check status");
-    }
-  }
-
-  async function handleViewLogs(deploy: Deploy) {
-    if (!deploy.logs_object_key) {
-      toast.error("No log file available");
-      return;
-    }
-
-    const service = serviceMap.get(deploy.service_id);
-
-    setLogDialog({
-      open: true,
-      log: "",
-      serviceName: service?.name || "Unknown Service",
-      isLoading: true,
-    });
-
-    const result = await checkDeployLogAction(deploy.logs_object_key, deploy.id);
-    if (result.success && result.data) {
-      setLogDialog((prev) => ({
-        ...prev,
-        log: result.data!.log,
-        isLoading: false,
-      }));
-
-      // Refresh if complete
-      if (result.data.isComplete && deploy.status === "running") {
-        startTransition(() => {
-          router.refresh();
-        });
-      }
-    } else {
-      setLogDialog((prev) => ({
-        ...prev,
-        log: result.error || "Failed to load logs",
-        isLoading: false,
-      }));
-    }
-  }
-
-  if (deploys.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Rocket className="h-4 w-4" />
-            Recent Deploys
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-fg-3 text-center py-4">No deploys yet</p>
-        </CardContent>
-      </Card>
-    );
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Rocket className="h-4 w-4" />
-            Recent Deploys
-          </CardTitle>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-fg-3 hover:text-err"
-                title="Clear old deployments"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Clear Deployment History?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove all completed deployments. Running deployments will not be affected.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleClearAll}
-                  disabled={isClearing}
-                  className="bg-err text-white hover:bg-err/90"
-                >
-                  {isClearing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Clear History
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {deploys.map((deploy) => {
-              const service = serviceMap.get(deploy.service_id);
-              return (
-                <div key={deploy.id} className="flex items-center justify-between rounded-lg border border-line p-3">
-                  <div className="flex items-center gap-3">
-                    <Chip tone={statusColors[deploy.status]}>{deploy.status}</Chip>
-                    <div>
-                      <p className="text-sm font-medium">{service?.name || "Unknown"}</p>
-                      <p className="text-xs text-fg-3">
-                        {formatRelativeTime(deploy.started_at)}
-                        {deploy.commit_sha && ` • ${deploy.commit_sha.slice(0, 7)}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Check Status button for running deploys */}
-                    {deploy.status === "running" && deploy.logs_object_key && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCheckStatus(deploy)}
-                        disabled={isPending}
-                        title="Check status"
-                      >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
-                      </Button>
-                    )}
-
-                    {/* View Logs button */}
-                    {deploy.logs_object_key && (
-                      <Button variant="ghost" size="sm" onClick={() => handleViewLogs(deploy)} title="View logs">
-                        <FileText className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-
-                    <span className="text-xs text-fg-3">{deploy.triggered_by}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Logs Dialog */}
-      <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Deploy Logs - {logDialog.serviceName}</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 bg-zinc-950 rounded-lg p-4 overflow-auto max-h-[60vh]">
-            {logDialog.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
-              </div>
-            ) : (
-              <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap">
-                {logDialog.log || "No logs available"}
-              </pre>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Panel>
+      <PanelHeader
+        title="Deploys"
+        icon={Rocket}
+        description={deploys.length ? `${deploys.length} on record` : undefined}
+        actions={
+          finished > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="Clear finished deploys" disabled={clearing}>
+                  <Trash2 strokeWidth={1.75} />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear this project&apos;s deploy history?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Removes {finished} finished deploy{finished === 1 ? "" : "s"} and their log links. Running and queued deploys stay. Other projects are not touched.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void clearHistory()} className="border-err/25 bg-err/10 text-err hover:bg-err/15">
+                    Clear history
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )
+        }
+      />
+      {deploys.length === 0 ? (
+        <EmptyState icon={Rocket} title="No deploys yet" description="Push to the configured branch, or press Deploy above." className="py-8" />
+      ) : (
+        deploys.map((deploy) => {
+          const name = serviceName.get(deploy.service_id) ?? "Unknown service";
+          return (
+            <div key={deploy.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">
+              <StatusDot status={TONE[deploy.status]} />
+              <code className="flex w-[74px] items-center gap-1 text-[12px] text-fg-2">
+                <GitCommitHorizontal className="size-3.5 text-fg-4" strokeWidth={1.75} />
+                {deploy.commit_sha?.slice(0, 7) ?? "—"}
+              </code>
+              <span className="min-w-0 flex-1 truncate text-fg-2">{deploy.error_message ?? name}</span>
+              <span className="ml-auto flex shrink-0 items-center gap-2 text-[11.5px] text-fg-3">
+                {deploy.status !== "success" && <Chip tone={TONE[deploy.status]}>{deploy.status}</Chip>}
+                <span className="max-w-[120px] truncate">{deploy.triggered_by}</span>
+                <span className="w-[48px] text-right tabular-nums">{duration(deploy)}</span>
+                <span className="w-[70px] truncate text-right text-fg-4">{formatRelativeTime(deploy.started_at)}</span>
+                <DeployLogsButton logFile={deploy.logs_object_key ?? ""} deployId={deploy.id} serviceName={name} hasLogFile={Boolean(deploy.logs_object_key)} />
+              </span>
+            </div>
+          );
+        })
+      )}
+      {dialog}
+    </Panel>
   );
 }

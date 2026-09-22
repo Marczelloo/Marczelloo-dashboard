@@ -104,7 +104,7 @@ export const deploys = {
 
   deleteDeployById: (id: string) => getSource().deploys.deleteDeployById(id),
 
-  clearCompletedDeploys: () => getSource().deploys.clearCompletedDeploys(),
+  clearCompletedDeploys: (serviceIds?: string[]) => getSource().deploys.clearCompletedDeploys(serviceIds),
 };
 
 // ========================================

@@ -1,33 +1,32 @@
-import { NextResponse } from "next/server";
-import { deploys, auditLogs } from "@/server/atlashub";
-import { requirePinVerification } from "@/server/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { checkDemoModeBlocked } from "@/lib/demo-mode";
+import { auditLogs, deploys, services } from "@/server/data";
+import { AuthError, requirePinVerification } from "@/server/lib/auth";
 
 /**
- * POST /api/deploys/clear
- * Clear deployment history, including stale pending records.
- * Running deployments are preserved.
+ * POST /api/deploys/clear  { projectId? }
+ * Clear finished deploys, of one project when projectId is given, otherwise of all.
+ * Running and queued deploys are preserved.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const demo = checkDemoModeBlocked();
+    if (demo.blocked) return NextResponse.json(demo.result, { status: 403 });
+
     const user = await requirePinVerification();
+    const { projectId } = (await request.json().catch(() => ({}))) as { projectId?: string };
+    const serviceIds = projectId ? (await services.getServicesByProjectId(projectId)).map((service) => service.id) : undefined;
 
-    const deleted = await deploys.clearCompletedDeploys();
+    const deleted = serviceIds && serviceIds.length === 0 ? 0 : await deploys.clearCompletedDeploys(serviceIds);
 
-    await auditLogs.logAction(user.email, "clear_deploys", "deploy", undefined, {
-      deleted_count: deleted,
-    });
+    await auditLogs.logAction(user.email, "clear_deploys", projectId ? "project" : "deploy", projectId, { deleted_count: deleted });
 
-    return NextResponse.json({
-      success: true,
-      deleted,
-    });
+    return NextResponse.json({ success: true, deleted });
   } catch (error) {
-    console.error("[API] Clear deploys error:", error);
-
-    if (error instanceof Error && error.message.includes("PIN")) {
-      return NextResponse.json({ success: false, error: "PIN verification required" }, { status: 401 });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ success: false, error: error.message, requirePin: error.code === "PIN_REQUIRED" }, { status: error.code === "NOT_AUTHORIZED" ? 403 : 401 });
     }
-
-    return NextResponse.json({ success: false, error: "Failed to clear deployments" }, { status: 500 });
+    console.error("[API] Clear deploys error:", error);
+    return NextResponse.json({ success: false, error: "Could not clear the history" }, { status: 500 });
   }
 }

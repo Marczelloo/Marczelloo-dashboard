@@ -111,10 +111,14 @@ export async function deleteDeployById(id: string): Promise<boolean> {
  * Pending records are included because stale queued deploys otherwise cannot
  * be removed from the dashboard.
  */
-export async function clearCompletedDeploys(): Promise<number> {
-  // Keep active deploys so the agent can still finish and report them.
-  const allDeploys = await getDeploys();
-  const historicalDeploys = allDeploys.filter((d) => d.status !== "running");
+/**
+ * Delete finished deploys, optionally only those of the given services.
+ * Running and queued deploys stay, so the agent can still finish and report them.
+ */
+export async function clearCompletedDeploys(serviceIds?: string[]): Promise<number> {
+  const scope = serviceIds ? new Set(serviceIds) : null;
+  const allDeploys = await getDeploys({ limit: 1000 });
+  const historicalDeploys = allDeploys.filter((d) => d.status !== "running" && d.status !== "pending" && (!scope || scope.has(d.service_id)));
 
   let deleted = 0;
   for (const deploy of historicalDeploys) {
