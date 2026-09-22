@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { AlertTriangle, Github, ExternalLink, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { Chip } from "@/components/ui";
 import Link from "next/link";
 
 interface DemoBannerProps {
@@ -40,18 +40,18 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
       {showIndicator && !showDialog && (
         <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleReopenDialog}
-            className="bg-background/95 backdrop-blur-sm border-primary/30 hover:border-primary shadow-lg"
+            className="bg-canvas/95 backdrop-blur-sm border-accent/30 hover:border-accent shadow-lg"
           >
-            <Info className="h-4 w-4 mr-2 text-primary" />
+            <Info className="h-4 w-4 mr-2 text-accent-text" />
             <span className="text-sm">Demo Mode</span>
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 bg-background/95 backdrop-blur-sm shadow-lg"
+            className="h-8 w-8 bg-canvas/95 backdrop-blur-sm shadow-lg"
             onClick={() => setShowIndicator(false)}
           >
             <X className="h-4 w-4" />
@@ -64,14 +64,14 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10">
-                <AlertTriangle className="h-5 w-5 text-primary" />
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-accent/10">
+                <AlertTriangle className="h-5 w-5 text-accent-text" />
               </div>
               <div>
                 <DialogTitle className="text-xl">Welcome to the Demo</DialogTitle>
-                <Badge variant="outline" className="mt-1 border-primary/30 text-primary">
+                <Chip tone="neutral" className="mt-1 border-accent/30 text-accent-text">
                   Preview Mode
-                </Badge>
+                </Chip>
               </div>
             </div>
             <DialogDescription className="text-left pt-2">
@@ -81,12 +81,12 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
 
           <div className="space-y-4 mt-2">
             {/* What this demo shows */}
-            <div className="rounded-lg border border-border p-4 space-y-3">
+            <div className="rounded-lg border border-line p-4 space-y-3">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-green-500" />
                 What you can explore
               </h4>
-              <ul className="text-sm text-muted-foreground space-y-1.5 ml-4">
+              <ul className="text-sm text-fg-3 space-y-1.5 ml-4">
                 <li>• Browse mock projects, services, and deployments</li>
                 <li>• View the monitoring dashboard and status indicators</li>
                 <li>• Explore container management UI and Raspberry Pi metrics</li>
@@ -95,12 +95,12 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
             </div>
 
             {/* Limitations */}
-            <div className="rounded-lg border border-border p-4 space-y-3">
+            <div className="rounded-lg border border-line p-4 space-y-3">
               <h4 className="font-medium text-sm flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-yellow-500" />
                 Demo limitations
               </h4>
-              <ul className="text-sm text-muted-foreground space-y-1.5 ml-4">
+              <ul className="text-sm text-fg-3 space-y-1.5 ml-4">
                 <li>• All data is simulated (nothing is saved)</li>
                 <li>• Create, edit, and delete actions are disabled</li>
                 <li>• Deployments and container actions won&apos;t execute</li>
@@ -110,16 +110,16 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
 
             {/* Source code link */}
             {githubUrl && (
-              <div className="rounded-lg bg-secondary/50 p-4">
+              <div className="rounded-lg bg-surface-raised/50 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Github className="h-5 w-5 text-muted-foreground" />
+                    <Github className="h-5 w-5 text-fg-3" />
                     <div>
                       <p className="text-sm font-medium">Want to see the code?</p>
-                      <p className="text-xs text-muted-foreground">This project is open source</p>
+                      <p className="text-xs text-fg-3">This project is open source</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="secondary" size="sm" asChild>
                     <Link href={githubUrl} target="_blank" rel="noopener noreferrer">
                       View Source
                       <ExternalLink className="h-3.5 w-3.5 ml-1.5" />

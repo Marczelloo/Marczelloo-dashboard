@@ -202,7 +202,7 @@ export function ChangelogViewer({ githubUrl, defaultExpanded = false }: Changelo
             <ScrollText className="h-4 w-4" />
             Changelog Generator
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
         </div>
@@ -223,7 +223,7 @@ export function ChangelogViewer({ githubUrl, defaultExpanded = false }: Changelo
                   <Skeleton className="h-10 w-full" />
                 </div>
               ) : error ? (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-fg-3">
                   {error}
                   <Button variant="ghost" size="sm" className="ml-2" onClick={fetchReleases}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -231,12 +231,12 @@ export function ChangelogViewer({ githubUrl, defaultExpanded = false }: Changelo
                   </Button>
                 </div>
               ) : releases.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No releases found</p>
+                <p className="text-sm text-fg-3">No releases found</p>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">From (older)</label>
+                      <label className="text-xs text-fg-3 mb-1 block">From (older)</label>
                       <Select value={selectedFrom} onValueChange={setSelectedFrom}>
                         <SelectTrigger>
                           <SelectValue placeholder="Beginning" />
@@ -252,7 +252,7 @@ export function ChangelogViewer({ githubUrl, defaultExpanded = false }: Changelo
                       </Select>
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">To (newer)</label>
+                      <label className="text-xs text-fg-3 mb-1 block">To (newer)</label>
                       <Select value={selectedTo} onValueChange={setSelectedTo}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select version" />
@@ -288,14 +288,14 @@ export function ChangelogViewer({ githubUrl, defaultExpanded = false }: Changelo
                         <span className="text-sm font-medium">Generated Changelog</span>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="sm" onClick={copyChangelog}>
-                            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                           <Button variant="ghost" size="sm" onClick={downloadChangelog}>
                             <Download className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
-                      <div className="prose prose-sm prose-invert max-w-none p-4 rounded-md bg-muted/50 max-h-[400px] overflow-y-auto">
+                      <div className="prose prose-sm prose-invert max-w-none p-4 rounded-md bg-surface-raised/50 max-h-[400px] overflow-y-auto">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{changelog}</ReactMarkdown>
                       </div>
                     </div>

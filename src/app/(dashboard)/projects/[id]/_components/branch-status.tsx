@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { GitBranch, ChevronDown, RefreshCw, ArrowUp, ArrowDown, Check, Shield, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -136,26 +135,26 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
   const getStatusBadge = (comparison: BranchComparison) => {
     if (comparison.ahead_by === 0 && comparison.behind_by === 0) {
       return (
-        <Badge variant="outline" className="text-success border-success/30 bg-success/10">
+        <Chip tone="neutral" className="text-ok border-ok/30 bg-ok/10">
           <Check className="h-3 w-3 mr-1" />
           Up to date
-        </Badge>
+        </Chip>
       );
     }
 
     return (
       <div className="flex items-center gap-2">
         {comparison.ahead_by > 0 && (
-          <Badge variant="outline" className="text-blue-400 border-blue-400/30 bg-blue-400/10">
+          <Chip tone="neutral" className="text-blue-400 border-blue-400/30 bg-blue-400/10">
             <ArrowUp className="h-3 w-3 mr-1" />
             {comparison.ahead_by} ahead
-          </Badge>
+          </Chip>
         )}
         {comparison.behind_by > 0 && (
-          <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">
+          <Chip tone="neutral" className="text-warn border-warn/30 bg-warn/10">
             <ArrowDown className="h-3 w-3 mr-1" />
             {comparison.behind_by} behind
-          </Badge>
+          </Chip>
         )}
       </div>
     );
@@ -171,11 +170,11 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
           >
             <GitBranch className="h-4 w-4" />
             Branch Status
-            <Badge variant="secondary" className="ml-2 text-xs">
+            <Chip tone="neutral" className="ml-2 text-xs">
               {branches.length || "..."}
-            </Badge>
+            </Chip>
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {isExpanded && (
@@ -213,7 +212,7 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
                   ))}
                 </div>
               ) : error ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
+                <div className="text-sm text-fg-3 text-center py-4">
                   {error}
                   <Button variant="ghost" size="sm" className="ml-2" onClick={fetchBranches}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -221,7 +220,7 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
                   </Button>
                 </div>
               ) : branches.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No branches found</p>
+                <p className="text-sm text-fg-3 text-center py-4">No branches found</p>
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {/* Default branch first */}
@@ -230,21 +229,21 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
                     .map((branch) => (
                       <div
                         key={branch.name}
-                        className="flex items-center justify-between p-2 rounded-lg bg-primary/5 border border-primary/20"
+                        className="flex items-center justify-between p-2 rounded-lg bg-accent/5 border border-accent/20"
                       >
                         <div className="flex items-center gap-2">
-                          <GitBranch className="h-4 w-4 text-primary" />
+                          <GitBranch className="h-4 w-4 text-accent-text" />
                           <span className="font-medium">{branch.name}</span>
-                          <Badge variant="secondary" className="text-xs">
+                          <Chip tone="neutral" className="text-xs">
                             default
-                          </Badge>
-                          {branch.protected && <Shield className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </Chip>
+                          {branch.protected && <Shield className="h-3.5 w-3.5 text-fg-3" />}
                         </div>
                         <a
                           href={`https://github.com/${parsed.owner}/${parsed.repo}/tree/${branch.name}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="text-fg-3 hover:text-fg"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
@@ -257,12 +256,12 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
                     .map((branch) => (
                       <div
                         key={branch.name}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-raised/50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <GitBranch className="h-4 w-4 text-muted-foreground" />
+                          <GitBranch className="h-4 w-4 text-fg-3" />
                           <span className="text-sm">{branch.name}</span>
-                          {branch.protected && <Shield className="h-3.5 w-3.5 text-muted-foreground" />}
+                          {branch.protected && <Shield className="h-3.5 w-3.5 text-fg-3" />}
                         </div>
                         <div className="flex items-center gap-2">
                           {comparisons[branch.name] && getStatusBadge(comparisons[branch.name])}
@@ -270,7 +269,7 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
                             href={`https://github.com/${parsed.owner}/${parsed.repo}/tree/${branch.name}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground"
+                            className="text-fg-3 hover:text-fg"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>

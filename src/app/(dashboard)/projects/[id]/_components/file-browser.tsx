@@ -227,7 +227,7 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
             <Folder className="h-4 w-4" />
             Files
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {isExpanded && (
@@ -269,11 +269,11 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
             <CardContent className="pt-0">
               {/* Breadcrumb */}
               {currentPath && (
-                <div className="flex items-center gap-1 text-sm mb-3 pb-3 border-b border-border overflow-x-auto">
+                <div className="flex items-center gap-1 text-sm mb-3 pb-3 border-b border-line overflow-x-auto">
                   <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={navigateHome}>
                     <Home className="h-3.5 w-3.5" />
                   </Button>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <ChevronRight className="h-3.5 w-3.5 text-fg-3 flex-shrink-0" />
                   {pathParts.map((part, index) => (
                     <div key={index} className="flex items-center gap-1">
                       <Button
@@ -288,7 +288,7 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
                         {part}
                       </Button>
                       {index < pathParts.length - 1 && (
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 text-fg-3 flex-shrink-0" />
                       )}
                     </div>
                   ))}
@@ -298,11 +298,11 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
               {/* Back button */}
               {currentPath && (
                 <button
-                  className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-secondary/50 transition-colors mb-1"
+                  className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-surface-raised/50 transition-colors mb-1"
                   onClick={navigateBack}
                 >
-                  <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">..</span>
+                  <ArrowLeft className="h-4 w-4 text-fg-3" />
+                  <span className="text-fg-3">..</span>
                 </button>
               )}
 
@@ -316,7 +316,7 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
                   ))}
                 </div>
               ) : error ? (
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center py-6 text-fg-3">
                   <Folder className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">{error}</p>
                   <Button variant="ghost" size="sm" className="mt-2" onClick={() => fetchContents(currentPath)}>
@@ -325,30 +325,30 @@ export function FileBrowser({ githubUrl, defaultExpanded = false }: FileBrowserP
                   </Button>
                 </div>
               ) : contents.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Empty directory</p>
+                <p className="text-sm text-fg-3 text-center py-4">Empty directory</p>
               ) : (
                 <div className="space-y-0.5 max-h-[400px] overflow-y-auto">
                   {contents.map((item) => (
                     <div key={item.sha}>
                       {item.type === "dir" ? (
                         <button
-                          className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-secondary/50 transition-colors"
+                          className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-surface-raised/50 transition-colors"
                           onClick={() => navigateTo(item.path)}
                         >
                           <Folder className="h-4 w-4 text-blue-400" />
                           <span className="truncate flex-1">{item.name}</span>
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          <ChevronRight className="h-3.5 w-3.5 text-fg-3" />
                         </button>
                       ) : (
                         <a
                           href={item.html_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-secondary/50 transition-colors"
+                          className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded hover:bg-surface-raised/50 transition-colors"
                         >
                           {getFileIcon(item.name)}
                           <span className="truncate flex-1">{item.name}</span>
-                          <span className="text-xs text-muted-foreground">{formatFileSize(item.size)}</span>
+                          <span className="text-xs text-fg-3">{formatFileSize(item.size)}</span>
                         </a>
                       )}
                     </div>

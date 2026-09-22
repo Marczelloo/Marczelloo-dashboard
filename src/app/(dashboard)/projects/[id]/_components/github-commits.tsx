@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import {
   GitCommit,
@@ -170,8 +170,8 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4 text-warning" />
+          <div className="flex items-center gap-2 text-sm text-fg-3">
+            <AlertTriangle className="h-4 w-4 text-warn" />
             {error}
           </div>
         </CardContent>
@@ -189,7 +189,7 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No commits found</p>
+          <p className="text-sm text-fg-3">No commits found</p>
         </CardContent>
       </Card>
     );
@@ -201,10 +201,10 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
         <CardTitle className="text-base flex items-center gap-2">
           <GitCommit className="h-4 w-4" />
           Recent Commits
-          <Badge variant="outline" className="ml-1 text-xs">
+          <Chip tone="neutral" className="ml-1 text-xs">
             {commits.length}
             {hasMore ? "+" : ""}
-          </Badge>
+          </Chip>
         </CardTitle>
         <Button
           variant="ghost"
@@ -235,7 +235,7 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                 className="group"
               >
                 <div
-                  className={`rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors ${
+                  className={`rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors ${
                     compact ? "py-2" : ""
                   }`}
                 >
@@ -253,8 +253,8 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                             unoptimized
                           />
                         ) : (
-                          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
-                            <User className="h-4 w-4 text-muted-foreground" />
+                          <div className="h-8 w-8 rounded-full bg-surface-raised flex items-center justify-center">
+                            <User className="h-4 w-4 text-fg-3" />
                           </div>
                         )}
                       </div>
@@ -297,7 +297,7 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                             title="Copy commit SHA"
                           >
                             {copiedSha === commit.sha ? (
-                              <Check className="h-3.5 w-3.5 text-success" />
+                              <Check className="h-3.5 w-3.5 text-ok" />
                             ) : (
                               <Copy className="h-3.5 w-3.5" />
                             )}
@@ -324,7 +324,7 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap font-mono bg-background/50 rounded p-2 border border-border"
+                            className="text-xs text-fg-3 mt-2 whitespace-pre-wrap font-mono bg-canvas/50 rounded p-2 border border-line"
                           >
                             {restOfMessage}
                           </motion.pre>
@@ -332,8 +332,8 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                       </AnimatePresence>
 
                       {/* Meta info */}
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                        <code className="font-mono text-primary/80">{commit.sha.substring(0, 7)}</code>
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-fg-3">
+                        <code className="font-mono text-accent-text/80">{commit.sha.substring(0, 7)}</code>
                         <span>·</span>
                         <span>{commit.commit.author.name}</span>
                         <span>·</span>
@@ -342,9 +342,9 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
                         {commit.commit.verification?.verified && (
                           <>
                             <span>·</span>
-                            <Badge variant="success" className="text-xs py-0 px-1">
+                            <Chip tone="ok" className="text-xs py-0 px-1">
                               Verified
-                            </Badge>
+                            </Chip>
                           </>
                         )}
                       </div>
@@ -359,7 +359,7 @@ export function GitHubCommits({ githubUrl, initialLimit = 10, compact = false }:
         {/* Load More */}
         {hasMore && (
           <div className="pt-2">
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="w-full">
+            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore} className="w-full">
               {loadingMore ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />

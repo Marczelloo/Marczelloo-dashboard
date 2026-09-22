@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import {
   Tag,
@@ -142,8 +142,8 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4 text-warning" />
+          <div className="flex items-center gap-2 text-sm text-fg-3">
+            <AlertTriangle className="h-4 w-4 text-warn" />
             {error}
           </div>
         </CardContent>
@@ -161,7 +161,7 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">No releases yet</p>
+          <p className="text-sm text-fg-3 text-center py-4">No releases yet</p>
         </CardContent>
       </Card>
     );
@@ -173,9 +173,9 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
         <CardTitle className="text-base flex items-center gap-2">
           <Tag className="h-4 w-4" />
           Releases
-          <Badge variant="outline" className="ml-1 text-xs">
+          <Chip tone="neutral" className="ml-1 text-xs">
             {releases.length}
-          </Badge>
+          </Chip>
         </CardTitle>
         <Button
           variant="ghost"
@@ -202,27 +202,27 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
                 transition={{ delay: index * 0.03 }}
                 className="group"
               >
-                <div className="rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors">
+                <div className="rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={release.prerelease ? "warning" : "success"} className="text-xs">
+                      <Chip tone={release.prerelease ? "warn" : "ok"} className="text-xs">
                         {release.tag_name}
-                      </Badge>
+                      </Chip>
                       {isLatest && (
-                        <Badge variant="default" className="text-xs bg-primary">
+                        <Chip tone="neutral" className="text-xs bg-accent">
                           Latest
-                        </Badge>
+                        </Chip>
                       )}
                       {release.prerelease && (
-                        <Badge variant="outline" className="text-xs">
+                        <Chip tone="neutral" className="text-xs">
                           Pre-release
-                        </Badge>
+                        </Chip>
                       )}
                       {release.draft && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Chip tone="neutral" className="text-xs">
                           Draft
-                        </Badge>
+                        </Chip>
                       )}
                     </div>
 
@@ -257,14 +257,14 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
                   )}
 
                   {release.body && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    <p className="text-xs text-fg-3 mt-1 line-clamp-2">
                       {release.body.replace(/[#*`]/g, "").substring(0, 200)}
                       {release.body.length > 200 ? "..." : ""}
                     </p>
                   )}
 
                   {/* Meta */}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 mt-2 text-xs text-fg-3">
                     {release.author && (
                       <span className="flex items-center gap-1">
                         {release.author.avatar_url ? (
@@ -311,9 +311,9 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 pt-3 border-t border-border"
+                        className="mt-3 pt-3 border-t border-line"
                       >
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Assets</p>
+                        <p className="text-xs font-medium text-fg-3 mb-2">Assets</p>
                         <div className="space-y-1.5">
                           {release.assets.map((asset) => (
                             <a
@@ -321,13 +321,13 @@ export function GitHubReleases({ githubUrl, limit = 10, latestOnly = false }: Gi
                               href={asset.browser_download_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-between gap-2 rounded-md border border-border bg-background/50 px-2 py-1.5 hover:bg-secondary/50 transition-colors"
+                              className="flex items-center justify-between gap-2 rounded-md border border-line bg-canvas/50 px-2 py-1.5 hover:bg-surface-raised/50 transition-colors"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <FileArchive className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                <FileArchive className="h-3.5 w-3.5 text-fg-3 flex-shrink-0" />
                                 <span className="text-xs font-mono truncate">{asset.name}</span>
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
+                              <div className="flex items-center gap-2 text-xs text-fg-3 flex-shrink-0">
                                 <span>{formatFileSize(asset.size)}</span>
                                 <span className="flex items-center gap-0.5">
                                   <Download className="h-3 w-3" />

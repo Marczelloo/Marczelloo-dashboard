@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Tag, RefreshCw, Sparkles, ChevronDown, AlertCircle, Rocket } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -165,16 +164,16 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
               }
             }}
           >
-            <Rocket className="h-4 w-4 text-primary" />
+            <Rocket className="h-4 w-4 text-accent-text" />
             Create Release
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {latestTag && (
-            <Badge variant="outline" className="text-xs">
+            <Chip tone="neutral" className="text-xs">
               Latest: {latestTag}
-            </Badge>
+            </Chip>
           )}
         </div>
       </CardHeader>
@@ -191,9 +190,9 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
               {/* Version Bump Suggestions */}
               {latestTag && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground">Quick bump:</span>
+                  <span className="text-xs text-fg-3">Quick bump:</span>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="h-7 text-xs"
                     onClick={() => suggestBumpVersion("patch")}
@@ -201,7 +200,7 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
                     Patch
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="h-7 text-xs"
                     onClick={() => suggestBumpVersion("minor")}
@@ -209,7 +208,7 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
                     Minor
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="h-7 text-xs"
                     onClick={() => suggestBumpVersion("major")}
@@ -230,7 +229,7 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
                     placeholder="v1.0.0"
                     className="flex-1"
                   />
-                  <Button variant="outline" size="icon" onClick={fetchLatestRelease} disabled={fetchingLatest}>
+                  <Button variant="secondary" size="icon" onClick={fetchLatestRelease} disabled={fetchingLatest}>
                     <RefreshCw className={`h-4 w-4 ${fetchingLatest ? "animate-spin" : ""}`} />
                   </Button>
                 </div>
@@ -251,17 +250,17 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
               <button
                 type="button"
                 onClick={() => setAutoGenerate(!autoGenerate)}
-                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${autoGenerate ? "border-primary/50 bg-primary/10" : "border-border bg-secondary/20"}`}
+                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${autoGenerate ? "border-accent/50 bg-accent/10" : "border-line bg-surface-raised/20"}`}
               >
                 <div className="flex items-center gap-3">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Sparkles className="h-4 w-4 text-accent-text" />
                   <div className="text-left">
                     <p className="text-sm font-medium">Auto-generate release notes</p>
-                    <p className="text-xs text-muted-foreground">Create notes from commits since last release</p>
+                    <p className="text-xs text-fg-3">Create notes from commits since last release</p>
                   </div>
                 </div>
                 <div
-                  className={`h-5 w-9 rounded-full transition-colors ${autoGenerate ? "bg-primary" : "bg-muted"} relative`}
+                  className={`h-5 w-9 rounded-full transition-colors ${autoGenerate ? "bg-accent" : "bg-surface-raised"} relative`}
                 >
                   <div
                     className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${autoGenerate ? "translate-x-4" : "translate-x-0.5"}`}
@@ -293,17 +292,17 @@ export function ReleaseCreator({ githubUrl, defaultExpanded = false, onReleaseCr
               <button
                 type="button"
                 onClick={() => setPrerelease(!prerelease)}
-                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${prerelease ? "border-warning/50 bg-warning/10" : "border-border"}`}
+                className={`flex items-center justify-between w-full rounded-lg border p-3 transition-colors ${prerelease ? "border-warn/50 bg-warn/10" : "border-line"}`}
               >
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="h-4 w-4 text-warning" />
+                  <AlertCircle className="h-4 w-4 text-warn" />
                   <div className="text-left">
                     <p className="text-sm font-medium">Mark as pre-release</p>
-                    <p className="text-xs text-muted-foreground">This is not production-ready</p>
+                    <p className="text-xs text-fg-3">This is not production-ready</p>
                   </div>
                 </div>
                 <div
-                  className={`h-5 w-9 rounded-full transition-colors ${prerelease ? "bg-warning" : "bg-muted"} relative`}
+                  className={`h-5 w-9 rounded-full transition-colors ${prerelease ? "bg-warn" : "bg-surface-raised"} relative`}
                 >
                   <div
                     className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${prerelease ? "translate-x-4" : "translate-x-0.5"}`}

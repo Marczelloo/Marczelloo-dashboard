@@ -49,7 +49,7 @@ function RepoSelectorSkeleton() {
       <div className="divide-y divide-line-subtle rounded-lg border border-line bg-surface">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-4">
-            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+            <div className="h-10 w-10 rounded-full bg-surface-raised animate-pulse" />
             <div className="flex-1 space-y-2">
               <div className="h-4 w-1/3 skeleton" />
               <div className="h-3 w-2/3 skeleton" />

@@ -51,7 +51,7 @@ export function DeployLogsButton({ logFile, deployId, serviceName, hasLogFile = 
         variant="ghost"
         size="sm"
         onClick={handleOpen}
-        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+        className="h-7 px-2 text-fg-3 hover:text-fg"
         title="View deploy logs"
       >
         <FileText className="h-4 w-4" />
@@ -66,18 +66,18 @@ export function DeployLogsButton({ logFile, deployId, serviceName, hasLogFile = 
             </DialogTitle>
             <DialogDescription>Log file: {logFile}</DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto bg-secondary/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
+          <div className="flex-1 min-h-0 overflow-auto bg-surface-raised/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading logs...</span>
+                <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
+                <span className="ml-2 text-fg-3">Loading logs...</span>
               </div>
             ) : error ? (
-              <div className="text-danger">{error}</div>
+              <div className="text-err">{error}</div>
             ) : logs ? (
               logs
             ) : (
-              <span className="text-muted-foreground">No logs available</span>
+              <span className="text-fg-3">No logs available</span>
             )}
           </div>
         </DialogContent>

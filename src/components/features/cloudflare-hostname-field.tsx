@@ -50,7 +50,7 @@ export function CloudflareHostnameField({ id, value, onChange, placeholder = "ap
         autoCorrect="off"
         aria-label="Subdomena"
       />
-      <span className="text-muted-foreground">.</span>
+      <span className="text-fg-3">.</span>
       <Select value={parts.zone} onValueChange={(zone) => {
         setPickedZone(zone);
         if (parts.label) compose(parts.label, zone);

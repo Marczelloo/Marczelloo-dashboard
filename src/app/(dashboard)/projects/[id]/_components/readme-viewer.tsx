@@ -127,7 +127,7 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
             <FileText className="h-4 w-4" />
             README
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {readme && (
@@ -159,7 +159,7 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
                   <Skeleton className="h-4 w-5/6" />
                 </div>
               ) : error ? (
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center py-6 text-fg-3">
                   <FileText className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">{error}</p>
                   <Button variant="ghost" size="sm" className="mt-2" onClick={fetchReadme}>
@@ -204,14 +204,14 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
                           const isInline = !className;
                           if (isInline) {
                             return (
-                              <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                              <code className="bg-surface-raised px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                                 {children}
                               </code>
                             );
                           }
                           return (
                             <code
-                              className={`${className} block bg-muted p-3 rounded-md text-sm font-mono overflow-x-auto`}
+                              className={`${className} block bg-surface-raised p-3 rounded-md text-sm font-mono overflow-x-auto`}
                               {...props}
                             >
                               {children}
@@ -220,26 +220,26 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
                         },
                         // Style pre blocks
                         pre: ({ children }) => (
-                          <pre className="bg-muted rounded-md overflow-x-auto my-3">{children}</pre>
+                          <pre className="bg-surface-raised rounded-md overflow-x-auto my-3">{children}</pre>
                         ),
                         // Style headings
                         h1: ({ children }) => (
-                          <h1 className="text-xl font-bold text-foreground mb-3 mt-4 first:mt-0">{children}</h1>
+                          <h1 className="text-xl font-bold text-fg mb-3 mt-4 first:mt-0">{children}</h1>
                         ),
                         h2: ({ children }) => (
-                          <h2 className="text-lg font-semibold text-foreground mb-2 mt-4">{children}</h2>
+                          <h2 className="text-lg font-semibold text-fg mb-2 mt-4">{children}</h2>
                         ),
                         h3: ({ children }) => (
-                          <h3 className="text-base font-semibold text-foreground mb-2 mt-3">{children}</h3>
+                          <h3 className="text-base font-semibold text-fg mb-2 mt-3">{children}</h3>
                         ),
                         // Style lists
                         ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
                         ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
                         // Style paragraphs
-                        p: ({ children }) => <p className="text-muted-foreground leading-relaxed my-2">{children}</p>,
+                        p: ({ children }) => <p className="text-fg-3 leading-relaxed my-2">{children}</p>,
                         // Style blockquotes
                         blockquote: ({ children }) => (
-                          <blockquote className="border-l-2 border-red-500/50 pl-4 my-3 italic text-muted-foreground">
+                          <blockquote className="border-l-2 border-red-500/50 pl-4 my-3 italic text-fg-3">
                             {children}
                           </blockquote>
                         ),
@@ -251,19 +251,19 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
                         // Style tables
                         table: ({ children }) => (
                           <div className="overflow-x-auto my-3">
-                            <table className="min-w-full divide-y divide-border">{children}</table>
+                            <table className="min-w-full divide-y divide-line">{children}</table>
                           </div>
                         ),
                         th: ({ children }) => (
-                          <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-fg-3 uppercase tracking-wider bg-surface-raised">
                             {children}
                           </th>
                         ),
                         td: ({ children }) => (
-                          <td className="px-3 py-2 text-sm text-foreground border-b border-border">{children}</td>
+                          <td className="px-3 py-2 text-sm text-fg border-b border-line">{children}</td>
                         ),
                         // Style horizontal rules
-                        hr: () => <hr className="border-border my-4" />,
+                        hr: () => <hr className="border-line my-4" />,
                       }}
                     >
                       {readme.content}
@@ -276,7 +276,7 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsFullExpanded(!isFullExpanded)}
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-fg-3 hover:text-fg"
                       >
                         {isFullExpanded ? (
                           <>

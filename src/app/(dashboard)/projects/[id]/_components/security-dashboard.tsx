@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Shield, ChevronDown, RefreshCw, AlertTriangle, ExternalLink, Bug, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -148,12 +147,12 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
             <Shield className="h-4 w-4" />
             Security
             {totalAlerts > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <Chip tone="err" className="ml-2">
                 {totalAlerts}
-              </Badge>
+              </Chip>
             )}
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {isExpanded && (
@@ -182,37 +181,37 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
           >
             <CardContent className="pt-0">
               {/* Tabs */}
-              <div className="flex gap-2 mb-4 border-b border-border">
+              <div className="flex gap-2 mb-4 border-b border-line">
                 <button
                   className={`flex items-center gap-2 pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === "dependabot"
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "border-accent text-accent-text"
+                      : "border-transparent text-fg-3 hover:text-fg"
                   }`}
                   onClick={() => setActiveTab("dependabot")}
                 >
                   <Lock className="h-4 w-4" />
                   Dependabot
                   {dependabotAlerts.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Chip tone="neutral" className="text-xs">
                       {dependabotAlerts.length}
-                    </Badge>
+                    </Chip>
                   )}
                 </button>
                 <button
                   className={`flex items-center gap-2 pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === "codeql"
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "border-accent text-accent-text"
+                      : "border-transparent text-fg-3 hover:text-fg"
                   }`}
                   onClick={() => setActiveTab("codeql")}
                 >
                   <Bug className="h-4 w-4" />
                   CodeQL
                   {codeScanningAlerts.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Chip tone="neutral" className="text-xs">
                       {codeScanningAlerts.length}
-                    </Badge>
+                    </Chip>
                   )}
                 </button>
               </div>
@@ -224,7 +223,7 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
                   ))}
                 </div>
               ) : error ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
+                <div className="text-sm text-fg-3 text-center py-4">
                   {error}
                   <Button variant="ghost" size="sm" className="ml-2" onClick={fetchAlerts}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -233,7 +232,7 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
                 </div>
               ) : activeTab === "dependabot" ? (
                 dependabotAlerts.length === 0 ? (
-                  <div className="flex flex-col items-center py-6 text-muted-foreground">
+                  <div className="flex flex-col items-center py-6 text-fg-3">
                     <Lock className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm">No Dependabot alerts</p>
                   </div>
@@ -245,34 +244,34 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
                         href={alert.html_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                        className="block p-3 rounded-lg border border-line hover:bg-surface-raised/50 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+                              <AlertTriangle className="h-4 w-4 text-warn shrink-0" />
                               <span className="text-sm font-medium truncate">
                                 {alert.security_advisory?.summary || `Alert #${alert.number}`}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 text-xs text-fg-3">
                               <span>{alert.security_vulnerability?.package?.name}</span>
-                              <Badge
-                                variant="outline"
+                              <Chip
+                                tone="neutral"
                                 className={getSeverityColor(alert.security_vulnerability?.severity)}
                               >
                                 {alert.security_vulnerability?.severity}
-                              </Badge>
+                              </Chip>
                             </div>
                           </div>
-                          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <ExternalLink className="h-4 w-4 text-fg-3 shrink-0" />
                         </div>
                       </a>
                     ))}
                   </div>
                 )
               ) : codeScanningAlerts.length === 0 ? (
-                <div className="flex flex-col items-center py-6 text-muted-foreground">
+                <div className="flex flex-col items-center py-6 text-fg-3">
                   <Bug className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">No CodeQL alerts</p>
                 </div>
@@ -284,31 +283,31 @@ export function SecurityDashboard({ githubUrl, defaultExpanded = false }: Securi
                       href={alert.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors"
+                      className="block p-3 rounded-lg border border-line hover:bg-surface-raised/50 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <Bug className="h-4 w-4 text-warning shrink-0" />
+                            <Bug className="h-4 w-4 text-warn shrink-0" />
                             <span className="text-sm font-medium truncate">
                               {alert.rule?.description || alert.rule?.name}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2 text-xs text-fg-3">
                             <span>
                               {alert.most_recent_instance?.location?.path}:
                               {alert.most_recent_instance?.location?.start_line}
                             </span>
-                            <Badge
-                              variant="outline"
+                            <Chip
+                              tone="neutral"
                               className={getSeverityColor(alert.rule?.security_severity_level || alert.rule?.severity)}
                             >
                               {alert.rule?.security_severity_level || alert.rule?.severity}
-                            </Badge>
-                            <span className="text-muted-foreground">{alert.tool?.name}</span>
+                            </Chip>
+                            <span className="text-fg-3">{alert.tool?.name}</span>
                           </div>
                         </div>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <ExternalLink className="h-4 w-4 text-fg-3 shrink-0" />
                       </div>
                     </a>
                   ))}

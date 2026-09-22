@@ -53,14 +53,14 @@ export function PinDialog({ open, onSuccess, onCancel }: PinDialogProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
+            <Lock className="h-5 w-5 text-accent-text" />
             PIN Required
           </DialogTitle>
           <DialogDescription>Enter your PIN to perform this action</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {error && <div className="rounded-lg bg-err/10 p-3 text-sm text-err">{error}</div>}
 
           <div className="space-y-2">
             <Label htmlFor="pin">PIN</Label>
@@ -78,7 +78,7 @@ export function PinDialog({ open, onSuccess, onCancel }: PinDialogProps) {
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            <Button type="button" variant="secondary" onClick={onCancel} disabled={isLoading}>
               Cancel
             </Button>
             <Button type="submit" loading={isLoading}>

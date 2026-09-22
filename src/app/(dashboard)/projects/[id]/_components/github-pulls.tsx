@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import {
   GitPullRequest,
@@ -109,28 +109,28 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
   const getPRStatusBadge = (pr: GitHubPullRequest) => {
     if (pr.merged_at) {
       return (
-        <Badge variant="default" className="bg-purple-600 hover:bg-purple-700">
+        <Chip tone="neutral" className="bg-purple-600 hover:bg-purple-700">
           <GitMerge className="h-3 w-3 mr-1" />
           Merged
-        </Badge>
+        </Chip>
       );
     }
     if (pr.state === "closed") {
       return (
-        <Badge variant="destructive">
+        <Chip tone="err">
           <XCircle className="h-3 w-3 mr-1" />
           Closed
-        </Badge>
+        </Chip>
       );
     }
     if (pr.draft) {
-      return <Badge variant="secondary">Draft</Badge>;
+      return <Chip tone="neutral">Draft</Chip>;
     }
     return (
-      <Badge variant="success">
+      <Chip tone="ok">
         <GitPullRequest className="h-3 w-3 mr-1" />
         Open
-      </Badge>
+      </Chip>
     );
   };
 
@@ -172,8 +172,8 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4 text-warning" />
+          <div className="flex items-center gap-2 text-sm text-fg-3">
+            <AlertTriangle className="h-4 w-4 text-warn" />
             {error}
           </div>
         </CardContent>
@@ -187,13 +187,13 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
         <CardTitle className="text-base flex items-center gap-2">
           <GitPullRequest className="h-4 w-4" />
           Pull Requests
-          <Badge variant="outline" className="ml-1 text-xs">
+          <Chip tone="neutral" className="ml-1 text-xs">
             {pulls.length}
-          </Badge>
+          </Chip>
         </CardTitle>
         <div className="flex items-center gap-2">
           {/* State Filter */}
-          <div className="flex rounded-md border border-border overflow-hidden">
+          <div className="flex rounded-md border border-line overflow-hidden">
             {(["open", "closed", "all"] as const).map((s) => (
               <Button
                 key={s}
@@ -201,7 +201,7 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                 size="sm"
                 onClick={() => handleStateChange(s)}
                 className={`h-7 px-2 text-xs rounded-none capitalize ${
-                  activeState === s ? "" : "hover:bg-secondary/50"
+                  activeState === s ? "" : "hover:bg-surface-raised/50"
                 }`}
               >
                 {s}
@@ -223,7 +223,7 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
       </CardHeader>
       <CardContent>
         {pulls.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="text-sm text-fg-3 text-center py-4">
             No {activeState === "all" ? "" : activeState} pull requests
           </p>
         ) : (
@@ -239,7 +239,7 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                 transition={{ delay: index * 0.03 }}
                 className="block group"
               >
-                <div className="rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors">
+                <div className="rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors">
                   <div className="flex items-start gap-3">
                     {/* Author Avatar */}
                     <div className="flex-shrink-0">
@@ -253,8 +253,8 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                           unoptimized
                         />
                       ) : (
-                        <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center">
-                          <User className="h-3 w-3 text-muted-foreground" />
+                        <div className="h-6 w-6 rounded-full bg-surface-raised flex items-center justify-center">
+                          <User className="h-3 w-3 text-fg-3" />
                         </div>
                       )}
                     </div>
@@ -263,11 +263,11 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                          <p className="text-sm font-medium line-clamp-1 group-hover:text-accent-text transition-colors">
                             {pr.title}
                           </p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span className="font-mono text-primary/70">#{pr.number}</span>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-fg-3">
+                            <span className="font-mono text-accent-text/70">#{pr.number}</span>
                             <span>·</span>
                             <span>{pr.user?.login || "Unknown"}</span>
                             <span>·</span>
@@ -280,7 +280,7 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
 
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {getPRStatusBadge(pr)}
-                          <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                          <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-fg-3" />
                         </div>
                       </div>
 
@@ -288,9 +288,9 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                       {pr.labels && pr.labels.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {pr.labels.slice(0, 5).map((label) => (
-                            <Badge
+                            <Chip
                               key={label.id}
-                              variant="outline"
+                              tone="neutral"
                               className="text-xs py-0 px-1.5"
                               style={{
                                 borderColor: `#${label.color}`,
@@ -298,18 +298,18 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                               }}
                             >
                               {label.name}
-                            </Badge>
+                            </Chip>
                           ))}
                           {pr.labels.length > 5 && (
-                            <Badge variant="outline" className="text-xs py-0 px-1.5">
+                            <Chip tone="neutral" className="text-xs py-0 px-1.5">
                               +{pr.labels.length - 5}
-                            </Badge>
+                            </Chip>
                           )}
                         </div>
                       )}
 
                       {/* Meta */}
-                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-2 text-xs text-fg-3">
                         {/* Comments */}
                         {pr.comments > 0 && (
                           <span className="flex items-center gap-1">
@@ -336,10 +336,10 @@ export function GitHubPulls({ githubUrl, state = "open", limit = 10 }: GitHubPul
                           <span
                             className={`flex items-center gap-1 ${
                               pr.mergeable_state === "clean"
-                                ? "text-success"
+                                ? "text-ok"
                                 : pr.mergeable_state === "blocked"
-                                  ? "text-warning"
-                                  : "text-muted-foreground"
+                                  ? "text-warn"
+                                  : "text-fg-3"
                             }`}
                           >
                             {pr.mergeable_state === "clean" && <Check className="h-3 w-3" />}

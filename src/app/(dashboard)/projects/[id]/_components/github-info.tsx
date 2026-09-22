@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Skeleton, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import {
   Github,
@@ -126,15 +126,15 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4 text-warning" />
+          <div className="flex items-center gap-2 text-sm text-fg-3">
+            <AlertTriangle className="h-4 w-4 text-warn" />
             {error}
           </div>
           <a
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm text-primary hover:underline mt-2"
+            className="flex items-center gap-1 text-sm text-accent-text hover:underline mt-2"
           >
             View on GitHub
             <ExternalLink className="h-3 w-3" />
@@ -178,19 +178,19 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
       <CardContent className="space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-fg-3">
             <GitBranch className="h-3.5 w-3.5" />
             <span>{stats.branches_count} branches</span>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-fg-3">
             <GitPullRequest className="h-3.5 w-3.5" />
             <span>{stats.open_prs_count} open PRs</span>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-fg-3">
             <Tag className="h-3.5 w-3.5" />
             <span>{stats.releases_count} releases</span>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-fg-3">
             <Users className="h-3.5 w-3.5" />
             <span>{stats.contributors_count} contributors</span>
           </div>
@@ -198,9 +198,9 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
 
         {/* Security Alerts */}
         {stats.security_alerts_count > 0 && (
-          <div className="flex items-center gap-2 rounded-md bg-danger/10 border border-danger/20 px-3 py-2">
-            <ShieldAlert className="h-4 w-4 text-danger" />
-            <span className="text-sm text-danger font-medium">
+          <div className="flex items-center gap-2 rounded-md bg-err/10 border border-err/20 px-3 py-2">
+            <ShieldAlert className="h-4 w-4 text-err" />
+            <span className="text-sm text-err font-medium">
               {stats.security_alerts_count} security alert{stats.security_alerts_count > 1 ? "s" : ""}
             </span>
           </div>
@@ -209,13 +209,13 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
         {/* Latest Commit */}
         {stats.last_commit && (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <div className="flex items-center gap-1 text-xs text-fg-3 font-medium">
               <GitCommit className="h-3 w-3" />
               Latest Commit
             </div>
-            <div className="rounded-md border border-border bg-secondary/30 p-2">
+            <div className="rounded-md border border-line bg-surface-raised/30 p-2">
               <p className="text-sm font-medium truncate">{stats.last_commit.commit.message.split("\n")[0]}</p>
-              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 mt-1 text-xs text-fg-3">
                 <span>{stats.last_commit.commit.author.name}</span>
                 <span>·</span>
                 <span>{formatRelativeTime(stats.last_commit.commit.author.date)}</span>
@@ -227,7 +227,7 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
         {/* Latest Release */}
         {stats.last_release && (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <div className="flex items-center gap-1 text-xs text-fg-3 font-medium">
               <Tag className="h-3 w-3" />
               Latest Release
             </div>
@@ -235,22 +235,22 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
               href={stats.last_release.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-md border border-border bg-secondary/30 p-2 hover:bg-secondary/50 transition-colors"
+              className="block rounded-md border border-line bg-surface-raised/30 p-2 hover:bg-surface-raised/50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Badge variant="success" className="text-xs">
+                <Chip tone="ok" className="text-xs">
                   {stats.last_release.tag_name}
-                </Badge>
+                </Chip>
                 {stats.last_release.prerelease && (
-                  <Badge variant="warning" className="text-xs">
+                  <Chip tone="warn" className="text-xs">
                     Pre-release
-                  </Badge>
+                  </Chip>
                 )}
               </div>
               {stats.last_release.name && stats.last_release.name !== stats.last_release.tag_name && (
                 <p className="text-sm mt-1 truncate">{stats.last_release.name}</p>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-fg-3 mt-1">
                 {stats.last_release.published_at ? formatRelativeTime(stats.last_release.published_at) : "Draft"}
               </p>
             </a>
@@ -258,16 +258,16 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
         )}
 
         {/* Default Branch */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
+        <div className="flex items-center justify-between text-xs text-fg-3 pt-2 border-t border-line">
           <span>Default branch</span>
-          <Badge variant="outline" className="text-xs font-mono">
+          <Chip tone="neutral" className="text-xs font-mono">
             {repo.default_branch}
-          </Badge>
+          </Chip>
         </div>
 
         {/* Language */}
         {repo.language && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-fg-3">
             <span>Primary language</span>
             <span>{repo.language}</span>
           </div>
@@ -275,7 +275,7 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
 
         {/* Last pushed */}
         {repo.pushed_at && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-fg-3">
             <span>Last push</span>
             <span>{formatRelativeTime(repo.pushed_at)}</span>
           </div>

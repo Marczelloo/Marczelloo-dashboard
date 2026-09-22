@@ -8,26 +8,7 @@ import { toast } from "sonner";
 import { LogConsole } from "@/components/features/log-console";
 import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { StatusDot } from "@/components/status-dot";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  Button,
-  Chip,
-  EmptyState,
-  Meter,
-  Panel,
-  Skeleton,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, Chip, EmptyState, Meter, Panel, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { formatBytes } from "@/lib/host";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 

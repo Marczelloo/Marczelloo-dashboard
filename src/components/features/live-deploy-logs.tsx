@@ -189,29 +189,29 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
   if (!logFile) return null;
 
   return (
-    <div className={cn("mt-2 rounded-lg border border-border/50 overflow-hidden", className)}>
+    <div className={cn("mt-2 rounded-lg border border-line overflow-hidden", className)}>
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-secondary/30 hover:bg-secondary/50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-surface-raised/30 hover:bg-surface-raised/50 transition-colors"
       >
         <div className="flex items-center gap-2 text-xs">
           {isRunning && isConnected ? (
-            <Loader2 className="h-3 w-3 animate-spin text-warning" />
+            <Loader2 className="h-3 w-3 animate-spin text-warn" />
           ) : (
-            <span className="h-3 w-3 rounded-full bg-muted-foreground/30" />
+            <span className="h-3 w-3 rounded-full bg-fg-3/30" />
           )}
           <span className="font-medium">Live Logs {stats.total > 0 && `(${stats.total} lines)`}</span>
 
           {/* Warning/Error counts */}
           {stats.warnings > 0 && (
-            <span className="flex items-center gap-1 text-warning">
+            <span className="flex items-center gap-1 text-warn">
               <AlertTriangle className="h-3 w-3" />
               {stats.warnings}
             </span>
           )}
           {stats.errors > 0 && (
-            <span className="flex items-center gap-1 text-destructive">
+            <span className="flex items-center gap-1 text-err">
               <XCircle className="h-3 w-3" />
               {stats.errors}
             </span>
@@ -219,19 +219,19 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
         </div>
 
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          <ChevronUp className="h-4 w-4 text-fg-3" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-fg-3" />
         )}
       </button>
 
       {/* Log content */}
       {expanded && (
-        <div ref={containerRef} className="max-h-[200px] overflow-auto bg-secondary/20 p-3 font-mono text-xs">
+        <div ref={containerRef} className="max-h-[200px] overflow-auto bg-surface-raised/20 p-3 font-mono text-xs">
           {error ? (
-            <div className="text-destructive">{error}</div>
+            <div className="text-err">{error}</div>
           ) : lines.length === 0 ? (
-            <div className="text-muted-foreground flex items-center gap-2">
+            <div className="text-fg-3 flex items-center gap-2">
               {isConnected ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -248,11 +248,11 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
                   key={line.id}
                   className={cn(
                     "whitespace-pre-wrap break-all leading-relaxed",
-                    line.type === "error" && "text-destructive font-medium",
-                    line.type === "warning" && "text-warning",
-                    line.type === "success" && "text-success",
-                    line.type === "info" && "text-primary/80",
-                    line.type === "normal" && "text-muted-foreground"
+                    line.type === "error" && "text-err font-medium",
+                    line.type === "warning" && "text-warn",
+                    line.type === "success" && "text-ok",
+                    line.type === "info" && "text-accent-text/80",
+                    line.type === "normal" && "text-fg-3"
                   )}
                 >
                   {line.text}

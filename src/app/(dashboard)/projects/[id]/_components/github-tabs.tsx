@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Github, GitCommit, GitPullRequest, Tag, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
@@ -56,13 +56,13 @@ export function GitHubTabs({ githubUrl }: GitHubTabsProps) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 mt-3 border-b border-border">
+        <div className="flex gap-1 mt-3 border-b border-line">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                activeTab === tab.id ? "text-accent-text" : "text-fg-3 hover:text-fg"
               }`}
             >
               {tab.icon}
@@ -70,7 +70,7 @@ export function GitHubTabs({ githubUrl }: GitHubTabsProps) {
               {activeTab === tab.id && (
                 <motion.div
                   layoutId="github-tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent"
                   initial={false}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
@@ -136,7 +136,7 @@ function GitHubReleasesInline({ githubUrl }: { githubUrl: string }) {
 // Inner components that render the actual content
 import { useEffect, useState as useStateHook, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Badge, Skeleton } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
 import {
   RefreshCw,
   AlertTriangle,
@@ -262,15 +262,15 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-        <AlertTriangle className="h-4 w-4 text-warning" />
+      <div className="flex items-center gap-2 text-sm text-fg-3 py-4">
+        <AlertTriangle className="h-4 w-4 text-warn" />
         {error}
       </div>
     );
   }
 
   if (commits.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-4">No commits found</p>;
+    return <p className="text-sm text-fg-3 text-center py-4">No commits found</p>;
   }
 
   return (
@@ -297,7 +297,7 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
             transition={{ delay: index * 0.02 }}
             className="group"
           >
-            <div className="rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors">
+            <div className="rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   {commit.author?.avatar_url ? (
@@ -310,8 +310,8 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
                       unoptimized
                     />
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
-                      <User className="h-4 w-4 text-muted-foreground" />
+                    <div className="h-8 w-8 rounded-full bg-surface-raised flex items-center justify-center">
+                      <User className="h-4 w-4 text-fg-3" />
                     </div>
                   )}
                 </div>
@@ -341,7 +341,7 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
                         className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         {copiedSha === commit.sha ? (
-                          <Check className="h-3.5 w-3.5 text-success" />
+                          <Check className="h-3.5 w-3.5 text-ok" />
                         ) : (
                           <Copy className="h-3.5 w-3.5" />
                         )}
@@ -366,15 +366,15 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap font-mono bg-background/50 rounded p-2 border border-border"
+                        className="text-xs text-fg-3 mt-2 whitespace-pre-wrap font-mono bg-canvas/50 rounded p-2 border border-line"
                       >
                         {restOfMessage}
                       </motion.pre>
                     )}
                   </AnimatePresence>
 
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                    <code className="font-mono text-primary/80">{commit.sha.substring(0, 7)}</code>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-fg-3">
+                    <code className="font-mono text-accent-text/80">{commit.sha.substring(0, 7)}</code>
                     <span>·</span>
                     <span>{commit.commit.author.name}</span>
                     <span>·</span>
@@ -382,9 +382,9 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
                     {commit.commit.verification?.verified && (
                       <>
                         <span>·</span>
-                        <Badge variant="success" className="text-xs py-0 px-1">
+                        <Chip tone="ok" className="text-xs py-0 px-1">
                           Verified
-                        </Badge>
+                        </Chip>
                       </>
                     )}
                   </div>
@@ -397,7 +397,7 @@ function InnerCommits({ githubUrl }: { githubUrl: string }) {
 
       {hasMore && (
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={() => fetchCommits(page + 1, true)}
           disabled={loadingMore}
@@ -489,28 +489,28 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
   const getPRStatusBadge = (pr: GitHubPullRequest) => {
     if (pr.merged_at) {
       return (
-        <Badge variant="default" className="bg-purple-600 hover:bg-purple-700">
+        <Chip tone="neutral" className="bg-purple-600 hover:bg-purple-700">
           <GitMerge className="h-3 w-3 mr-1" />
           Merged
-        </Badge>
+        </Chip>
       );
     }
     if (pr.state === "closed") {
       return (
-        <Badge variant="destructive">
+        <Chip tone="err">
           <XCircle className="h-3 w-3 mr-1" />
           Closed
-        </Badge>
+        </Chip>
       );
     }
     if (pr.draft) {
-      return <Badge variant="secondary">Draft</Badge>;
+      return <Chip tone="neutral">Draft</Chip>;
     }
     return (
-      <Badge variant="success">
+      <Chip tone="ok">
         <GitPullRequest className="h-3 w-3 mr-1" />
         Open
-      </Badge>
+      </Chip>
     );
   };
 
@@ -534,8 +534,8 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-        <AlertTriangle className="h-4 w-4 text-warning" />
+      <div className="flex items-center gap-2 text-sm text-fg-3 py-4">
+        <AlertTriangle className="h-4 w-4 text-warn" />
         {error}
       </div>
     );
@@ -544,14 +544,14 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex rounded-md border border-border overflow-hidden">
+        <div className="flex rounded-md border border-line overflow-hidden">
           {(["open", "closed", "all"] as const).map((s) => (
             <Button
               key={s}
               variant={activeState === s ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveState(s)}
-              className={`h-7 px-2 text-xs rounded-none capitalize ${activeState === s ? "" : "hover:bg-secondary/50"}`}
+              className={`h-7 px-2 text-xs rounded-none capitalize ${activeState === s ? "" : "hover:bg-surface-raised/50"}`}
             >
               {s}
             </Button>
@@ -570,7 +570,7 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
       </div>
 
       {pulls.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
+        <p className="text-sm text-fg-3 text-center py-4">
           No {activeState === "all" ? "" : activeState} pull requests
         </p>
       ) : (
@@ -585,7 +585,7 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
             transition={{ delay: index * 0.03 }}
             className="block group"
           >
-            <div className="rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors">
+            <div className="rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   {pr.user?.avatar_url ? (
@@ -598,8 +598,8 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
                       unoptimized
                     />
                   ) : (
-                    <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center">
-                      <User className="h-3 w-3 text-muted-foreground" />
+                    <div className="h-6 w-6 rounded-full bg-surface-raised flex items-center justify-center">
+                      <User className="h-3 w-3 text-fg-3" />
                     </div>
                   )}
                 </div>
@@ -607,11 +607,11 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                      <p className="text-sm font-medium line-clamp-1 group-hover:text-accent-text transition-colors">
                         {pr.title}
                       </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span className="font-mono text-primary/70">#{pr.number}</span>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-fg-3">
+                        <span className="font-mono text-accent-text/70">#{pr.number}</span>
                         <span>·</span>
                         <span>{pr.user?.login || "Unknown"}</span>
                         <span>·</span>
@@ -627,19 +627,19 @@ function InnerPulls({ githubUrl }: { githubUrl: string }) {
                   {pr.labels && pr.labels.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {pr.labels.slice(0, 5).map((label) => (
-                        <Badge
+                        <Chip
                           key={label.id}
-                          variant="outline"
+                          tone="neutral"
                           className="text-xs py-0 px-1.5"
                           style={{ borderColor: `#${label.color}`, color: `#${label.color}` }}
                         >
                           {label.name}
-                        </Badge>
+                        </Chip>
                       ))}
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 mt-2 text-xs text-fg-3">
                     {pr.comments > 0 && (
                       <span className="flex items-center gap-1">
                         <MessageSquare className="h-3 w-3" />
@@ -751,15 +751,15 @@ function InnerReleases({ githubUrl }: { githubUrl: string }) {
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-        <AlertTriangle className="h-4 w-4 text-warning" />
+      <div className="flex items-center gap-2 text-sm text-fg-3 py-4">
+        <AlertTriangle className="h-4 w-4 text-warn" />
         {error}
       </div>
     );
   }
 
   if (releases.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-4">No releases yet</p>;
+    return <p className="text-sm text-fg-3 text-center py-4">No releases yet</p>;
   }
 
   return (
@@ -783,26 +783,26 @@ function InnerReleases({ githubUrl }: { githubUrl: string }) {
             transition={{ delay: index * 0.03 }}
             className="group"
           >
-            <div className="rounded-md border border-border bg-secondary/20 p-3 hover:bg-secondary/40 transition-colors">
+            <div className="rounded-md border border-line bg-surface-raised/20 p-3 hover:bg-surface-raised/40 transition-colors">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant={release.prerelease ? "warning" : "success"} className="text-xs">
+                  <Chip tone={release.prerelease ? "warn" : "ok"} className="text-xs">
                     {release.tag_name}
-                  </Badge>
+                  </Chip>
                   {isLatest && (
-                    <Badge variant="default" className="text-xs bg-primary">
+                    <Chip tone="neutral" className="text-xs bg-accent">
                       Latest
-                    </Badge>
+                    </Chip>
                   )}
                   {release.prerelease && (
-                    <Badge variant="outline" className="text-xs">
+                    <Chip tone="neutral" className="text-xs">
                       Pre-release
-                    </Badge>
+                    </Chip>
                   )}
                   {release.draft && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Chip tone="neutral" className="text-xs">
                       Draft
-                    </Badge>
+                    </Chip>
                   )}
                 </div>
 
@@ -835,13 +835,13 @@ function InnerReleases({ githubUrl }: { githubUrl: string }) {
               )}
 
               {release.body && (
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                <p className="text-xs text-fg-3 mt-1 line-clamp-2">
                   {release.body.replace(/[#*`]/g, "").substring(0, 200)}
                   {release.body.length > 200 ? "..." : ""}
                 </p>
               )}
 
-              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 mt-2 text-xs text-fg-3">
                 {release.author && (
                   <span className="flex items-center gap-1">
                     {release.author.avatar_url ? (
@@ -883,9 +883,9 @@ function InnerReleases({ githubUrl }: { githubUrl: string }) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 pt-3 border-t border-border"
+                    className="mt-3 pt-3 border-t border-line"
                   >
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Assets</p>
+                    <p className="text-xs font-medium text-fg-3 mb-2">Assets</p>
                     <div className="space-y-1.5">
                       {release.assets.map((asset) => (
                         <a
@@ -893,13 +893,13 @@ function InnerReleases({ githubUrl }: { githubUrl: string }) {
                           href={asset.browser_download_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center justify-between gap-2 rounded-md border border-border bg-background/50 px-2 py-1.5 hover:bg-secondary/50 transition-colors"
+                          className="flex items-center justify-between gap-2 rounded-md border border-line bg-canvas/50 px-2 py-1.5 hover:bg-surface-raised/50 transition-colors"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <FileArchive className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <FileArchive className="h-3.5 w-3.5 text-fg-3 flex-shrink-0" />
                             <span className="text-xs font-mono truncate">{asset.name}</span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
+                          <div className="flex items-center gap-2 text-xs text-fg-3 flex-shrink-0">
                             <span>{formatFileSize(asset.size)}</span>
                             <span className="flex items-center gap-0.5">
                               <Download className="h-3 w-3" />

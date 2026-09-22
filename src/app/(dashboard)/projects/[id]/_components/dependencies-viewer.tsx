@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Package, ChevronDown, RefreshCw, ExternalLink, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -117,12 +116,12 @@ export function DependenciesViewer({ githubUrl, defaultExpanded = false }: Depen
             <Package className="h-4 w-4" />
             Dependencies
             {packages.length > 0 && (
-              <Badge variant="secondary" className="ml-2">
+              <Chip tone="neutral" className="ml-2">
                 {packages.length}
-              </Badge>
+              </Chip>
             )}
             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-fg-3" />
             </motion.div>
           </CardTitle>
           {isExpanded && (
@@ -174,7 +173,7 @@ export function DependenciesViewer({ githubUrl, defaultExpanded = false }: Depen
                   ))}
                 </div>
               ) : error ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
+                <div className="text-sm text-fg-3 text-center py-4">
                   {error}
                   <Button variant="ghost" size="sm" className="ml-2" onClick={fetchDependencies}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />
@@ -182,12 +181,12 @@ export function DependenciesViewer({ githubUrl, defaultExpanded = false }: Depen
                   </Button>
                 </div>
               ) : message && packages.length === 0 ? (
-                <div className="flex flex-col items-center py-6 text-muted-foreground">
+                <div className="flex flex-col items-center py-6 text-fg-3">
                   <Layers className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">{message}</p>
                 </div>
               ) : packages.length === 0 ? (
-                <div className="flex flex-col items-center py-6 text-muted-foreground">
+                <div className="flex flex-col items-center py-6 text-fg-3">
                   <Package className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">No dependencies found</p>
                 </div>
@@ -202,8 +201,8 @@ export function DependenciesViewer({ githubUrl, defaultExpanded = false }: Depen
                           onClick={() => setSelectedEcosystem(eco)}
                           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             selectedEcosystem === eco
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-secondary hover:bg-secondary/80"
+                              ? "bg-accent text-white"
+                              : "bg-surface-raised hover:bg-surface-raised/80"
                           }`}
                         >
                           {eco}
@@ -218,27 +217,27 @@ export function DependenciesViewer({ githubUrl, defaultExpanded = false }: Depen
                     {currentPackages.slice(0, 50).map((pkg, index) => (
                       <div
                         key={`${pkg.name}-${index}`}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-raised/50 transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <Package className="h-4 w-4 text-fg-3 shrink-0" />
                           <span className="text-sm truncate">{pkg.name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <code className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                          <code className="text-xs text-fg-3 bg-surface-raised px-1.5 py-0.5 rounded">
                             {pkg.version}
                           </code>
-                          <Badge
-                            variant="outline"
+                          <Chip
+                            tone="neutral"
                             className={`text-xs ${ecosystemColors[pkg.ecosystem] || ecosystemColors.unknown}`}
                           >
                             {pkg.ecosystem}
-                          </Badge>
+                          </Chip>
                         </div>
                       </div>
                     ))}
                     {currentPackages.length > 50 && (
-                      <p className="text-xs text-muted-foreground text-center pt-2">
+                      <p className="text-xs text-fg-3 text-center pt-2">
                         And {currentPackages.length - 50} more...
                       </p>
                     )}

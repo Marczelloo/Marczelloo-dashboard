@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Chip } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -28,12 +28,12 @@ interface ProjectDeploysClientProps {
   services: Service[];
 }
 
-const statusColors: Record<string, "secondary" | "warning" | "success" | "danger"> = {
-  pending: "secondary",
-  running: "warning",
-  success: "success",
-  failed: "danger",
-  cancelled: "secondary",
+const statusColors: Record<string, "idle" | "live" | "ok" | "err"> = {
+  pending: "idle",
+  running: "live",
+  success: "ok",
+  failed: "err",
+  cancelled: "idle",
 };
 
 export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClientProps) {
@@ -142,7 +142,7 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">No deploys yet</p>
+          <p className="text-sm text-fg-3 text-center py-4">No deploys yet</p>
         </CardContent>
       </Card>
     );
@@ -161,7 +161,7 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-destructive"
+                className="text-fg-3 hover:text-err"
                 title="Clear old deployments"
               >
                 <Trash2 className="h-4 w-4" />
@@ -179,7 +179,7 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
                 <AlertDialogAction
                   onClick={handleClearAll}
                   disabled={isClearing}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-err text-white hover:bg-err/90"
                 >
                   {isClearing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Clear History
@@ -193,12 +193,12 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
             {deploys.map((deploy) => {
               const service = serviceMap.get(deploy.service_id);
               return (
-                <div key={deploy.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div key={deploy.id} className="flex items-center justify-between rounded-lg border border-line p-3">
                   <div className="flex items-center gap-3">
-                    <Badge variant={statusColors[deploy.status]}>{deploy.status}</Badge>
+                    <Chip tone={statusColors[deploy.status]}>{deploy.status}</Chip>
                     <div>
                       <p className="text-sm font-medium">{service?.name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-fg-3">
                         {formatRelativeTime(deploy.started_at)}
                         {deploy.commit_sha && ` • ${deploy.commit_sha.slice(0, 7)}`}
                       </p>
@@ -225,7 +225,7 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
                       </Button>
                     )}
 
-                    <span className="text-xs text-muted-foreground">{deploy.triggered_by}</span>
+                    <span className="text-xs text-fg-3">{deploy.triggered_by}</span>
                   </div>
                 </div>
               );
@@ -243,7 +243,7 @@ export function ProjectDeploysClient({ deploys, services }: ProjectDeploysClient
           <div className="mt-4 bg-zinc-950 rounded-lg p-4 overflow-auto max-h-[60vh]">
             {logDialog.isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
               </div>
             ) : (
               <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap">
