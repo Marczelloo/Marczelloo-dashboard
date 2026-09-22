@@ -1,15 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { GitBranch, ChevronDown, RefreshCw, ArrowUp, ArrowDown, Check, Shield, ExternalLink } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Button, Chip, Panel, PanelHeader, Skeleton } from "@/components/ui";
+import { GitBranch, RefreshCw, ArrowUp, ArrowDown, Shield, ExternalLink } from "lucide-react";
 
 interface BranchStatusProps {
   githubUrl: string;
-  defaultExpanded?: boolean;
 }
 
 interface Branch {
@@ -28,12 +24,11 @@ interface BranchComparison {
   total_commits: number;
 }
 
-export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatusProps) {
+export function BranchStatus({ githubUrl }: BranchStatusProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [comparisons, setComparisons] = useState<Record<string, BranchComparison>>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [defaultBranch, setDefaultBranch] = useState<string>("main");
 
   // Parse owner and repo from GitHub URL
@@ -67,13 +62,13 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
     try {
       // First fetch repo info to get default branch
       const repoResponse = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}`);
+      let currentDefault = "main";
 
       if (repoResponse.ok) {
         const repoData = await repoResponse.json();
-        if (repoData.data?.default_branch) {
-          setDefaultBranch(repoData.data.default_branch);
-        }
+        if (repoData.data?.default_branch) currentDefault = repoData.data.default_branch;
       }
+      setDefaultBranch(currentDefault);
 
       // Fetch branches
       const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/branches?per_page=20`);
@@ -87,7 +82,6 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
       setBranches(branchList);
 
       // Fetch comparisons for non-default branches
-      const currentDefault = defaultBranch;
       const comparisonPromises = branchList
         .filter((b: Branch) => b.name !== currentDefault)
         .slice(0, 10) // Limit to first 10 non-default branches
@@ -120,168 +114,74 @@ export function BranchStatus({ githubUrl, defaultExpanded = false }: BranchStatu
     } finally {
       setLoading(false);
     }
-  }, [parsed, defaultBranch]);
+  }, [parsed]);
 
   useEffect(() => {
-    if (isExpanded && branches.length === 0 && !error) {
-      fetchBranches();
-    }
-  }, [isExpanded, branches.length, error, fetchBranches]);
+    void fetchBranches();
+  }, [fetchBranches]);
 
   if (!parsed) {
     return null;
   }
 
-  const getStatusBadge = (comparison: BranchComparison) => {
-    if (comparison.ahead_by === 0 && comparison.behind_by === 0) {
-      return (
-        <Chip tone="neutral" className="text-ok border-ok/30 bg-ok/10">
-          <Check className="h-3 w-3 mr-1" />
-          Up to date
-        </Chip>
-      );
-    }
-
-    return (
-      <div className="flex items-center gap-2">
-        {comparison.ahead_by > 0 && (
-          <Chip tone="neutral" className="text-blue-400 border-blue-400/30 bg-blue-400/10">
-            <ArrowUp className="h-3 w-3 mr-1" />
-            {comparison.ahead_by} ahead
-          </Chip>
-        )}
-        {comparison.behind_by > 0 && (
-          <Chip tone="neutral" className="text-warn border-warn/30 bg-warn/10">
-            <ArrowDown className="h-3 w-3 mr-1" />
-            {comparison.behind_by} behind
-          </Chip>
-        )}
-      </div>
-    );
-  };
+  const treeUrl = (name: string) => `https://github.com/${parsed.owner}/${parsed.repo}/tree/${name}`;
+  const ordered = [...branches.filter((branch) => branch.name === defaultBranch), ...branches.filter((branch) => branch.name !== defaultBranch)];
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="text-base flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <GitBranch className="h-4 w-4" />
-            Branch Status
-            <Chip tone="neutral" className="ml-2 text-xs">
-              {branches.length || "..."}
-            </Chip>
-            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-fg-3" />
-            </motion.div>
-          </CardTitle>
-          {isExpanded && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                fetchBranches();
-              }}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-          )}
+    <Panel>
+      <PanelHeader
+        title="Branches"
+        icon={GitBranch}
+        description={loading ? undefined : `${branches.length} against ${defaultBranch}`}
+        actions={
+          <Button variant="ghost" size="icon-sm" onClick={() => void fetchBranches()} disabled={loading} aria-label="Refresh">
+            <RefreshCw className={loading ? "animate-spin" : undefined} strokeWidth={1.75} />
+          </Button>
+        }
+      />
+      {loading && branches.length === 0 ? (
+        <div className="grid gap-2.5 p-3.5">
+          {[0, 1, 2].map((row) => (
+            <Skeleton key={row} className="h-5 w-full" />
+          ))}
         </div>
-      </CardHeader>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <Skeleton className="h-5 w-32" />
-                      <Skeleton className="h-5 w-24" />
-                    </div>
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="text-sm text-fg-3 text-center py-4">
-                  {error}
-                  <Button variant="ghost" size="sm" className="ml-2" onClick={fetchBranches}>
-                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                    Retry
-                  </Button>
-                </div>
-              ) : branches.length === 0 ? (
-                <p className="text-sm text-fg-3 text-center py-4">No branches found</p>
-              ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {/* Default branch first */}
-                  {branches
-                    .filter((b) => b.name === defaultBranch)
-                    .map((branch) => (
-                      <div
-                        key={branch.name}
-                        className="flex items-center justify-between p-2 rounded-lg bg-accent/5 border border-accent/20"
-                      >
-                        <div className="flex items-center gap-2">
-                          <GitBranch className="h-4 w-4 text-accent-text" />
-                          <span className="font-medium">{branch.name}</span>
-                          <Chip tone="neutral" className="text-xs">
-                            default
-                          </Chip>
-                          {branch.protected && <Shield className="h-3.5 w-3.5 text-fg-3" />}
-                        </div>
-                        <a
-                          href={`https://github.com/${parsed.owner}/${parsed.repo}/tree/${branch.name}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-fg-3 hover:text-fg"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </div>
-                    ))}
-
-                  {/* Other branches */}
-                  {branches
-                    .filter((b) => b.name !== defaultBranch)
-                    .map((branch) => (
-                      <div
-                        key={branch.name}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-raised/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <GitBranch className="h-4 w-4 text-fg-3" />
-                          <span className="text-sm">{branch.name}</span>
-                          {branch.protected && <Shield className="h-3.5 w-3.5 text-fg-3" />}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {comparisons[branch.name] && getStatusBadge(comparisons[branch.name])}
-                          <a
-                            href={`https://github.com/${parsed.owner}/${parsed.repo}/tree/${branch.name}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-fg-3 hover:text-fg"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+      ) : error ? (
+        <p className="p-3.5 text-[13px] text-fg-3">{error}</p>
+      ) : branches.length === 0 ? (
+        <p className="p-3.5 text-[13px] text-fg-3">No branches</p>
+      ) : (
+        <div className="max-h-[320px] overflow-y-auto">
+          {ordered.map((branch) => {
+            const comparison = comparisons[branch.name];
+            const isDefault = branch.name === defaultBranch;
+            return (
+              <div key={branch.name} className="flex items-center gap-2 px-3.5 py-2 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">
+                <code className={isDefault ? "min-w-0 truncate text-[12.5px] font-medium text-fg" : "min-w-0 truncate text-[12.5px] text-fg-2"}>{branch.name}</code>
+                {isDefault && <Chip>default</Chip>}
+                {branch.protected && <Shield className="size-3.5 shrink-0 text-fg-4" strokeWidth={1.75} aria-label="Protected" />}
+                <span className="ml-auto flex shrink-0 items-center gap-2 font-mono text-[11.5px]">
+                  {comparison && comparison.ahead_by === 0 && comparison.behind_by === 0 && <span className="text-fg-4">even</span>}
+                  {comparison && comparison.ahead_by > 0 && (
+                    <span className="flex items-center gap-0.5 text-ok">
+                      <ArrowUp className="size-3" strokeWidth={2} />
+                      {comparison.ahead_by}
+                    </span>
+                  )}
+                  {comparison && comparison.behind_by > 0 && (
+                    <span className="flex items-center gap-0.5 text-warn">
+                      <ArrowDown className="size-3" strokeWidth={2} />
+                      {comparison.behind_by}
+                    </span>
+                  )}
+                  <a href={treeUrl(branch.name)} target="_blank" rel="noopener noreferrer" className="text-fg-4 hover:text-fg" aria-label={`Open ${branch.name} on GitHub`}>
+                    <ExternalLink className="size-3.5" strokeWidth={1.75} />
+                  </a>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
   );
 }

@@ -42,7 +42,7 @@ export {
   AlertDialogCancel,
 } from "./alert-dialog";
 export { Chip, chipVariants } from "./chip";
-export { Panel } from "./card";
+export { Panel, PanelHeader } from "./card";
 export { SegmentedControl, type SegmentedOption } from "./segmented-control";
 export { EmptyState } from "./empty-state";
 export { UptimeStrip, type UptimeState } from "./uptime-strip";

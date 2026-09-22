@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Github, GitCommit, GitPullRequest, Tag, ExternalLink } from "lucide-react";
+import { Button, Chip, Panel, PanelHeader, SegmentedControl } from "@/components/ui";
+import { Github, ExternalLink, GitPullRequest } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface GitHubTabsProps {
@@ -12,124 +11,40 @@ interface GitHubTabsProps {
 
 type TabId = "commits" | "pulls" | "releases";
 
-interface Tab {
-  id: TabId;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const tabs: Tab[] = [
-  { id: "commits", label: "Commits", icon: <GitCommit className="h-4 w-4" /> },
-  { id: "pulls", label: "Pull Requests", icon: <GitPullRequest className="h-4 w-4" /> },
-  { id: "releases", label: "Releases", icon: <Tag className="h-4 w-4" /> },
+const TABS: { value: TabId; label: string }[] = [
+  { value: "commits", label: "Commits" },
+  { value: "pulls", label: "Pull requests" },
+  { value: "releases", label: "Releases" },
 ];
 
+/** The repository's activity: commits, pull requests and releases, one at a time. */
 export function GitHubTabs({ githubUrl }: GitHubTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("commits");
-
-  // Parse GitHub URL for the header link
-  const getRepoUrl = (url: string): string => {
-    const patterns = [/^(https?:\/\/github\.com\/[^\/]+\/[^\/\?#]+)/];
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-    return url;
-  };
-
-  const repoUrl = getRepoUrl(githubUrl);
+  const repoUrl = /^(https?:\/\/github\.com\/[^/]+\/[^/?#]+)/.exec(githubUrl)?.[1] ?? githubUrl;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Github className="h-4 w-4" />
-            GitHub Activity
-          </CardTitle>
-          <a href={repoUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
-              <ExternalLink className="h-3.5 w-3.5" />
-              View on GitHub
-            </Button>
-          </a>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex gap-1 mt-3 border-b border-line">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab.id ? "text-accent-text" : "text-fg-3 hover:text-fg"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="github-tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === "commits" && (
-            <div className="-mx-4 -mb-4">
-              <GitHubCommitsInline githubUrl={githubUrl} />
-            </div>
-          )}
-          {activeTab === "pulls" && (
-            <div className="-mx-4 -mb-4">
-              <GitHubPullsInline githubUrl={githubUrl} />
-            </div>
-          )}
-          {activeTab === "releases" && (
-            <div className="-mx-4 -mb-4">
-              <GitHubReleasesInline githubUrl={githubUrl} />
-            </div>
-          )}
-        </motion.div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Inline versions without Card wrapper for embedding
-function GitHubCommitsInline({ githubUrl }: { githubUrl: string }) {
-  return (
-    <div className="p-4">
-      <InnerCommits githubUrl={githubUrl} />
-    </div>
-  );
-}
-
-function GitHubPullsInline({ githubUrl }: { githubUrl: string }) {
-  return (
-    <div className="p-4">
-      <InnerPulls githubUrl={githubUrl} />
-    </div>
-  );
-}
-
-function GitHubReleasesInline({ githubUrl }: { githubUrl: string }) {
-  return (
-    <div className="p-4">
-      <InnerReleases githubUrl={githubUrl} />
-    </div>
+    <Panel className="self-start">
+      <PanelHeader
+        title="Activity"
+        icon={Github}
+        actions={
+          <Button variant="ghost" size="sm" asChild>
+            <a href={repoUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink strokeWidth={1.75} />
+              GitHub
+            </a>
+          </Button>
+        }
+      />
+      <div className="border-b border-line-subtle px-3.5 py-2.5">
+        <SegmentedControl<TabId> aria-label="Repository activity" value={activeTab} onChange={setActiveTab} options={TABS} />
+      </div>
+      <div className="p-3.5">
+        {activeTab === "commits" && <InnerCommits githubUrl={githubUrl} />}
+        {activeTab === "pulls" && <InnerPulls githubUrl={githubUrl} />}
+        {activeTab === "releases" && <InnerReleases githubUrl={githubUrl} />}
+      </div>
+    </Panel>
   );
 }
 

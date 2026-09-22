@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Skeleton, Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
+import { Button, Chip, Panel, PanelHeader, Skeleton } from "@/components/ui";
 import {
   Github,
   GitBranch,
@@ -98,189 +97,141 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
     return null;
   }
 
+  const refresh = (
+    <Button variant="ghost" size="icon-sm" onClick={fetchData} disabled={isRefreshing} aria-label="Refresh">
+      <RefreshCw className={isRefreshing ? "animate-spin" : undefined} strokeWidth={1.75} />
+    </Button>
+  );
+
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Github className="h-4 w-4" />
-            GitHub
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Panel>
+        <PanelHeader title="Repository" icon={Github} />
+        <div className="grid gap-2.5 p-3.5">
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Github className="h-4 w-4" />
-            GitHub
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-fg-3">
-            <AlertTriangle className="h-4 w-4 text-warn" />
-            {error}
-          </div>
-          <a
-            href={githubUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm text-accent-text hover:underline mt-2"
-          >
-            View on GitHub
-            <ExternalLink className="h-3 w-3" />
+      <Panel>
+        <PanelHeader title="Repository" icon={Github} actions={refresh} />
+        <div className="grid gap-2 p-3.5 text-[13px]">
+          <p className="flex items-center gap-2 text-fg-2">
+            <AlertTriangle className="size-4 text-warn" strokeWidth={1.75} />
+            {error ?? "Nothing came back from GitHub"}
+          </p>
+          <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="flex w-fit items-center gap-1 text-fg-3 hover:text-fg">
+            Open on GitHub
+            <ExternalLink className="size-3" strokeWidth={1.75} />
           </a>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
-  }
-
-  if (!data) {
-    return null;
   }
 
   const { repo, stats } = data;
+  const lastCommit = stats.last_commit;
+  const lastRelease = stats.last_release;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Github className="h-4 w-4" />
-          {repo.name}
-        </CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchData}
-            disabled={isRefreshing}
-            className="h-7 w-7 p-0"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
-          <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-              <ExternalLink className="h-3.5 w-3.5" />
+    <Panel>
+      <PanelHeader
+        title={repo.name}
+        icon={Github}
+        description={repo.description ?? undefined}
+        actions={
+          <>
+            {refresh}
+            <Button variant="ghost" size="icon-sm" asChild>
+              <a href={repo.html_url} target="_blank" rel="noopener noreferrer" aria-label="Open on GitHub">
+                <ExternalLink strokeWidth={1.75} />
+              </a>
             </Button>
-          </a>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="flex items-center gap-2 text-fg-3">
-            <GitBranch className="h-3.5 w-3.5" />
-            <span>{stats.branches_count} branches</span>
+          </>
+        }
+      />
+      <div className="grid grid-cols-4 divide-x divide-line-subtle border-b border-line-subtle text-center">
+        {[
+          { icon: GitBranch, value: stats.branches_count, label: "branches" },
+          { icon: GitPullRequest, value: stats.open_prs_count, label: "open PRs" },
+          { icon: Tag, value: stats.releases_count, label: "releases" },
+          { icon: Users, value: stats.contributors_count, label: "people" },
+        ].map(({ icon: Icon, value, label }) => (
+          <div key={label} className="px-1 py-2.5">
+            <p className="flex items-center justify-center gap-1.5 text-[15px] font-semibold tabular-nums">
+              <Icon className="size-3.5 text-fg-4" strokeWidth={1.75} />
+              {value}
+            </p>
+            <p className="text-[11px] text-fg-3">{label}</p>
           </div>
-          <div className="flex items-center gap-2 text-fg-3">
-            <GitPullRequest className="h-3.5 w-3.5" />
-            <span>{stats.open_prs_count} open PRs</span>
-          </div>
-          <div className="flex items-center gap-2 text-fg-3">
-            <Tag className="h-3.5 w-3.5" />
-            <span>{stats.releases_count} releases</span>
-          </div>
-          <div className="flex items-center gap-2 text-fg-3">
-            <Users className="h-3.5 w-3.5" />
-            <span>{stats.contributors_count} contributors</span>
-          </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Security Alerts */}
+      <div className="grid gap-3 p-3.5">
         {stats.security_alerts_count > 0 && (
-          <div className="flex items-center gap-2 rounded-md bg-err/10 border border-err/20 px-3 py-2">
-            <ShieldAlert className="h-4 w-4 text-err" />
-            <span className="text-sm text-err font-medium">
-              {stats.security_alerts_count} security alert{stats.security_alerts_count > 1 ? "s" : ""}
-            </span>
-          </div>
+          <p className="flex items-center gap-2 rounded-md border border-err/25 bg-err/10 px-3 py-2 text-[12.5px] font-medium text-err">
+            <ShieldAlert className="size-4" strokeWidth={1.75} />
+            {stats.security_alerts_count} open security alert{stats.security_alerts_count > 1 ? "s" : ""}
+          </p>
         )}
 
-        {/* Latest Commit */}
-        {stats.last_commit && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1 text-xs text-fg-3 font-medium">
-              <GitCommit className="h-3 w-3" />
-              Latest Commit
-            </div>
-            <div className="rounded-md border border-line bg-surface-raised/30 p-2">
-              <p className="text-sm font-medium truncate">{stats.last_commit.commit.message.split("\n")[0]}</p>
-              <div className="flex items-center gap-2 mt-1 text-xs text-fg-3">
-                <span>{stats.last_commit.commit.author.name}</span>
-                <span>·</span>
-                <span>{formatRelativeTime(stats.last_commit.commit.author.date)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Latest Release */}
-        {stats.last_release && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1 text-xs text-fg-3 font-medium">
-              <Tag className="h-3 w-3" />
-              Latest Release
-            </div>
-            <a
-              href={stats.last_release.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block rounded-md border border-line bg-surface-raised/30 p-2 hover:bg-surface-raised/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Chip tone="ok" className="text-xs">
-                  {stats.last_release.tag_name}
-                </Chip>
-                {stats.last_release.prerelease && (
-                  <Chip tone="warn" className="text-xs">
-                    Pre-release
-                  </Chip>
-                )}
-              </div>
-              {stats.last_release.name && stats.last_release.name !== stats.last_release.tag_name && (
-                <p className="text-sm mt-1 truncate">{stats.last_release.name}</p>
-              )}
-              <p className="text-xs text-fg-3 mt-1">
-                {stats.last_release.published_at ? formatRelativeTime(stats.last_release.published_at) : "Draft"}
-              </p>
+        {lastCommit && (
+          <div className="grid gap-1">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-fg-4">
+              <GitCommit className="size-3" strokeWidth={1.75} />
+              LATEST COMMIT
+            </p>
+            <a href={lastCommit.html_url} target="_blank" rel="noopener noreferrer" className="group grid gap-0.5">
+              <span className="truncate text-[13px] font-medium group-hover:underline">{lastCommit.commit.message.split("\n")[0]}</span>
+              <span className="text-[11.5px] text-fg-3">
+                {lastCommit.commit.author.name} · {formatRelativeTime(lastCommit.commit.author.date)} · <code className="text-fg-4">{lastCommit.sha.slice(0, 7)}</code>
+              </span>
             </a>
           </div>
         )}
 
-        {/* Default Branch */}
-        <div className="flex items-center justify-between text-xs text-fg-3 pt-2 border-t border-line">
-          <span>Default branch</span>
-          <Chip tone="neutral" className="text-xs font-mono">
-            {repo.default_branch}
-          </Chip>
-        </div>
-
-        {/* Language */}
-        {repo.language && (
-          <div className="flex items-center justify-between text-xs text-fg-3">
-            <span>Primary language</span>
-            <span>{repo.language}</span>
+        {lastRelease && (
+          <div className="grid gap-1">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-fg-4">
+              <Tag className="size-3" strokeWidth={1.75} />
+              LATEST RELEASE
+            </p>
+            <a href={lastRelease.html_url} target="_blank" rel="noopener noreferrer" className="group flex flex-wrap items-center gap-2 text-[13px]">
+              <Chip tone={lastRelease.prerelease ? "warn" : "ok"} mono>
+                {lastRelease.tag_name}
+              </Chip>
+              {lastRelease.name && lastRelease.name !== lastRelease.tag_name && <span className="min-w-0 truncate group-hover:underline">{lastRelease.name}</span>}
+              <span className="ml-auto text-[11.5px] text-fg-3">{lastRelease.published_at ? formatRelativeTime(lastRelease.published_at) : "draft"}</span>
+            </a>
           </div>
         )}
 
-        {/* Last pushed */}
-        {repo.pushed_at && (
-          <div className="flex items-center justify-between text-xs text-fg-3">
-            <span>Last push</span>
-            <span>{formatRelativeTime(repo.pushed_at)}</span>
+        <dl className="grid border-t border-line-subtle pt-1 text-[12.5px]">
+          <div className="flex items-center justify-between py-1.5">
+            <dt className="text-fg-3">Default branch</dt>
+            <dd>
+              <code className="text-[12px] text-fg-2">{repo.default_branch}</code>
+            </dd>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {repo.language && (
+            <div className="flex items-center justify-between py-1.5">
+              <dt className="text-fg-3">Language</dt>
+              <dd className="text-fg-2">{repo.language}</dd>
+            </div>
+          )}
+          {repo.pushed_at && (
+            <div className="flex items-center justify-between py-1.5">
+              <dt className="text-fg-3">Last push</dt>
+              <dd className="text-fg-2">{formatRelativeTime(repo.pushed_at)}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+    </Panel>
   );
 }
