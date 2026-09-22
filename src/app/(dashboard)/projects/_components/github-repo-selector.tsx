@@ -23,23 +23,7 @@ import {
 } from "lucide-react";
 import { CloudflareHostnameField } from "@/components/features/cloudflare-hostname-field";
 import { toast } from "sonner";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Skeleton,
-} from "@/components/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Chip } from "@/components/ui";
 import { preflightDeploymentAction, provisionGitHubProjectAction } from "@/app/actions/projects";
 import { slugify } from "@/lib/utils";
 import type { BuildSpec } from "@/server/deployments/detect";
@@ -224,54 +208,54 @@ export function GitHubRepoSelector() {
   }
 
   if (error) {
-    return <Card className="border-dashed"><CardContent className="flex flex-col items-center gap-4 py-12"><AlertTriangle className="h-10 w-10 text-warning" /><p className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={fetchRepos}><RefreshCw className="h-4 w-4" />Try again</Button></CardContent></Card>;
+    return <Card className="border-dashed"><CardContent className="flex flex-col items-center gap-4 py-12"><AlertTriangle className="h-10 w-10 text-warn" /><p className="text-sm text-fg-3">{error}</p><Button variant="secondary" onClick={fetchRepos}><RefreshCw className="h-4 w-4" />Try again</Button></CardContent></Card>;
   }
 
   return (
     <div className="space-y-6">
-      <Card className="border-primary/20">
+      <Card className="border-accent/20">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Github className="h-5 w-5" /></div>
-            <div><CardTitle>Deploy from GitHub</CardTitle><CardDescription>Jedna konfiguracja dla repozytorium, Docker Compose i publicznego adresu.</CardDescription></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent-text"><Github className="h-5 w-5" /></div>
+            <div><CardTitle>Deploy from GitHub</CardTitle><CardDescription>One setup for the repository, how it builds, and its public address.</CardDescription></div>
           </div>
         </CardHeader>
-        <CardContent><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" placeholder="Search repositories…" value={query} onChange={(event) => setQuery(event.target.value)} /></div></CardContent>
+        <CardContent><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-3" /><Input className="pl-9" placeholder="Search repositories…" value={query} onChange={(event) => setQuery(event.target.value)} /></div></CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-base">Repository</CardTitle><Button variant="ghost" size="sm" onClick={fetchRepos} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button></CardHeader>
         <CardContent className="p-0">
           {loading ? <div className="space-y-0">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="flex gap-3 border-t p-4"><Skeleton className="h-9 w-9 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-2/3" /></div></div>)}</div> :
-            filteredRepos.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground"><Code2 className="mx-auto mb-3 h-8 w-8 opacity-50" />No matching repositories</div> :
-              <div className="max-h-[28rem] divide-y divide-border overflow-y-auto">{filteredRepos.map((repo) => <button key={repo.id} type="button" onClick={() => chooseRepo(repo)} className={`flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-secondary/50 ${selected?.id === repo.id ? "bg-primary/10" : ""}`}>
+            filteredRepos.length === 0 ? <div className="py-10 text-center text-sm text-fg-3"><Code2 className="mx-auto mb-3 h-8 w-8 opacity-50" />No matching repositories</div> :
+              <div className="max-h-[28rem] divide-y divide-line overflow-y-auto">{filteredRepos.map((repo) => <button key={repo.id} type="button" onClick={() => chooseRepo(repo)} className={`flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-surface-raised/50 ${selected?.id === repo.id ? "bg-accent/10" : ""}`}>
                 <Image src={repo.owner.avatar_url} alt="" width={36} height={36} className="rounded-full" unoptimized />
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{repo.name}</span>{repo.private ? <Lock className="h-3.5 w-3.5 text-muted-foreground" /> : <Globe className="h-3.5 w-3.5 text-muted-foreground" />}</div>{repo.description && <p className="mt-1 truncate text-sm text-muted-foreground">{repo.description}</p>}<div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">{repo.language && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: languageColors[repo.language] || "#858585" }} />{repo.language}</span>}<span className="flex items-center gap-1"><Star className="h-3.5 w-3.5" />{repo.stargazers_count}</span><span className="font-mono">{repo.default_branch}</span></div></div>
-                <span className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected?.id === repo.id ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"}`}>{selected?.id === repo.id && <Check className="h-3 w-3" />}</span>
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{repo.name}</span>{repo.private ? <Lock className="h-3.5 w-3.5 text-fg-3" /> : <Globe className="h-3.5 w-3.5 text-fg-3" />}</div>{repo.description && <p className="mt-1 truncate text-sm text-fg-3">{repo.description}</p>}<div className="mt-2 flex items-center gap-3 text-xs text-fg-3">{repo.language && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: languageColors[repo.language] || "#858585" }} />{repo.language}</span>}<span className="flex items-center gap-1"><Star className="h-3.5 w-3.5" />{repo.stargazers_count}</span><span className="font-mono">{repo.default_branch}</span></div></div>
+                <span className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected?.id === repo.id ? "border-accent bg-accent text-white" : "border-fg-3/30"}`}>{selected?.id === repo.id && <Check className="h-3 w-3" />}</span>
               </button>)}</div>}
         </CardContent>
       </Card>
 
-      {selected && <Card className="border-primary/30">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Container className="h-4 w-4 text-primary" />Deployment plan</CardTitle><CardDescription>{selected.full_name} zostanie utrzymany jako repo Git i stack Docker Compose na Raspberry Pi.</CardDescription></CardHeader>
+      {selected && <Card className="border-accent/30">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Container className="h-4 w-4 text-accent-text" />Deployment plan</CardTitle><CardDescription>{selected.full_name} will live on the Pi as a Git checkout and a Compose stack.</CardDescription></CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Branch" icon={<GitBranch className="h-4 w-4" />}><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
             <Field label="Compose project"><Input value={composeProject} onChange={(event) => setComposeProject(event.target.value)} /></Field>
-            <Field label="Repository path" className="md:col-span-2"><Input className="font-mono text-xs" value={repoPath} onChange={(event) => setRepoPath(event.target.value)} /><p className="text-xs text-muted-foreground">Nowe repo zostanie sklonowane tutaj. Istniejący katalog musi być poprawnym repozytorium Git.</p></Field>
+            <Field label="Repository path" className="md:col-span-2"><Input className="font-mono text-xs" value={repoPath} onChange={(event) => setRepoPath(event.target.value)} /><p className="text-xs text-fg-3">A new repository is cloned here; an existing directory must already be a Git checkout.</p></Field>
             {(!build || build.kind === "compose") && <Field label="Compose file (optional)"><Input placeholder="Auto-detect: compose.yml" value={composeFile} onChange={(event) => setComposeFile(event.target.value)} /></Field>}
-            <Field label="Production profiles (optional)"><Input placeholder="api, production" value={profiles} onChange={(event) => setProfiles(event.target.value)} /><p className="text-xs text-muted-foreground">Tylko wybrane profile; `dev` nie jest uruchamiany automatycznie.</p></Field>
+            <Field label="Production profiles (optional)"><Input placeholder="api, production" value={profiles} onChange={(event) => setProfiles(event.target.value)} /><p className="text-xs text-fg-3">Only these profiles start; `dev` never starts on its own.</p></Field>
             <Field label="Runtime"><Select value={runtime} onValueChange={(value) => setRuntime(value as Runtime)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="web">Web application</SelectItem><SelectItem value="bot">Bot</SelectItem><SelectItem value="worker">Worker / background job</SelectItem><SelectItem value="stack">Multi-service stack</SelectItem></SelectContent></Select></Field>
             <Field label="Exposure"><Select value={exposure} onValueChange={(value) => setExposure(value as Exposure)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="internal">Internal only</SelectItem><SelectItem value="cloudflare">Cloudflare Tunnel</SelectItem></SelectContent></Select></Field>
           </div>
 
           <BuildPlan githubUrl={selected.html_url} branch={branch} runtime={runtime} value={build} onChange={setBuild} />
 
-          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-border/70 bg-secondary/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-primary" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-muted-foreground">Po udanym deployu dashboard doda trasę tunelu i rekord DNS dla wybranej domeny.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
+          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-line bg-surface-raised/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-accent-text" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-fg-3">After the first successful deploy the dashboard adds the route and the DNS record.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
 
-          {preflight && <div className="rounded-lg border border-border/70 bg-background/50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><ShieldCheck className={`h-4 w-4 ${preflight.ok ? "text-success" : "text-destructive"}`} /><p className="text-sm font-medium">Preflight {preflight.ok ? "passed" : "needs attention"}</p>{preflight.composeFile && <Badge variant="secondary" className="font-mono">{preflight.composeFile}</Badge>}{preflight.services.map((service) => <Badge key={service} variant="outline" className="font-mono">{service}</Badge>)}</div><div className="space-y-2">{preflight.messages.map((message, index) => <div key={`${message.text}-${index}`} className="flex gap-2 text-sm"><span className={message.level === "success" ? "text-success" : message.level === "warning" ? "text-warning" : "text-destructive"}>{message.level === "success" ? "✓" : message.level === "warning" ? "!" : "×"}</span><span className="text-muted-foreground">{message.text}</span></div>)}</div></div>}
+          {preflight && <div className="rounded-lg border border-line bg-canvas/50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><ShieldCheck className={`h-4 w-4 ${preflight.ok ? "text-ok" : "text-err"}`} /><p className="text-sm font-medium">Preflight {preflight.ok ? "passed" : "needs attention"}</p>{preflight.composeFile && <Chip tone="neutral" className="font-mono">{preflight.composeFile}</Chip>}{preflight.services.map((service) => <Chip key={service} tone="neutral" className="font-mono">{service}</Chip>)}</div><div className="space-y-2">{preflight.messages.map((message, index) => <div key={`${message.text}-${index}`} className="flex gap-2 text-sm"><span className={message.level === "success" ? "text-ok" : message.level === "warning" ? "text-warn" : "text-err"}>{message.level === "success" ? "✓" : message.level === "warning" ? "!" : "×"}</span><span className="text-fg-3">{message.text}</span></div>)}</div></div>}
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-border/60 pt-5"><Button variant="outline" onClick={runPreflight} disabled={checking || provisioning}>{checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}Run preflight</Button><Button onClick={provision} disabled={provisioning || checking}>{provisioning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}Provision & deploy<ArrowRight className="h-4 w-4" /></Button></div>
+          <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-5"><Button variant="secondary" onClick={runPreflight} disabled={checking || provisioning}>{checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}Run preflight</Button><Button onClick={provision} disabled={provisioning || checking}>{provisioning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}Provision & deploy<ArrowRight className="h-4 w-4" /></Button></div>
         </CardContent>
       </Card>}
     </div>

@@ -1,23 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  Button,
-  Input,
-  Label,
-  Badge,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Chip } from "@/components/ui";
 import {
   Plus,
   Trash2,
@@ -625,20 +609,20 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         </div>
         <div className="flex items-center gap-2">
           {saving && (
-            <Badge variant="warning" className="animate-pulse">
+            <Chip tone="warn" className="animate-pulse">
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               Saving...
-            </Badge>
+            </Chip>
           )}
 
           {hasUnsavedChanges && (
-            <Badge variant="warning" className="animate-pulse">
+            <Chip tone="warn" className="animate-pulse">
               Unsaved changes
-            </Badge>
+            </Chip>
           )}
 
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => loadFromBothSources()}
             disabled={loading || saving}
@@ -648,7 +632,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </Button>
 
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setShowImportModal(!showImportModal)}
             disabled={saving}
@@ -658,7 +642,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           </Button>
 
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleExport}
             disabled={workingVars.length === 0 || saving}
@@ -670,7 +654,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           {hasUnsavedChanges && (
             <>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={handleDiscard}
                 disabled={saving}
@@ -679,7 +663,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
               </Button>
 
               <Button
-                variant="default"
+                variant="primary"
                 size="sm"
                 onClick={saveAll}
                 disabled={saving}
@@ -695,7 +679,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
           )}
 
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setShowAddForm(!showAddForm)}
             disabled={saving}
@@ -708,7 +692,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       <CardContent className="space-y-4">
         {/* Error Banner */}
         {error && (
-          <div className="flex items-center justify-between rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="flex items-center justify-between rounded-lg bg-err/10 p-3 text-sm text-err">
             {error}
             <button onClick={() => setError(null)}>
               <X className="h-4 w-4" />
@@ -729,7 +713,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                 setSelectedFile(e.target.value);
                 loadFromBothSources();
               }}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              className="rounded-md border border-line-strong bg-canvas px-3 py-1.5 text-sm"
               disabled={loading || saving}
             >
               {availableFiles.map((file) => (
@@ -743,13 +727,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
         {/* Import Modal */}
         {showImportModal && (
-          <div className="space-y-3 p-4 rounded-lg border border-border bg-secondary/30">
+          <div className="space-y-3 p-4 rounded-lg border border-line bg-surface-raised/30">
             <Label>Import .env content</Label>
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               placeholder="KEY=value&#10;ANOTHER_KEY=value"
-              className="w-full h-32 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+              className="w-full h-32 rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm font-mono"
             />
             <div className="flex gap-2">
               <Button
@@ -762,7 +746,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => {
                   setShowImportModal(false);
                   setImportText("");
@@ -831,14 +815,14 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
         {/* Loading State */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
           </div>
         ) : workingVars.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-fg-3 mb-4">
               No environment variables in {selectedFile}
             </p>
-            <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
+            <Button variant="secondary" size="sm" onClick={() => setShowAddForm(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add your first variable
             </Button>
@@ -848,7 +832,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
             {workingVars.map((envVar) => (
               <div
                 key={envVar.key}
-                className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30"
+                className="flex items-center gap-3 p-3 rounded-lg border border-line bg-surface-raised/30"
               >
                 {editingId === envVar.key ? (
                   <div className="flex-1 space-y-2">
@@ -875,7 +859,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                           <button
                             type="button"
                             onClick={() => setRevealEditValue(!revealEditValue)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-3 hover:text-fg text-xs"
                           >
                             {revealEditValue ? "👁️" : "•••"}
                           </button>
@@ -916,12 +900,12 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                           {envVar.key}
                         </code>
                         {envVar.isSecret && (
-                          <Badge variant="outline" className="text-xs">
+                          <Chip tone="neutral" className="text-xs">
                             masked
-                          </Badge>
+                          </Chip>
                         )}
                       </div>
-                      <code className="text-xs text-muted-foreground font-mono">
+                      <code className="text-xs text-fg-3 font-mono">
                         {envVar.isSecret ? "••••••••" : envVar.value}
                       </code>
                     </div>
@@ -943,7 +927,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDelete(envVar.key)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-err hover:text-err"
                         disabled={saving}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -960,7 +944,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
         {/* No repo path warning */}
         {!repoPath && (
-          <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
+          <div className="rounded-lg bg-warn/10 p-3 text-sm text-warn">
             Configure a repository path in service settings to manage env files.
           </div>
         )}

@@ -1,8 +1,8 @@
 "use server";
 
-import { projects, auditLogs, services, workItems, deploys } from "@/server/atlashub";
+import { projects, auditLogs, services, workItems, deploys } from "@/server/data";
 import { requirePinVerification, requireAuth, getCurrentUser } from "@/server/lib/auth";
-import { checkDemoModeBlocked } from "@/lib/demo-mode";
+import { checkDemoModeBlocked, isDemoMode } from "@/lib/demo-mode";
 import {
   createRelease,
   generateReleaseNotes,
@@ -512,6 +512,14 @@ export async function getProjectTunnelStatusAction(id: string): Promise<ActionRe
 }>> {
   try {
     await requireAuth();
+    if (isDemoMode()) {
+      const project = await projects.getProjectById(id);
+      if (!project) return { success: false, error: "Project not found" };
+      const hostname = project.prod_url ? new URL(project.prod_url).hostname : null;
+      if (!hostname) return { success: true, data: { supportsManagedDeployment: true, configured: true, tunnel: null, actualRoute: null, status: "not_configured" } };
+      const tunnel = { enabled: true, hostname, localPort: 3000, service: "app", port: 3000 };
+      return { success: true, data: { supportsManagedDeployment: true, configured: true, tunnel, actualRoute: { hostname, service: `http://${project.slug}-app:3000`, localPort: null }, status: "active" } };
+    }
     const [project, config, ingress] = await Promise.all([
       projects.getProjectById(id),
       getDeploymentConfig(id),

@@ -1,8 +1,6 @@
 import type { Config } from "tailwindcss";
-import typography from "@tailwindcss/typography";
 
 const rgb = (token: string) => `rgb(var(--${token}) / <alpha-value>)`;
-const hsl = (token: string) => `hsl(var(--${token}))`;
 
 const config: Config = {
   darkMode: "class",
@@ -18,21 +16,6 @@ const config: Config = {
         warn: rgb("warn"),
         err: rgb("err"),
         line: { DEFAULT: "var(--line)", subtle: "var(--line-subtle)", strong: "var(--line-strong)" },
-        // Legacy names, removed in phase 8.
-        background: hsl("background"),
-        foreground: hsl("foreground"),
-        card: { DEFAULT: hsl("card"), foreground: hsl("card-foreground") },
-        popover: { DEFAULT: hsl("popover"), foreground: hsl("popover-foreground") },
-        primary: { DEFAULT: hsl("primary"), foreground: hsl("primary-foreground") },
-        secondary: { DEFAULT: hsl("secondary"), foreground: hsl("secondary-foreground") },
-        muted: { DEFAULT: hsl("muted"), foreground: hsl("muted-foreground") },
-        destructive: { DEFAULT: hsl("destructive"), foreground: hsl("destructive-foreground") },
-        border: hsl("border"),
-        input: hsl("input"),
-        ring: hsl("ring"),
-        success: hsl("success"),
-        warning: hsl("warning"),
-        danger: hsl("danger"),
       },
       borderRadius: { xs: "4px", sm: "6px", md: "8px", lg: "10px", xl: "14px" },
       fontFamily: {
@@ -63,7 +46,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [typography],
+  plugins: [],
 };
 
 export default config;

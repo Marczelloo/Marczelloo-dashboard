@@ -19,10 +19,6 @@ const buttonVariants = cva(
         ghost: "text-fg-2 hover:bg-white/5 hover:text-fg",
         danger,
         link: "h-auto px-0 text-fg-2 underline-offset-4 hover:text-fg hover:underline active:scale-100",
-        // Legacy names kept until every page is migrated (phase 8).
-        default: primary,
-        destructive: danger,
-        outline: secondary,
       },
       size: {
         default: "h-8 px-3 text-[13px]",

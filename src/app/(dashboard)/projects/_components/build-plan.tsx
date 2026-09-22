@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Hammer, Loader2, RefreshCw } from "lucide-react";
 import { detectRepositoryBuildAction } from "@/app/actions/build-detect";
-import { Badge, Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Chip } from "@/components/ui";
 import type { BuildKind, BuildSpec } from "@/server/deployments/detect";
 
 const KIND_LABEL: Record<BuildKind, string> = {
   compose: "Own Compose file",
   dockerfile: "Own Dockerfile",
-  node: "Aplikacja Node.js (szablon)",
-  static: "Strona statyczna (nginx)",
-  python: "Aplikacja Python (szablon)",
+  node: "Node.js app (template)",
+  static: "Static site (nginx)",
+  python: "Python app (template)",
 };
 
 const EMPTY: Omit<BuildSpec, "kind"> = {
@@ -58,37 +58,37 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
   const templated = value && value.kind !== "compose";
 
   return (
-    <div className="space-y-4 rounded-lg border border-border/70 bg-secondary/20 p-4">
+    <div className="space-y-4 rounded-lg border border-line bg-surface-raised/20 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Hammer className="mt-0.5 h-4 w-4 text-primary" />
+          <Hammer className="mt-0.5 h-4 w-4 text-accent-text" />
           <div>
             <p className="text-sm font-medium">How it builds</p>
-            <p className="text-xs text-muted-foreground">Detected from the repository's files; correct it before deploying if needed.</p>
+            <p className="text-xs text-fg-3">Detected from the repository's files; correct it before deploying if needed.</p>
           </div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => void detect()} disabled={detecting}>
           {detecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Wykryj ponownie
+          Detect again
         </Button>
       </div>
 
       {reasons.length > 0 && (
-        <ul className="space-y-1 text-xs text-muted-foreground">
+        <ul className="space-y-1 text-xs text-fg-3">
           {reasons.map((reason) => <li key={reason}>• {reason}</li>)}
         </ul>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label>Typ</Label>
+          <Label>Kind</Label>
           <Select value={value?.kind ?? ""} onValueChange={(kind) => onChange({ ...EMPTY, ...(value ?? {}), kind: kind as BuildKind })}>
             <SelectTrigger><SelectValue placeholder="Not recognised; choose one" /></SelectTrigger>
             <SelectContent>
               {(Object.keys(KIND_LABEL) as BuildKind[]).map((kind) => <SelectItem key={kind} value={kind}>{KIND_LABEL[kind]}</SelectItem>)}
             </SelectContent>
           </Select>
-          {value?.framework && <Badge variant="secondary">{value.framework}{value.packageManager ? ` · ${value.packageManager}` : ""}</Badge>}
+          {value?.framework && <Chip tone="neutral">{value.framework}{value.packageManager ? ` · ${value.packageManager}` : ""}</Chip>}
         </div>
 
         {templated && (
@@ -108,11 +108,11 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
         {(value?.kind === "node" || value?.kind === "python" || value?.kind === "static") && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="build-install">Instalacja</Label>
+              <Label htmlFor="build-install">Install command</Label>
               <Input id="build-install" className="font-mono text-xs" value={text("installCommand")} onChange={(event) => set({ installCommand: nullable(event.target.value) })} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="build-build">Build (opcjonalnie)</Label>
+              <Label htmlFor="build-build">Build command (optional)</Label>
               <Input id="build-build" className="font-mono text-xs" value={text("buildCommand")} onChange={(event) => set({ buildCommand: nullable(event.target.value) })} />
             </div>
           </>
@@ -134,7 +134,7 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
       </div>
 
       {templated && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-fg-3">
           Dashboard wygeneruje Dockerfile i compose poza repozytorium. Plik <code>.env</code> trafia do kontenera jako zmienne, nigdy do obrazu.
         </p>
       )}

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/components/ui";
+import { FormField } from "@/components/layout/form-layout";
+import { Button, Chip, Input, Panel, PanelHeader, Switch } from "@/components/ui";
 import { getProjectTunnelStatusAction, updateProjectTunnelAction } from "@/app/actions/projects";
 import { CloudflareHostnameField } from "@/components/features/cloudflare-hostname-field";
-import { CheckCircle2, Cloud, ExternalLink, Pencil, RefreshCw, Server, TriangleAlert } from "lucide-react";
+import { Cloud, ExternalLink, Pencil, RefreshCw, TriangleAlert } from "lucide-react";
 
 type TunnelStatus = "active" | "pending" | "not_configured" | "unavailable";
 
@@ -18,11 +19,11 @@ type TunnelData = {
   status: TunnelStatus;
 };
 
-const statusMeta: Record<TunnelStatus, { label: string; variant: "success" | "warning" | "secondary" | "danger" }> = {
-  active: { label: "Aktywny", variant: "success" },
-  pending: { label: "Needs a deploy", variant: "warning" },
-  not_configured: { label: "Not configured", variant: "secondary" },
-  unavailable: { label: "Unavailable", variant: "danger" },
+const statusMeta: Record<TunnelStatus, { label: string; tone: "ok" | "warn" | "idle" | "err" }> = {
+  active: { label: "live", tone: "ok" },
+  pending: { label: "needs a deploy", tone: "warn" },
+  not_configured: { label: "not set", tone: "idle" },
+  unavailable: { label: "unavailable", tone: "err" },
 };
 
 export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
@@ -68,7 +69,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
     }
     toast.success(enabled ? "Route saved" : "Route removed", {
       description: result.data?.deployQueued
-        ? "Nowy port zostanie wystawiony po automatycznym deployu projektu."
+        ? "The new port goes live with the deploy that was just queued."
         : result.data?.changed
           ? "The tunnel route was updated."
           : "It was already up to date.",
@@ -81,113 +82,126 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
   const activeHostname = data?.tunnel?.hostname || data?.actualRoute?.hostname;
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Cloud className="h-4 w-4 text-primary" />
-            Cloudflare Tunnel
-          </CardTitle>
-          <CardDescription>Publiczna domena, lokalny port i wpis ingress dla tego projektu.</CardDescription>
-        </div>
-        {!loading && status && <Badge variant={status.variant}>{status.label}</Badge>}
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="grid gap-3 sm:grid-cols-3" aria-label="Loading the route">
-            {["domena", "port", "ingress"].map((item) => <div key={item} className="h-16 animate-pulse rounded-md border border-border/50 bg-secondary/30" />)}
-          </div>
+    <Panel className="lg:col-span-2">
+      <PanelHeader
+        title="Public route"
+        icon={Cloud}
+        description="The hostname, the port it reaches, and the route Cloudflare holds for it."
+        actions={
+          <>
+            {!loading && status && <Chip tone={status.tone}>{status.label}</Chip>}
+            <Button variant="ghost" size="icon-sm" onClick={() => void load()} disabled={loading} aria-label="Refresh">
+              <RefreshCw className={loading ? "animate-spin" : undefined} strokeWidth={1.75} />
+            </Button>
+          </>
+        }
+      />
+      <div className="grid gap-4 p-3.5">
+        {loading && !data ? (
+          <div className="h-24 animate-pulse rounded-md bg-white/[.03]" aria-label="Loading the route" />
         ) : !data ? (
-          <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
-            <span>The tunnel cannot be read right now.</span>
-            <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw /> Try again</Button>
-          </div>
+          <p className="flex items-center gap-2 text-[13px] text-fg-3">
+            <TriangleAlert className="size-4 text-err" strokeWidth={1.75} />
+            The tunnel cannot be read right now.
+          </p>
         ) : !data.supportsManagedDeployment ? (
-          <div className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <p>Connect this project to a GitHub repository and a Compose file first; only then can the dashboard manage its route.</p>
-          </div>
+          <p className="flex items-start gap-2 text-[13px] text-fg-2">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" strokeWidth={1.75} />
+            Connect this project to a GitHub repository and a Compose file first; only then can the dashboard manage its route.
+          </p>
         ) : (
-          <div className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <StatusValue icon={<Cloud />} label="Domain" value={activeHostname || "—"} mono />
-              <StatusValue icon={<Server />} label="Local port" value={data.tunnel?.localPort ? `127.0.0.1:${data.tunnel.localPort}` : "—"} mono />
-              <StatusValue icon={<CheckCircle2 />} label="Ingress" value={data.actualRoute?.service || "No route"} mono />
-            </div>
+          <>
+            <dl className="grid text-[13px]">
+              <Fact label="Domain" value={activeHostname || "—"} />
+              <Fact label="Port" value={data.tunnel?.localPort ? String(data.tunnel.localPort) : "—"} />
+              <Fact label="Route target" value={data.actualRoute?.service || "no route"} />
+            </dl>
 
             {data.status === "pending" && (
-              <div className="flex gap-3 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-muted-foreground">
-                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <p>Konfiguracja projektu nie odpowiada jeszcze wpisowi ingress. Zapisz ustawienia ponownie albo wykonaj deploy projektu.</p>
-              </div>
+              <p className="flex items-start gap-2 rounded-md border border-warn/25 bg-warn/[.07] px-3 py-2.5 text-[12.5px] text-fg-2">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" strokeWidth={1.75} />
+                The saved settings and the live route differ. Save again, or deploy the project.
+              </p>
             )}
             {data.status === "unavailable" && (
-              <div className="flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
-                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <p>{data.error || "Could not read the tunnel routes."}</p>
-              </div>
+              <p className="flex items-start gap-2 rounded-md border border-err/25 bg-err/10 px-3 py-2.5 text-[12.5px] text-fg-2">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-err" strokeWidth={1.75} />
+                {data.error || "Could not read the tunnel routes."}
+              </p>
             )}
 
             {!editing ? (
-              <div className="flex flex-wrap gap-2 border-t border-border/50 pt-4">
+              <div className="flex flex-wrap gap-2">
                 {activeHostname && data.status === "active" && (
-                  <a href={`https://${activeHostname}`} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm"><ExternalLink /> Open domain</Button>
-                  </a>
+                  <Button variant="secondary" size="sm" asChild>
+                    <a href={`https://${activeHostname}`} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink strokeWidth={1.75} />
+                      Open
+                    </a>
+                  </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Pencil /> Edytuj tunel</Button>
-                <Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw /> Refresh</Button>
+                <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                  <Pencil strokeWidth={1.75} />
+                  Edit route
+                </Button>
               </div>
             ) : (
-              <form className="space-y-4 border-t border-border/50 pt-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-                <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 bg-secondary/20 p-3">
-                  <div>
-                    <Label htmlFor="tunnel-enabled">Wystaw przez Cloudflare Tunnel</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">Turning this off removes the route; the container keeps running.</p>
-                  </div>
-                  <button
-                    id="tunnel-enabled"
-                    type="button"
-                    role="switch"
-                    aria-checked={enabled}
-                    onClick={() => setEnabled((value) => !value)}
-                    className={`relative h-8 w-14 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${enabled ? "border-primary bg-primary" : "border-border bg-background"}`}
-                  >
-                    <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-7" : "translate-x-1"}`} />
-                    <span className="sr-only">{enabled ? "Turn the route off" : "Turn the route on"}</span>
-                  </button>
-                </div>
+              <form
+                className="grid gap-4 border-t border-line-subtle pt-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void save();
+                }}
+              >
+                <label className="flex items-center justify-between gap-4 text-[13px]">
+                  <span>
+                    Publish through the tunnel
+                    <span className="block text-[11.5px] text-fg-3">Turning this off removes the route; the container keeps running.</span>
+                  </span>
+                  <Switch checked={enabled} onChange={setEnabled} aria-label="Publish through the tunnel" />
+                </label>
                 {enabled && (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="tunnel-hostname">Domain</Label>
+                    <FormField label="Domain" htmlFor="tunnel-hostname">
                       <CloudflareHostnameField id="tunnel-hostname" value={hostname} onChange={setHostname} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tunnel-port">Local port</Label>
-                      <Input id="tunnel-port" inputMode="numeric" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} placeholder="3202" />
-                      <p className="text-xs text-muted-foreground">A port already in use is replaced with the first free one in 3000–3999.</p>
-                    </div>
+                    </FormField>
+                    <FormField label="Port" htmlFor="tunnel-port" hint="A port already in use is swapped for the first free one in 3000–3999.">
+                      <Input id="tunnel-port" inputMode="numeric" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} placeholder="3202" className="font-mono" />
+                    </FormField>
                   </div>
                 )}
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="ghost" onClick={() => { setEditing(false); void load(); }} disabled={saving}>Cancel</Button>
-                  <Button type="submit" loading={saving} disabled={enabled && (!hostname.trim() || !localPort)}>Save route</Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditing(false);
+                      void load();
+                    }}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" loading={saving} disabled={enabled && (!hostname.trim() || !localPort)}>
+                    Save route
+                  </Button>
                 </div>
               </form>
             )}
-          </div>
+          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
-function StatusValue({ icon, label, value, mono = false }: { icon: React.ReactNode; label: string; value: string; mono?: boolean }) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-md border border-border/50 bg-secondary/20 p-3">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">{icon}<span>{label}</span></div>
-      <p className={`mt-2 truncate text-sm font-medium tabular-nums ${mono ? "font-mono text-xs" : ""}`} title={value}>{value}</p>
+    <div className="flex items-center justify-between gap-3 py-1.5 [&+&]:border-t [&+&]:border-line-subtle">
+      <dt className="text-fg-3">{label}</dt>
+      <dd className="min-w-0 truncate font-mono text-[12px] text-fg-2" title={value}>
+        {value}
+      </dd>
     </div>
   );
 }

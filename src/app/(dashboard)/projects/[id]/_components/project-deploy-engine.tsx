@@ -1,29 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, History, Loader2, RotateCcw } from "lucide-react";
+import { History, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { getDeployEngineAction, rollbackProjectAction } from "@/app/actions/agent-deploy";
 import { PinDialog } from "@/components/pin-dialog";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { StatusDot } from "@/components/status-dot";
+import { Button, Chip, Panel, PanelHeader } from "@/components/ui";
+import { formatRelativeTime } from "@/lib/utils";
 
 type EngineData = NonNullable<Awaited<ReturnType<typeof getDeployEngineAction>>["data"]>;
-type PendingAction = { kind: "rollback"; sha: string };
 
-const JOB_STATUS: Record<string, string> = { queued: "w kolejce", running: "w toku" };
-const formatDate = (value: string) => new Date(value).toLocaleString("pl-PL");
+const JOB_STATUS: Record<string, string> = { queued: "queued", running: "deploying" };
 
+/** Releases the agent keeps for this project, and rollback to any of them. */
 export function ProjectDeployEngine({ projectId }: { projectId: string }) {
   const [data, setData] = useState<EngineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [pendingSha, setPendingSha] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const result = await getDeployEngineAction(projectId);
     if (result.success && result.data) setData(result.data);
-    else toast.error("Could not read the deploy setup", { description: result.error });
+    else toast.error("Could not read the releases", { description: result.error });
     setLoading(false);
   }, [projectId]);
 
@@ -31,30 +32,31 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
     void load();
   }, [load]);
 
-  async function execute(action: PendingAction) {
+  async function rollback(sha: string) {
     setBusy(true);
-    const result = await rollbackProjectAction(projectId, action.sha);
+    const result = await rollbackProjectAction(projectId, sha);
     setBusy(false);
     if (result.code === "PIN_REQUIRED") {
-      setPending(action);
+      setPendingSha(sha);
       return;
     }
     if (!result.success) {
       toast.error("The rollback was not queued", { description: result.error });
       return;
     }
-    toast.success("Rollback queued on the agent");
+    toast.success(`Rolling back to ${sha.slice(0, 7)}`);
     await load();
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <Card>
-        <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading the deploy setup…
-        </CardContent>
-      </Card>
+      <Panel>
+        <PanelHeader title="Releases" icon={History} />
+        <p className="flex items-center gap-2 p-3.5 text-[13px] text-fg-3">
+          <Loader2 className="size-4 animate-spin" />
+          Loading…
+        </p>
+      </Panel>
     );
   }
   if (!data?.managed) return null;
@@ -63,66 +65,51 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
   const [current, ...previous] = data.releases;
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Bot className="h-4 w-4" />
-            Wydania
-          </CardTitle>
-          <CardDescription>
-            {agent
-              ? "Agent: kolejka, obrazy z tagiem commita, bramka zdrowia i automatyczny rollback."
-              : "This project is not deployed by the agent yet. Save its deploy settings again."}
-          </CardDescription>
-        </CardHeader>
-        {agent && (
-          <CardContent className="space-y-3 text-sm">
-            {data.agentError && <p className="text-danger">{data.agentError}</p>}
-            {data.activeJob && (
-              <p>
-                Zadanie {JOB_STATUS[data.activeJob.status] ?? data.activeJob.status}: <span className="font-mono">{data.activeJob.sha.slice(0, 7)}</span>
-              </p>
-            )}
-            {current ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <History className="h-4 w-4 text-muted-foreground" />
-                Aktualna wersja
-                <Badge variant="success" className="font-mono">
-                  {current.sha.slice(0, 7)}
-                </Badge>
-                <span className="text-muted-foreground">{formatDate(current.deployedAt)}</span>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">The agent has not deployed this project yet.</p>
-            )}
-            {previous.length > 0 && (
-              <ul className="space-y-1">
-                {previous.map((release) => (
-                  <li key={release.sha} className="flex items-center justify-between gap-2">
-                    <span>
-                      <span className="font-mono">{release.sha.slice(0, 7)}</span> <span className="text-muted-foreground">{formatDate(release.deployedAt)}</span>
-                    </span>
-                    <Button variant="outline" size="sm" disabled={busy || Boolean(data.activeJob)} onClick={() => execute({ kind: "rollback", sha: release.sha })}>
-                      <RotateCcw className="h-4 w-4" />
-                      Restore
+    <Panel>
+      <PanelHeader title="Releases" icon={History} description={agent ? "Built images the agent keeps, newest first." : undefined} />
+      {!agent ? (
+        <p className="p-3.5 text-[13px] text-fg-3">This project is not deployed by the agent yet. Save its deploy settings again.</p>
+      ) : (
+        <div className="grid">
+          {data.agentError && <p className="border-b border-line-subtle px-3.5 py-2.5 text-[12.5px] text-err">{data.agentError}</p>}
+          {data.activeJob && (
+            <p className="flex items-center gap-2 border-b border-line-subtle px-3.5 py-2.5 text-[13px]">
+              <StatusDot status="live" />
+              {JOB_STATUS[data.activeJob.status] ?? data.activeJob.status}
+              <code className="text-[12px] text-fg-2">{data.activeJob.sha.slice(0, 7)}</code>
+            </p>
+          )}
+          {!current ? (
+            <p className="p-3.5 text-[13px] text-fg-3">The agent has not deployed this project yet.</p>
+          ) : (
+            [current, ...previous].map((release, index) => (
+              <div key={release.sha} className="flex items-center gap-2 px-3.5 py-2 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">
+                <code className="text-[12px] text-fg-2">{release.sha.slice(0, 7)}</code>
+                <span className="text-[11.5px] text-fg-3">{formatRelativeTime(release.deployedAt)}</span>
+                <span className="ml-auto">
+                  {index === 0 ? (
+                    <Chip tone="ok">live</Chip>
+                  ) : (
+                    <Button variant="ghost" size="sm" disabled={busy || Boolean(data.activeJob)} onClick={() => void rollback(release.sha)}>
+                      <RotateCcw strokeWidth={1.75} />
+                      Roll back
                     </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        )}
-      </Card>
+                  )}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
       <PinDialog
-        open={pending !== null}
-        onCancel={() => setPending(null)}
+        open={pendingSha !== null}
+        onCancel={() => setPendingSha(null)}
         onSuccess={() => {
-          const retry = pending;
-          setPending(null);
-          if (retry) void execute(retry);
+          const retry = pendingSha;
+          setPendingSha(null);
+          if (retry) void rollback(retry);
         }}
       />
-    </>
+    </Panel>
   );
 }

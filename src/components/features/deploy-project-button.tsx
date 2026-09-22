@@ -283,11 +283,11 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
   return (
     <>
       <Button
-        variant="default"
+        variant="primary"
         size="sm"
         onClick={handleClick}
         disabled={isDeploying}
-        className="bg-primary hover:bg-primary/90"
+        className="bg-accent hover:bg-accent/90"
       >
         {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
         Deploy Project
@@ -315,7 +315,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
                 </Label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between" disabled={loadingBranches}>
+                    <Button variant="secondary" className="w-full justify-between" disabled={loadingBranches}>
                       {loadingBranches ? (
                         <span className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -327,14 +327,14 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
                           {selectedBranch}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">Use current branch (default)</span>
+                        <span className="text-fg-3">Use current branch (default)</span>
                       )}
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-[300px] max-h-[300px] overflow-y-auto">
                     <DropdownMenuItem onClick={() => setSelectedBranch("")}>
-                      <span className="text-muted-foreground">Use current branch (default)</span>
+                      <span className="text-fg-3">Use current branch (default)</span>
                     </DropdownMenuItem>
                     {branches.map((branch) => (
                       <DropdownMenuItem
@@ -347,7 +347,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
                           {branch.name}
                         </span>
                         {branch.isDefault && (
-                          <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                          <span className="text-xs text-fg-3 bg-surface-raised px-1.5 py-0.5 rounded">
                             default
                           </span>
                         )}
@@ -355,7 +355,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-fg-3">
                   Select a branch to deploy. Leave empty to use the current branch on the Pi.
                 </p>
               </div>
@@ -364,10 +364,10 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
+            <Button variant="secondary" onClick={() => setShowConfigDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleDeploy} disabled={!managedDeployment} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleDeploy} disabled={!managedDeployment} className="bg-accent hover:bg-accent/90">
               <Rocket className="h-4 w-4 mr-2" />
               Deploy
             </Button>
@@ -387,14 +387,14 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Deploy: {projectName}
-              {buildComplete && <CheckCircle2 className="h-5 w-5 text-success" />}
+              {buildComplete && <CheckCircle2 className="h-5 w-5 text-ok" />}
               {isStreaming && (
-                <span className="flex items-center gap-1 text-sm font-normal text-primary">
+                <span className="flex items-center gap-1 text-sm font-normal text-accent-text">
                   <Radio className="h-4 w-4 animate-pulse" />
                   Live
                 </span>
               )}
-              {logFile && !buildComplete && !isStreaming && <Clock className="h-5 w-5 text-warning" />}
+              {logFile && !buildComplete && !isStreaming && <Clock className="h-5 w-5 text-warn" />}
             </DialogTitle>
             <DialogDescription className="flex items-center justify-between">
               <span>
@@ -412,12 +412,12 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               </span>
               <div className="flex gap-2">
                 {isStreaming && (
-                  <Button variant="outline" size="sm" onClick={stopStreaming}>
+                  <Button variant="secondary" size="sm" onClick={stopStreaming}>
                     Stop Stream
                   </Button>
                 )}
                 {logFile && !isDeploying && !isStreaming && (
-                  <Button variant="outline" size="sm" onClick={handleCheckStatus} disabled={isChecking}>
+                  <Button variant="secondary" size="sm" onClick={handleCheckStatus} disabled={isChecking}>
                     {isChecking ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
@@ -427,7 +427,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
                   </Button>
                 )}
                 {logFile && !isStreaming && !buildComplete && (
-                  <Button variant="outline" size="sm" onClick={startStreaming}>
+                  <Button variant="secondary" size="sm" onClick={startStreaming}>
                     <Radio className="h-4 w-4 mr-2" />
                     Stream Logs
                   </Button>
@@ -435,14 +435,14 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               </div>
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto bg-secondary/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
+          <div className="flex-1 min-h-0 overflow-auto bg-surface-raised/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
             {isDeploying ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Starting deployment...</span>
+                <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
+                <span className="ml-2 text-fg-3">Starting deployment...</span>
               </div>
             ) : error ? (
-              <div className="text-danger">{error}</div>
+              <div className="text-err">{error}</div>
             ) : (
               output || "No output"
             )}
