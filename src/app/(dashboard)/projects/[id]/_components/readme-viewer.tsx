@@ -1,17 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button, Skeleton } from "@/components/ui";
 import { FileText, ExternalLink, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CodePanel } from "./code-panel";
 
 interface ReadmeViewerProps {
   githubUrl: string;
-  defaultExpanded?: boolean;
   maxHeight?: number;
 }
 
@@ -21,11 +18,10 @@ interface ReadmeData {
   html_url: string;
 }
 
-export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 400 }: ReadmeViewerProps) {
+export function ReadmeViewer({ githubUrl, maxHeight = 520 }: ReadmeViewerProps) {
   const [readme, setReadme] = useState<ReadmeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isFullExpanded, setIsFullExpanded] = useState(false);
 
   // Parse owner and repo from GitHub URL
@@ -107,197 +103,108 @@ export function ReadmeViewer({ githubUrl, defaultExpanded = false, maxHeight = 4
   }, [parsed]);
 
   useEffect(() => {
-    if (isExpanded && !readme && !error) {
-      fetchReadme();
-    }
-  }, [isExpanded, readme, error, fetchReadme]);
+    void fetchReadme();
+  }, [fetchReadme]);
 
   if (!parsed) {
     return null;
   }
 
+  const long = (readme?.content.length ?? 0) > 1200;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="text-base flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <FileText className="h-4 w-4" />
-            README
-            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-fg-3" />
-            </motion.div>
-          </CardTitle>
-          {readme && (
-            <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
-              <a href={readme.html_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+    <CodePanel
+      title="README"
+      icon={FileText}
+      description={readme?.path}
+      actions={
+        readme && (
+          <Button variant="ghost" size="icon-sm" asChild>
+            <a href={readme.html_url} target="_blank" rel="noopener noreferrer" aria-label="Open on GitHub">
+              <ExternalLink strokeWidth={1.75} />
+            </a>
+          </Button>
+        )
+      }
+    >
+      <div className="p-3.5 md:px-5">
+        {loading ? (
+          <div className="grid gap-2.5">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+        ) : error ? (
+          <div className="flex items-center gap-3 text-[13px] text-fg-3">
+            {error}
+            <Button variant="ghost" size="sm" onClick={() => void fetchReadme()}>
+              <RefreshCw strokeWidth={1.75} />
+              Retry
             </Button>
-          )}
-        </div>
-      </CardHeader>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                </div>
-              ) : error ? (
-                <div className="flex flex-col items-center justify-center py-6 text-fg-3">
-                  <FileText className="h-8 w-8 mb-2 opacity-50" />
-                  <p className="text-sm">{error}</p>
-                  <Button variant="ghost" size="sm" className="mt-2" onClick={fetchReadme}>
-                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                    Retry
-                  </Button>
-                </div>
-              ) : readme ? (
-                <div className="relative">
-                  <div
-                    className={`prose prose-sm prose-invert max-w-none overflow-hidden transition-all duration-300 ${
-                      isFullExpanded ? "" : ""
-                    }`}
-                    style={{
-                      maxHeight: isFullExpanded ? "none" : `${maxHeight}px`,
-                      maskImage:
-                        !isFullExpanded && readme.content.length > 500
-                          ? "linear-gradient(to bottom, black 80%, transparent 100%)"
-                          : undefined,
-                      WebkitMaskImage:
-                        !isFullExpanded && readme.content.length > 500
-                          ? "linear-gradient(to bottom, black 80%, transparent 100%)"
-                          : undefined,
-                    }}
-                  >
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        // Style links
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-red-400 hover:text-red-300 underline"
-                          >
-                            {children}
-                          </a>
-                        ),
-                        // Style code blocks
-                        code: ({ className, children, ...props }) => {
-                          const isInline = !className;
-                          if (isInline) {
-                            return (
-                              <code className="bg-surface-raised px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                                {children}
-                              </code>
-                            );
-                          }
-                          return (
-                            <code
-                              className={`${className} block bg-surface-raised p-3 rounded-md text-sm font-mono overflow-x-auto`}
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          );
-                        },
-                        // Style pre blocks
-                        pre: ({ children }) => (
-                          <pre className="bg-surface-raised rounded-md overflow-x-auto my-3">{children}</pre>
-                        ),
-                        // Style headings
-                        h1: ({ children }) => (
-                          <h1 className="text-xl font-bold text-fg mb-3 mt-4 first:mt-0">{children}</h1>
-                        ),
-                        h2: ({ children }) => (
-                          <h2 className="text-lg font-semibold text-fg mb-2 mt-4">{children}</h2>
-                        ),
-                        h3: ({ children }) => (
-                          <h3 className="text-base font-semibold text-fg mb-2 mt-3">{children}</h3>
-                        ),
-                        // Style lists
-                        ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
-                        // Style paragraphs
-                        p: ({ children }) => <p className="text-fg-3 leading-relaxed my-2">{children}</p>,
-                        // Style blockquotes
-                        blockquote: ({ children }) => (
-                          <blockquote className="border-l-2 border-red-500/50 pl-4 my-3 italic text-fg-3">
-                            {children}
-                          </blockquote>
-                        ),
-                        // Style images - using img for external GitHub images
-                        img: ({ src, alt }) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={src} alt={alt || ""} className="max-w-full h-auto rounded-md my-3" />
-                        ),
-                        // Style tables
-                        table: ({ children }) => (
-                          <div className="overflow-x-auto my-3">
-                            <table className="min-w-full divide-y divide-line">{children}</table>
-                          </div>
-                        ),
-                        th: ({ children }) => (
-                          <th className="px-3 py-2 text-left text-xs font-medium text-fg-3 uppercase tracking-wider bg-surface-raised">
-                            {children}
-                          </th>
-                        ),
-                        td: ({ children }) => (
-                          <td className="px-3 py-2 text-sm text-fg border-b border-line">{children}</td>
-                        ),
-                        // Style horizontal rules
-                        hr: () => <hr className="border-line my-4" />,
-                      }}
-                    >
-                      {readme.content}
-                    </ReactMarkdown>
-                  </div>
-
-                  {readme.content.length > 500 && (
-                    <div className="flex justify-center pt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsFullExpanded(!isFullExpanded)}
-                        className="text-fg-3 hover:text-fg"
-                      >
-                        {isFullExpanded ? (
-                          <>
-                            <ChevronUp className="h-4 w-4 mr-1" />
-                            Show Less
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="h-4 w-4 mr-1" />
-                            Show More
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+          </div>
+        ) : readme ? (
+          <>
+            <div
+              className="overflow-hidden"
+              style={{
+                maxHeight: long && !isFullExpanded ? `${maxHeight}px` : "none",
+                maskImage: long && !isFullExpanded ? "linear-gradient(to bottom, black 75%, transparent)" : undefined,
+                WebkitMaskImage: long && !isFullExpanded ? "linear-gradient(to bottom, black 75%, transparent)" : undefined,
+              }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN}>
+                {readme.content}
+              </ReactMarkdown>
+            </div>
+            {long && (
+              <div className="flex justify-center pt-2">
+                <Button variant="ghost" size="sm" onClick={() => setIsFullExpanded((value) => !value)}>
+                  {isFullExpanded ? <ChevronUp strokeWidth={1.75} /> : <ChevronDown strokeWidth={1.75} />}
+                  {isFullExpanded ? "Show less" : "Show all"}
+                </Button>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </CodePanel>
   );
 }
+
+/** Markdown rendered in the app's own type and colours. */
+const MARKDOWN: Components = {
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-fg underline decoration-line-strong underline-offset-[3px] hover:decoration-fg-3">
+      {children}
+    </a>
+  ),
+  code: ({ className, children, ...props }) =>
+    className ? (
+      <code className={`${className} block overflow-x-auto p-3 font-mono text-[12px] leading-relaxed text-fg-2`} {...props}>
+        {children}
+      </code>
+    ) : (
+      <code className="rounded-xs bg-white/[.05] px-1 py-px font-mono text-[12px] text-fg" {...props}>
+        {children}
+      </code>
+    ),
+  pre: ({ children }) => <pre className="my-3 overflow-x-auto rounded-md border border-line bg-canvas">{children}</pre>,
+  h1: ({ children }) => <h1 className="mb-2 mt-5 text-[18px] font-semibold tracking-[-0.01em] text-fg first:mt-0">{children}</h1>,
+  h2: ({ children }) => <h2 className="mb-2 mt-5 border-b border-line-subtle pb-1.5 text-[15px] font-semibold text-fg first:mt-0">{children}</h2>,
+  h3: ({ children }) => <h3 className="mb-1.5 mt-4 text-[13.5px] font-semibold text-fg">{children}</h3>,
+  ul: ({ children }) => <ul className="my-2 grid gap-1 pl-5 text-[13px] text-fg-2 [&>li]:list-disc [&>li]:marker:text-fg-4">{children}</ul>,
+  ol: ({ children }) => <ol className="my-2 grid gap-1 pl-5 text-[13px] text-fg-2 [&>li]:list-decimal [&>li]:marker:text-fg-4">{children}</ol>,
+  p: ({ children }) => <p className="my-2 text-[13px] leading-relaxed text-fg-2">{children}</p>,
+  blockquote: ({ children }) => <blockquote className="my-3 border-l-2 border-line-strong pl-3 text-fg-3">{children}</blockquote>,
+  // eslint-disable-next-line @next/next/no-img-element
+  img: ({ src, alt }) => <img src={typeof src === "string" ? src : undefined} alt={alt || ""} className="my-3 h-auto max-w-full rounded-md" />,
+  table: ({ children }) => (
+    <div className="my-3 overflow-x-auto rounded-md border border-line">
+      <table className="min-w-full text-[12.5px]">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => <th className="border-b border-line bg-white/[.02] px-3 py-2 text-left font-medium text-fg-2">{children}</th>,
+  td: ({ children }) => <td className="border-b border-line-subtle px-3 py-2 text-fg-2">{children}</td>,
+  hr: () => <hr className="my-4 border-line" />,
+};

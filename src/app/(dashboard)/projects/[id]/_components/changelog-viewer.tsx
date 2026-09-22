@@ -1,19 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollText, RefreshCw, ChevronDown, Copy, Check, Download } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowRight, Check, Copy, Download, ScrollText, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-interface ChangelogViewerProps {
-  githubUrl: string;
-  defaultExpanded?: boolean;
-}
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@/components/ui";
+import { CodePanel } from "./code-panel";
 
 interface GitHubRelease {
   id: number;
@@ -21,291 +13,161 @@ interface GitHubRelease {
   name: string;
   body: string;
   published_at: string;
-  prerelease: boolean;
-  draft: boolean;
 }
 
-export function ChangelogViewer({ githubUrl, defaultExpanded = false }: ChangelogViewerProps) {
+const START = "__start__";
+
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  const match = /github\.com[/:]([^/]+)\/([^/?#]+)/.exec(url);
+  return match ? { owner: match[1], repo: match[2].replace(/\.git$/, "") } : null;
+}
+
+/** Release notes between two releases joined into one file, newest last. */
+function fromReleaseBodies(releases: GitHubRelease[], from: string, to: string): string {
+  const toIndex = releases.findIndex((release) => release.tag_name === to);
+  const fromIndex = from === START ? releases.length : releases.findIndex((release) => release.tag_name === from);
+  if (toIndex < 0) return "";
+  return releases
+    .slice(toIndex, Math.max(fromIndex, toIndex + 1))
+    .reverse()
+    .filter((release) => release.body)
+    .map((release) => `## ${release.tag_name}\n\n${release.body.trim()}`)
+    .join("\n\n");
+}
+
+/** What changed between two releases, ready to paste or save as CHANGELOG.md. */
+export function ChangelogViewer({ githubUrl }: { githubUrl: string }) {
+  const parsed = useMemo(() => parseGitHubUrl(githubUrl), [githubUrl]);
   const [releases, setReleases] = useState<GitHubRelease[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [selectedFrom, setSelectedFrom] = useState<string>("");
-  const [selectedTo, setSelectedTo] = useState<string>("");
-  const [changelog, setChangelog] = useState<string>("");
-  const [generatingChangelog, setGeneratingChangelog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [from, setFrom] = useState(START);
+  const [to, setTo] = useState("");
+  const [changelog, setChangelog] = useState("");
+  const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Parse owner and repo from GitHub URL
-  const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
-    const patterns = [/github\.com\/([^\/]+)\/([^\/\?#]+)/, /github\.com:([^\/]+)\/([^\/\?#\.]+)/];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) {
-        return {
-          owner: match[1],
-          repo: match[2].replace(/\.git$/, ""),
-        };
-      }
-    }
-    return null;
-  };
-
-  // Memoize parsed URL to prevent infinite re-renders
-  const parsed = useMemo(() => parseGitHubUrl(githubUrl), [githubUrl]);
-
-  const fetchReleases = useCallback(async () => {
-    if (!parsed) {
-      setError("Invalid GitHub URL");
-      return;
-    }
-
+  const load = useCallback(async () => {
+    if (!parsed) return;
     setLoading(true);
-    setError(null);
-
     try {
       const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/releases?per_page=20`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch releases");
-      }
-
-      const data = await response.json();
-      const releaseList = Array.isArray(data.data) ? data.data : [data.data].filter(Boolean);
-      setReleases(releaseList);
-
-      // Auto-select latest two releases if available
-      if (releaseList.length >= 2 && !selectedFrom && !selectedTo) {
-        setSelectedTo(releaseList[0].tag_name);
-        setSelectedFrom(releaseList[1].tag_name);
-      } else if (releaseList.length === 1 && !selectedTo) {
-        setSelectedTo(releaseList[0].tag_name);
-      }
-    } catch (err) {
-      console.error("Failed to fetch releases:", err);
-      setError("Failed to load releases");
+      const result = (await response.json().catch(() => ({}))) as { data?: GitHubRelease[] };
+      const list = response.ok && Array.isArray(result.data) ? result.data : [];
+      setReleases(list);
+      if (list[0]) setTo(list[0].tag_name);
+      if (list[1]) setFrom(list[1].tag_name);
     } finally {
       setLoading(false);
     }
-  }, [parsed, selectedFrom, selectedTo]);
+  }, [parsed]);
 
   useEffect(() => {
-    if (isExpanded && releases.length === 0 && !error) {
-      fetchReleases();
-    }
-  }, [isExpanded, releases.length, error, fetchReleases]);
+    void load();
+  }, [load]);
 
-  const generateChangelog = async () => {
-    if (!parsed || !selectedTo) {
-      return;
-    }
-
-    setGeneratingChangelog(true);
-    setChangelog("");
-
+  async function generate() {
+    if (!parsed || !to) return;
+    setGenerating(true);
+    const title = `# ${from === START ? "Start" : from} → ${to}\n\n`;
     try {
-      // Use GitHub's release notes generation API
-      const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/releases`, {
+      // GitHub writes the notes from merged pull requests; nothing is created by asking.
+      const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/releases/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tagName: `changelog-preview-${Date.now()}`, // Temporary tag
-          autoGenerateNotes: true,
-          previousTag: selectedFrom || undefined,
-          draft: true, // Don't actually create the release
-        }),
+        body: JSON.stringify({ tagName: to, previousTag: from === START ? undefined : from }),
       });
-
-      if (!response.ok) {
-        // Fall back to comparing release bodies
-        let changelogText = `# Changelog: ${selectedFrom || "Beginning"} → ${selectedTo}\n\n`;
-
-        // Get all releases in between
-        const toIndex = releases.findIndex((r) => r.tag_name === selectedTo);
-        const fromIndex = selectedFrom ? releases.findIndex((r) => r.tag_name === selectedFrom) : releases.length;
-
-        const relevantReleases = releases.slice(toIndex, fromIndex + 1);
-
-        for (const release of relevantReleases.reverse()) {
-          if (release.body) {
-            changelogText += `## ${release.tag_name}${release.name !== release.tag_name ? ` - ${release.name}` : ""}\n\n`;
-            changelogText += release.body + "\n\n";
-          }
-        }
-
-        setChangelog(changelogText);
-      } else {
-        // Successfully generated notes
-        const data = await response.json();
-        if (data.data?.body) {
-          setChangelog(`# Changelog: ${selectedFrom || "Beginning"} → ${selectedTo}\n\n${data.data.body}`);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to generate changelog:", err);
-      // Fall back to combining release notes
-      let changelogText = `# Changelog: ${selectedFrom || "Beginning"} → ${selectedTo}\n\n`;
-
-      const toIndex = releases.findIndex((r) => r.tag_name === selectedTo);
-      const fromIndex = selectedFrom ? releases.findIndex((r) => r.tag_name === selectedFrom) : releases.length;
-
-      if (toIndex >= 0) {
-        const relevantReleases = releases.slice(toIndex, Math.max(fromIndex, toIndex) + 1);
-
-        for (const release of relevantReleases.reverse()) {
-          if (release.body) {
-            changelogText += `## ${release.tag_name}\n\n`;
-            changelogText += release.body + "\n\n";
-          }
-        }
-      }
-
-      setChangelog(changelogText);
+      const result = (await response.json().catch(() => ({}))) as { data?: { body?: string } };
+      setChangelog(title + (response.ok && result.data?.body ? result.data.body : fromReleaseBodies(releases, from, to)));
+    } catch {
+      setChangelog(title + fromReleaseBodies(releases, from, to));
     } finally {
-      setGeneratingChangelog(false);
+      setGenerating(false);
     }
-  };
+  }
 
-  const copyChangelog = async () => {
+  async function copy() {
     try {
       await navigator.clipboard.writeText(changelog);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // The text stays on screen to select by hand.
     }
-  };
-
-  const downloadChangelog = () => {
-    const blob = new Blob([changelog], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `CHANGELOG-${selectedFrom || "start"}-${selectedTo}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (!parsed) {
-    return null;
   }
 
+  function download() {
+    const url = URL.createObjectURL(new Blob([changelog], { type: "text/markdown" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `CHANGELOG-${from === START ? "start" : from}-${to}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!parsed) return null;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="text-base flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <ScrollText className="h-4 w-4" />
-            Changelog Generator
-            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-fg-3" />
-            </motion.div>
-          </CardTitle>
+    <CodePanel title="Changelog" icon={ScrollText} description={releases.length ? `${releases.length} releases` : undefined}>
+      {loading ? (
+        <div className="p-3.5">
+          <Skeleton className="h-8 w-full" />
         </div>
-      </CardHeader>
+      ) : releases.length === 0 ? (
+        <p className="p-3.5 text-[13px] text-fg-3">No releases yet. Tag one from the Deployments tab.</p>
+      ) : (
+        <div className="grid gap-3 p-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={from} onValueChange={setFrom}>
+              <SelectTrigger className="h-8 w-[130px]" aria-label="From release">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={START}>Start</SelectItem>
+                {releases.map((release) => (
+                  <SelectItem key={release.id} value={release.tag_name}>
+                    {release.tag_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ArrowRight className="size-3.5 text-fg-4" strokeWidth={1.75} />
+            <Select value={to} onValueChange={setTo}>
+              <SelectTrigger className="h-8 w-[130px]" aria-label="To release">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {releases.map((release) => (
+                  <SelectItem key={release.id} value={release.tag_name}>
+                    {release.tag_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" size="sm" onClick={() => void generate()} loading={generating} disabled={!to} className="ml-auto">
+              {!generating && <Sparkles strokeWidth={1.75} />}
+              Generate
+            </Button>
+          </div>
 
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="pt-0 space-y-4">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : error ? (
-                <div className="text-sm text-fg-3">
-                  {error}
-                  <Button variant="ghost" size="sm" className="ml-2" onClick={fetchReleases}>
-                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                    Retry
-                  </Button>
-                </div>
-              ) : releases.length === 0 ? (
-                <p className="text-sm text-fg-3">No releases found</p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-fg-3 mb-1 block">From (older)</label>
-                      <Select value={selectedFrom} onValueChange={setSelectedFrom}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Beginning" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Beginning</SelectItem>
-                          {releases.map((release) => (
-                            <SelectItem key={release.id} value={release.tag_name}>
-                              {release.tag_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-fg-3 mb-1 block">To (newer)</label>
-                      <Select value={selectedTo} onValueChange={setSelectedTo}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select version" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {releases.map((release) => (
-                            <SelectItem key={release.id} value={release.tag_name}>
-                              {release.tag_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button onClick={generateChangelog} disabled={!selectedTo || generatingChangelog} className="w-full">
-                    {generatingChangelog ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <ScrollText className="h-4 w-4 mr-2" />
-                        Generate Changelog
-                      </>
-                    )}
-                  </Button>
-
-                  {changelog && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">Generated Changelog</span>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={copyChangelog}>
-                            {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={downloadChangelog}>
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="prose prose-sm prose-invert max-w-none p-4 rounded-md bg-surface-raised/50 max-h-[400px] overflow-y-auto">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{changelog}</ReactMarkdown>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+          {changelog && (
+            <div className="overflow-hidden rounded-md border border-line bg-canvas">
+              <div className="flex items-center justify-end gap-1 border-b border-line-subtle px-1.5 py-1">
+                <Button variant="ghost" size="sm" onClick={() => void copy()}>
+                  {copied ? <Check strokeWidth={1.75} /> : <Copy strokeWidth={1.75} />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={download}>
+                  <Download strokeWidth={1.75} />
+                  .md
+                </Button>
+              </div>
+              <div className="max-h-[360px] overflow-y-auto px-3.5 py-2 text-[13px] leading-relaxed text-fg-2 [&_h1]:mb-2 [&_h1]:text-[14px] [&_h1]:font-semibold [&_h1]:text-fg [&_h2]:mb-1 [&_h2]:mt-3 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-fg [&_li]:ml-4 [&_li]:list-disc [&_p]:my-1.5 [&_a]:underline [&_a]:decoration-line-strong">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{changelog}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </CodePanel>
   );
 }

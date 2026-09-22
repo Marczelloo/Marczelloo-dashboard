@@ -1,253 +1,117 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, Chip } from "@/components/ui";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Package, ChevronDown, RefreshCw, ExternalLink, Layers } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-
-interface DependenciesViewerProps {
-  githubUrl: string;
-  defaultExpanded?: boolean;
-}
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink, Package, RefreshCw } from "lucide-react";
+import { Button, Input, SegmentedControl, Skeleton } from "@/components/ui";
+import { CodePanel } from "./code-panel";
 
 interface DependencyPackage {
   name: string;
   version: string;
   ecosystem: string;
   downloadLocation?: string;
-  manifest?: string;
 }
 
-const ecosystemColors: Record<string, string> = {
-  npm: "text-red-400 bg-red-400/10 border-red-400/30",
-  pip: "text-blue-400 bg-blue-400/10 border-blue-400/30",
-  cargo: "text-orange-400 bg-orange-400/10 border-orange-400/30",
-  go: "text-cyan-400 bg-cyan-400/10 border-cyan-400/30",
-  maven: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
-  nuget: "text-purple-400 bg-purple-400/10 border-purple-400/30",
-  rubygems: "text-red-400 bg-red-400/10 border-red-400/30",
-  composer: "text-indigo-400 bg-indigo-400/10 border-indigo-400/30",
-  unknown: "text-gray-400 bg-gray-400/10 border-gray-400/30",
-};
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  const match = /github\.com[/:]([^/]+)\/([^/?#]+)/.exec(url);
+  return match ? { owner: match[1], repo: match[2].replace(/\.git$/, "") } : null;
+}
 
-export function DependenciesViewer({ githubUrl, defaultExpanded = false }: DependenciesViewerProps) {
-  const [packages, setPackages] = useState<DependencyPackage[]>([]);
-  const [byEcosystem, setByEcosystem] = useState<Record<string, DependencyPackage[]>>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [selectedEcosystem, setSelectedEcosystem] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
-    const pattern = new RegExp("github\\.com[/:]([^/]+)/([^/?#.]+)");
-    const match = url.match(pattern);
-    if (match) {
-      return { owner: match[1], repo: match[2].replace(".git", "") };
-    }
-    return null;
-  };
-
-  // Memoize parsed URL to prevent infinite re-renders
+/** What the repository depends on, from GitHub's dependency graph. */
+export function DependenciesViewer({ githubUrl }: { githubUrl: string }) {
   const parsed = useMemo(() => parseGitHubUrl(githubUrl), [githubUrl]);
+  const [byEcosystem, setByEcosystem] = useState<Record<string, DependencyPackage[]>>({});
+  const [ecosystem, setEcosystem] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const fetchDependencies = useCallback(async () => {
-    if (!parsed) {
-      setError("Invalid GitHub URL");
-      return;
-    }
-
+  const load = useCallback(async () => {
+    if (!parsed) return;
     setLoading(true);
-    setError(null);
-    setMessage(null);
-
+    setNotice(null);
     try {
       const response = await fetch(`/api/github/repos/${parsed.owner}/${parsed.repo}/dependencies`);
-
+      const result = (await response.json().catch(() => ({}))) as { data?: { by_ecosystem?: Record<string, DependencyPackage[]> }; message?: string; error?: string };
       if (!response.ok) {
-        throw new Error("Failed to fetch dependencies");
+        setNotice(result.error ?? "GitHub did not answer");
+        return;
       }
-
-      const data = await response.json();
-
-      if (data.message) {
-        setMessage(data.message);
-      }
-
-      if (data.data) {
-        setPackages(data.data.packages || []);
-        setByEcosystem(data.data.by_ecosystem || {});
-
-        // Auto-select first ecosystem
-        const ecosystems = Object.keys(data.data.by_ecosystem || {});
-        if (ecosystems.length > 0 && !selectedEcosystem) {
-          setSelectedEcosystem(ecosystems[0]);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch dependencies:", err);
-      setError("Failed to load dependencies");
+      const groups = result.data?.by_ecosystem ?? {};
+      setByEcosystem(groups);
+      setEcosystem((current) => (current && groups[current] ? current : (Object.keys(groups)[0] ?? "")));
+      if (result.message) setNotice(result.message);
+    } catch {
+      setNotice("GitHub did not answer");
     } finally {
       setLoading(false);
     }
-  }, [parsed, selectedEcosystem]);
+  }, [parsed]);
 
   useEffect(() => {
-    if (isExpanded && packages.length === 0 && !error && !message) {
-      fetchDependencies();
-    }
-  }, [isExpanded, packages.length, error, message, fetchDependencies]);
+    void load();
+  }, [load]);
 
   if (!parsed) return null;
 
   const ecosystems = Object.keys(byEcosystem);
-  const currentPackages = selectedEcosystem ? byEcosystem[selectedEcosystem] || [] : packages;
+  const total = ecosystems.reduce((sum, key) => sum + byEcosystem[key].length, 0);
+  const needle = query.trim().toLowerCase();
+  const packages = (byEcosystem[ecosystem] ?? []).filter((item) => !needle || item.name.toLowerCase().includes(needle));
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="text-base flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <Package className="h-4 w-4" />
-            Dependencies
-            {packages.length > 0 && (
-              <Chip tone="neutral" className="ml-2">
-                {packages.length}
-              </Chip>
-            )}
-            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-4 w-4 text-fg-3" />
-            </motion.div>
-          </CardTitle>
-          {isExpanded && (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fetchDependencies();
-                }}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
-                <a
-                  href={`https://github.com/${parsed.owner}/${parsed.repo}/network/dependencies`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </Button>
-            </div>
-          )}
+    <CodePanel
+      title="Dependencies"
+      icon={Package}
+      description={total ? `${total} packages` : undefined}
+      actions={
+        <Button variant="ghost" size="icon-sm" onClick={() => void load()} disabled={loading} aria-label="Refresh">
+          <RefreshCw className={loading ? "animate-spin" : undefined} strokeWidth={1.75} />
+        </Button>
+      }
+    >
+      {loading && total === 0 ? (
+        <div className="grid gap-2 p-3.5">
+          {[0, 1, 2, 3].map((row) => (
+            <Skeleton key={row} className="h-5 w-full" />
+          ))}
         </div>
-      </CardHeader>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="pt-0">
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    {[...Array(3)].map((_, i) => (
-                      <Skeleton key={i} className="h-8 w-20" />
-                    ))}
-                  </div>
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="text-sm text-fg-3 text-center py-4">
-                  {error}
-                  <Button variant="ghost" size="sm" className="ml-2" onClick={fetchDependencies}>
-                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                    Retry
-                  </Button>
-                </div>
-              ) : message && packages.length === 0 ? (
-                <div className="flex flex-col items-center py-6 text-fg-3">
-                  <Layers className="h-8 w-8 mb-2 opacity-50" />
-                  <p className="text-sm">{message}</p>
-                </div>
-              ) : packages.length === 0 ? (
-                <div className="flex flex-col items-center py-6 text-fg-3">
-                  <Package className="h-8 w-8 mb-2 opacity-50" />
-                  <p className="text-sm">No dependencies found</p>
-                </div>
-              ) : (
-                <>
-                  {/* Ecosystem tabs */}
-                  {ecosystems.length > 1 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {ecosystems.map((eco) => (
-                        <button
-                          key={eco}
-                          onClick={() => setSelectedEcosystem(eco)}
-                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                            selectedEcosystem === eco
-                              ? "bg-accent text-white"
-                              : "bg-surface-raised hover:bg-surface-raised/80"
-                          }`}
-                        >
-                          {eco}
-                          <span className="ml-1.5 opacity-75">({byEcosystem[eco]?.length || 0})</span>
-                        </button>
-                      ))}
-                    </div>
+      ) : total === 0 ? (
+        <p className="p-3.5 text-[13px] text-fg-3">{notice ?? "No dependency graph for this repository."}</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-3.5 py-2.5">
+            {ecosystems.length > 1 && (
+              <SegmentedControl<string>
+                aria-label="Ecosystem"
+                value={ecosystem}
+                onChange={setEcosystem}
+                options={ecosystems.map((key) => ({ value: key, label: key, count: byEcosystem[key].length }))}
+              />
+            )}
+            {total > 12 && <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter packages" aria-label="Filter packages" className="h-8 min-w-0 flex-1" />}
+          </div>
+          <div className="max-h-[360px] overflow-y-auto py-1">
+            {packages.length === 0 ? (
+              <p className="px-3.5 py-2 text-[13px] text-fg-3">Nothing matches “{query}”.</p>
+            ) : (
+              packages.map((item) => (
+                <div key={`${item.ecosystem}:${item.name}`} className="flex items-center gap-2 px-3.5 py-1.5 text-[13px]">
+                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                  <code className="shrink-0 text-[11.5px] text-fg-3">{item.version}</code>
+                  {item.downloadLocation && item.downloadLocation.startsWith("http") ? (
+                    <a href={item.downloadLocation} target="_blank" rel="noopener noreferrer" className="text-fg-4 hover:text-fg" aria-label={`Open ${item.name}`}>
+                      <ExternalLink className="size-3.5" strokeWidth={1.75} />
+                    </a>
+                  ) : (
+                    <span className="size-3.5" />
                   )}
-
-                  {/* Package list */}
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                    {currentPackages.slice(0, 50).map((pkg, index) => (
-                      <div
-                        key={`${pkg.name}-${index}`}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-raised/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Package className="h-4 w-4 text-fg-3 shrink-0" />
-                          <span className="text-sm truncate">{pkg.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <code className="text-xs text-fg-3 bg-surface-raised px-1.5 py-0.5 rounded">
-                            {pkg.version}
-                          </code>
-                          <Chip
-                            tone="neutral"
-                            className={`text-xs ${ecosystemColors[pkg.ecosystem] || ecosystemColors.unknown}`}
-                          >
-                            {pkg.ecosystem}
-                          </Chip>
-                        </div>
-                      </div>
-                    ))}
-                    {currentPackages.length > 50 && (
-                      <p className="text-xs text-fg-3 text-center pt-2">
-                        And {currentPackages.length - 50} more...
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </CodePanel>
   );
 }
