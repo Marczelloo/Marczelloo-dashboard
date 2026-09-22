@@ -1,7 +1,7 @@
 "use server";
 
 import { projects, auditLogs, services, workItems, deploys } from "@/server/data";
-import { requirePinVerification, requireAuth, getCurrentUser } from "@/server/lib/auth";
+import { AuthError, requirePinVerification, requireAuth, getCurrentUser } from "@/server/lib/auth";
 import { checkDemoModeBlocked, isDemoMode } from "@/lib/demo-mode";
 import {
   createRelease,
@@ -128,7 +128,7 @@ const projectTunnelSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid domain, such as app.marczelloo.dev.", path: ["hostname"] });
   }
   if (!value.localPort) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "Podaj lokalny port aplikacji.", path: ["localPort"] });
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Enter the app's local port.", path: ["localPort"] });
   }
 });
 
@@ -410,6 +410,7 @@ export async function updateProjectAction(id: string, input: UpdateProjectInput)
     return { success: true };
   } catch (error) {
     console.error("updateProjectAction error:", error);
+    if (error instanceof AuthError) return { success: false, error: error.message };
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
     }
@@ -461,6 +462,7 @@ export async function deleteProjectAction(id: string): Promise<ActionResult> {
     return { success: true };
   } catch (error) {
     console.error("deleteProjectAction error:", error);
+    if (error instanceof AuthError) return { success: false, error: error.message };
     return { success: false, error: "Failed to delete project" };
   }
 }

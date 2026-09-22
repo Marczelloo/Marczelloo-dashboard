@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { deleteProjectAction, updateProjectAction, updateProjectSharedNetworkAction } from "@/app/actions/projects";
 import { FormActions, FormField, FormLayout, FormSection, SectionNav, type FormSectionLink } from "@/components/layout/form-layout";
 import { StatusDot } from "@/components/status-dot";
+import { usePinGuard } from "@/components/features/use-pin-guard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +61,7 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
   const [deleting, setDeleting] = useState(false);
   const [sharedNetwork, setSharedNetwork] = useState(detail.config?.sharedNetwork === true);
   const [savingNetwork, setSavingNetwork] = useState(false);
+  const { run: withPin, dialog: pinDialog } = usePinGuard();
   const dirty = JSON.stringify(form) !== JSON.stringify({
     name: project.name,
     slug: project.slug,
@@ -79,7 +81,7 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
-    const result = await updateProjectAction(project.id, {
+    const result = await withPin(() => updateProjectAction(project.id, {
       name: form.name,
       slug: form.slug,
       description: form.description || undefined,
@@ -90,8 +92,9 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
       tags: toList(form.tags),
       technologies: toList(form.technologies),
       notes: form.notes || undefined,
-    });
+    }));
     setSaving(false);
+    if (!result) return;
     if (result.success) {
       toast.success("Project saved");
       router.refresh();
@@ -102,8 +105,9 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
 
   const toggleSharedNetwork = async (next: boolean) => {
     setSavingNetwork(true);
-    const result = await updateProjectSharedNetworkAction(project.id, next);
+    const result = await withPin(() => updateProjectSharedNetworkAction(project.id, next));
     setSavingNetwork(false);
+    if (!result) return;
     if (result.success) {
       setSharedNetwork(next);
       toast.success(next ? "Every service joins the shared network" : "Only routed services join the shared network", { description: "Takes effect on the next deploy or environment apply." });
@@ -114,8 +118,9 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
 
   const remove = async () => {
     setDeleting(true);
-    const result = await deleteProjectAction(project.id);
+    const result = await withPin(() => deleteProjectAction(project.id));
     setDeleting(false);
+    if (!result) return;
     if (result.success) {
       toast.success(`${project.name} deleted`);
       router.push("/projects");
@@ -225,6 +230,7 @@ export function SettingsTab({ detail, managed }: { detail: ProjectDetail; manage
               <Link href={`/projects/${project.id}?tab=deployments`}>Releases and rollback</Link>
             </Button>
           </div>
+          {pinDialog}
           {managed && (
             <label className="flex items-center justify-between gap-3 border-t border-line-subtle pt-3.5 text-[13px]">
               <span>
