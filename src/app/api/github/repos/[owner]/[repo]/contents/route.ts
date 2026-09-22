@@ -1,19 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContents, isGitHubConfigured, GitHubError } from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import { demoRepoFromParams } from "@/server/demo/github";
 
 /**
  * GET /api/github/repos/[owner]/[repo]/contents
  * Get file or directory contents from a repository
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ owner: string; repo: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ owner: string; repo: string }> },
+) {
   const { owner, repo } = await params;
   const searchParams = request.nextUrl.searchParams;
   const path = searchParams.get("path") || "";
   const ref = searchParams.get("ref") || undefined;
 
+  if (isDemoMode()) {
+    const data = await demoRepoFromParams(Promise.resolve({ owner, repo }));
+    if (!data || !data.contents[path]) {
+      return NextResponse.json(
+        { error: "File or directory not found" },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ data: data.contents[path] });
+  }
+
   if (!isGitHubConfigured()) {
-    return NextResponse.json({ error: "GitHub integration not configured" }, { status: 503 });
+    return NextResponse.json(
+      { error: "GitHub integration not configured" },
+      { status: 503 },
+    );
   }
 
   try {
@@ -25,11 +44,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (error instanceof GitHubError) {
       if (error.statusCode === 404) {
-        return NextResponse.json({ error: "File or directory not found" }, { status: 404 });
+        return NextResponse.json(
+          { error: "File or directory not found" },
+          { status: 404 },
+        );
       }
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch contents" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch contents" },
+      { status: 500 },
+    );
   }
 }

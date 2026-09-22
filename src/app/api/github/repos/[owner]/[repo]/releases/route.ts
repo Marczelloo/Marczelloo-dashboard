@@ -13,6 +13,12 @@ import {
   GitHubError,
 } from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import {
+  demoGithubPage,
+  demoRepoFromParams,
+  pageOptions,
+} from "@/server/demo/github";
 
 interface RouteParams {
   params: Promise<{
@@ -23,9 +29,27 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      const data = await demoRepoFromParams(params);
+      if (!data) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      const query = request.nextUrl.searchParams;
+      if (query.get("latest") === "true") {
+        return NextResponse.json({ data: data.releases[0] ?? null });
+      }
+      const result = demoGithubPage(data.releases, pageOptions(query));
+      return NextResponse.json({
+        data: result.data,
+        pagination: result.pagination,
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
@@ -39,7 +63,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const options = {
       page: parseInt(searchParams.get("page") || "1", 10),
-      perPage: Math.min(parseInt(searchParams.get("per_page") || "30", 10), 100),
+      perPage: Math.min(
+        parseInt(searchParams.get("per_page") || "30", 10),
+        100,
+      ),
     };
 
     const result = await listReleases(owner, repo, options);
@@ -52,10 +79,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("[GitHub Releases] Error:", error);
 
     if (error instanceof GitHubError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch releases" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch releases" },
+      { status: 500 },
+    );
   }
 }
 
@@ -64,9 +97,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      return NextResponse.json(
+        { error: "Not available in the demo." },
+        { status: 403 },
+      );
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
@@ -84,7 +126,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } = body;
 
     if (!tagName) {
-      return NextResponse.json({ error: "tagName is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "tagName is required" },
+        { status: 400 },
+      );
     }
 
     let releaseBody = description || "";
@@ -92,7 +137,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Auto-generate release notes if requested
     if (autoGenerateNotes) {
       try {
-        const notes = await generateReleaseNotes(owner, repo, tagName, previousTag, targetCommitish);
+        const notes = await generateReleaseNotes(
+          owner,
+          repo,
+          tagName,
+          previousTag,
+          targetCommitish,
+        );
         releaseBody = notes.body;
       } catch (notesError) {
         console.warn("[GitHub Releases] Failed to generate notes:", notesError);
@@ -117,9 +168,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("[GitHub Releases] Create error:", error);
 
     if (error instanceof GitHubError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to create release" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create release" },
+      { status: 500 },
+    );
   }
 }

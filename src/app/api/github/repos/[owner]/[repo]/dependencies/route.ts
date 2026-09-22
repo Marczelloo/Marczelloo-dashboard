@@ -4,8 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isGitHubConfigured, GitHubError, githubRequest } from "@/server/github";
+import {
+  isGitHubConfigured,
+  GitHubError,
+  githubRequest,
+} from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import { demoRepoFromParams } from "@/server/demo/github";
 
 interface RouteParams {
   params: Promise<{
@@ -53,26 +59,54 @@ interface DependencyGraphResponse {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      const demo = await demoRepoFromParams(params);
+      if (!demo) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      const byEcosystem = demo.dependencies.reduce<
+        Record<string, typeof demo.dependencies>
+      >((groups, dependency) => {
+        (groups[dependency.ecosystem] ||= []).push(dependency);
+        return groups;
+      }, {});
+      return NextResponse.json({
+        data: {
+          packages: demo.dependencies,
+          by_ecosystem: byEcosystem,
+          total: demo.dependencies.length,
+          created_at: demo.repository.updated_at,
+        },
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
 
     // Try to get SBOM (Software Bill of Materials)
     try {
-      const sbom = await githubRequest<DependencyGraphResponse>(`/repos/${owner}/${repo}/dependency-graph/sbom`);
+      const sbom = await githubRequest<DependencyGraphResponse>(
+        `/repos/${owner}/${repo}/dependency-graph/sbom`,
+      );
 
       // Parse packages from SBOM
       const packages = sbom.sbom.packages
         .filter((pkg) => pkg.SPDXID !== "SPDXRef-DOCUMENT")
         .map((pkg) => {
           // Extract ecosystem from external refs
-          const ecosystemRef = pkg.externalRefs?.find((ref) => ref.referenceType === "purl");
+          const ecosystemRef = pkg.externalRefs?.find(
+            (ref) => ref.referenceType === "purl",
+          );
           let ecosystem = "unknown";
           if (ecosystemRef?.referenceLocator) {
-            const purlMatch = ecosystemRef.referenceLocator.match(/^pkg:([^\/]+)\//);
+            const purlMatch =
+              ecosystemRef.referenceLocator.match(/^pkg:([^\/]+)\//);
             if (purlMatch) {
               ecosystem = purlMatch[1];
             }
@@ -110,7 +144,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Try dependency manifests endpoint
       try {
         const manifests = await githubRequest<DependencyManifest[]>(
-          `/repos/${owner}/${repo}/dependency-graph/manifests`
+          `/repos/${owner}/${repo}/dependency-graph/manifests`,
         );
 
         const packages: Array<{
@@ -173,9 +207,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           message: "Dependency graph is not enabled for this repository",
         });
       }
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch dependencies" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch dependencies" },
+      { status: 500 },
+    );
   }
 }

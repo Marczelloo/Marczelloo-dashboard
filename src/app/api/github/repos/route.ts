@@ -4,14 +4,31 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isGitHubConfigured, listRepositories, GitHubError } from "@/server/github";
+import {
+  isGitHubConfigured,
+  listRepositories,
+  GitHubError,
+} from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import { listDemoGithubRepos, pageOptions } from "@/server/demo/github";
 
 export async function GET(request: NextRequest) {
   try {
+    if (isDemoMode()) {
+      const searchParams = request.nextUrl.searchParams;
+      const result = listDemoGithubRepos(pageOptions(searchParams));
+      return NextResponse.json({
+        data: result.data,
+        pagination: result.pagination,
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -28,9 +45,15 @@ export async function GET(request: NextRequest) {
     console.error("[GitHub Repos] Error:", error);
 
     if (error instanceof GitHubError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch repositories" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch repositories" },
+      { status: 500 },
+    );
   }
 }
