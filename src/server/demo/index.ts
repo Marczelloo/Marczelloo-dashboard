@@ -330,7 +330,7 @@ export const auditLogs = {
   },
 
   async getRecentAuditLogs(limit = 50): Promise<AuditLog[]> {
-    return mockAuditLogs.slice(0, limit);
+    return [...mockAuditLogs].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
   },
 
   async createAuditLog(input: CreateAuditLogInput): Promise<AuditLog> {
