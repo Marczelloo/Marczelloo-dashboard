@@ -115,7 +115,7 @@ describe("recovery and helpers", () => {
     let state = startJob(enqueue(emptyState(), input("j1", "a", undefined, "apply-env"), "t1").state, "j1", "t2");
     state = recoverAfterRestart(state, "t3");
     expect(state.jobs[0]).toMatchObject({ status: "failed", finishedAt: "t3" });
-    expect(state.jobs[0].error).toContain("zrestartowany");
+    expect(state.jobs[0].error).toContain("restarted");
     expect(state.outbox.at(-1)).toMatchObject({ id: "j1:finished", status: "failed" });
   });
 

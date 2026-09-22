@@ -10,11 +10,11 @@ const COMPOSE_CANDIDATES = ["compose.yaml", "compose.yml", "docker-compose.yaml"
 export function resolveComposeFile(target: DeployTarget, exists: (filePath: string) => boolean): string {
   if (target.composeFile) {
     const configured = `${target.repoPath}/${target.composeFile}`;
-    if (!exists(configured)) throw new Error(`Brak pliku Compose ${target.composeFile} w repozytorium.`);
+    if (!exists(configured)) throw new Error(`Compose file ${target.composeFile} was not found in the repository.`);
     return configured;
   }
   const found = COMPOSE_CANDIDATES.map((name) => `${target.repoPath}/${name}`).find(exists);
-  if (!found) throw new Error("Nie znaleziono pliku Compose w repozytorium.");
+  if (!found) throw new Error("No Compose file found in the repository.");
   return found;
 }
 
@@ -61,7 +61,7 @@ function tunnelPortCandidate(config: ComposeConfigJson, port: number): { service
 
 export function loopbackPortOverride(config: ComposeConfigJson, port: number): { service: string; mapping: string } | null {
   const chosen = tunnelPortCandidate(config, port);
-  if (!chosen) throw new Error("Automatyczny port wymaga jednego opublikowanego portu TCP (albo jednego już mapowanego na wybrany port).");
+  if (!chosen) throw new Error("Automatic port selection requires one published TCP port or one already mapped to the selected port.");
   if (chosen.published === String(port) && chosen.hostIp === "127.0.0.1") return null;
   return { service: chosen.service, mapping: `127.0.0.1:${port}:${chosen.target}/tcp` };
 }
@@ -90,7 +90,7 @@ export function edgeAttachment(
   const services: Record<string, string[]> = {};
   for (const name of new Set([...edge.services, ...(tunnelService ? [tunnelService] : [])])) {
     const definition = config.services?.[name];
-    if (!definition) throw new Error(`Usługa ${name} nie istnieje w projekcie Compose (sieć ${edge.network}).`);
+    if (!definition) throw new Error(`Service ${name} does not exist in the Compose project (network ${edge.network}).`);
     services[name] = Object.keys(definition.networks ?? { default: null }).filter((network) => network !== edge.network);
   }
   return Object.keys(services).length ? { network: edge.network, dropPorts: Boolean(edge.dropPorts), services } : null;

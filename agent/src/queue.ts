@@ -72,7 +72,7 @@ export function enqueue(state: AgentState, input: EnqueueInput, now: string): { 
   );
   if (input.kind === "deploy" && running) {
     // A redelivered webhook or a double click must not rebuild the commit being deployed.
-    const duplicate: Job = { ...job, status: "superseded", finishedAt: now, error: `Ten commit jest już wdrażany (zadanie ${running.id}).` };
+    const duplicate: Job = { ...job, status: "superseded", finishedAt: now, error: `This commit is already deploying (job ${running.id}).` };
     return { state: prune({ ...state, jobs: [...state.jobs, duplicate], outbox: [...state.outbox, eventFor(duplicate, "job.finished", now)] }), job: duplicate };
   }
   const superseded = new Set(
@@ -86,7 +86,7 @@ export function enqueue(state: AgentState, input: EnqueueInput, now: string): { 
   const jobs = state.jobs.map((candidate) => {
     if (!superseded.has(candidate.id)) return candidate;
     // Only the newest push is built; the older request is closed explicitly.
-    const closed: Job = { ...candidate, status: "superseded", finishedAt: now, error: `Zastąpione przez nowszy commit ${input.sha.slice(0, 7)}.` };
+    const closed: Job = { ...candidate, status: "superseded", finishedAt: now, error: `Replaced by newer commit ${input.sha.slice(0, 7)}.` };
     events.push(eventFor(closed, "job.finished", now));
     return closed;
   });
@@ -139,7 +139,7 @@ export function recoverAfterRestart(state: AgentState, now: string): AgentState 
   const events: AgentEvent[] = [];
   const jobs = state.jobs.map((job) => {
     if (job.status !== "running") return job;
-    const failed: Job = { ...job, status: "failed", finishedAt: now, error: "Agent został zrestartowany w trakcie zadania — uruchom wdrożenie ponownie." };
+    const failed: Job = { ...job, status: "failed", finishedAt: now, error: "The agent restarted during the job. Deploy again." };
     events.push(eventFor(failed, "job.finished", now));
     return failed;
   });

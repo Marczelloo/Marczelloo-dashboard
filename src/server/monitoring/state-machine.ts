@@ -60,11 +60,11 @@ export function shouldPersist(stored: TargetState | null, next: TargetState, now
 }
 
 const KIND_LABEL: Record<MonitorKind, string> = {
-  agent: "Agent wdrożeń",
-  disk: "Dysk Pi",
-  containers: "Kontenery",
-  domain: "Domena",
-  tls: "Certyfikat",
+  agent: "Deployment agent",
+  disk: "Pi disk",
+  containers: "Containers",
+  domain: "Domain",
+  tls: "Certificate",
 };
 
 export function formatDuration(fromIso: string, toIso: string): string {
@@ -80,15 +80,15 @@ export function notificationFor(target: MonitorTarget, transition: Transition, n
   if (transition.from === "unknown" && transition.to === "ok") return null;
   const subject = target.kind === "agent" || target.kind === "disk" ? KIND_LABEL[target.kind] : `${KIND_LABEL[target.kind]} ${target.label}`;
   const fields: NotificationPayload["fields"] = [];
-  if (projectName) fields.push({ name: "Projekt", value: projectName, inline: true });
+  if (projectName) fields.push({ name: "Project", value: projectName, inline: true });
 
   if (transition.to === "ok") {
-    fields.push({ name: "Czas trwania", value: formatDuration(transition.previousSince, now), inline: true });
-    return { title: `✅ ${subject}: znowu działa`, message: transition.from === "warning" ? "Ostrzeżenie rozwiązane." : "Usługa znowu odpowiada poprawnie.", color: "success", fields };
+    fields.push({ name: "Duration", value: formatDuration(transition.previousSince, now), inline: true });
+    return { title: `✅ ${subject}: back up`, message: transition.from === "warning" ? "Warning resolved." : "Service is responding again.", color: "success", fields };
   }
-  if (transition.reason) fields.push({ name: "Przyczyna", value: transition.reason, inline: false });
-  if (transition.to === "down") return { title: `🔴 ${subject}: awaria`, message: "Kolejne sprawdzenia kończą się błędem.", color: "danger", fields };
-  return { title: `⚠️ ${subject}: ostrzeżenie`, message: "Wymaga uwagi, ale jeszcze działa.", color: "warning", fields };
+  if (transition.reason) fields.push({ name: "Reason", value: transition.reason, inline: false });
+  if (transition.to === "down") return { title: `🔴 ${subject}: down`, message: "More checks are failing.", color: "danger", fields };
+  return { title: `⚠️ ${subject}: warning`, message: "Needs attention but is still running.", color: "warning", fields };
 }
 
 /** Incidents span down and warning periods; switching between the two keeps the same incident. */

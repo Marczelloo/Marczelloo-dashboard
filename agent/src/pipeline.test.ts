@@ -138,7 +138,7 @@ describe("runDeploy", () => {
   it("snapshots the live version on the first agent deploy and rolls back to it", async () => {
     const { deps, steps } = harness({ samples: [[crashed]], running: { app: "sha256:live" } });
     const outcome = await runDeploy(job("deploy", NEW), null, null, deps);
-    const tag = steps.find((step) => step.label === "Kopia bieżącej wersji app");
+    const tag = steps.find((step) => step.label === "Snapshot of current app");
     expect(tag?.args).toEqual(["image", "tag", "sha256:live", "marczelloo-tools-app:aaaaaaaaaaaa"]);
     expect(outcome).toMatchObject({ status: "rolled_back", rolledBackTo: OLD, baseline: { sha: OLD, images: { app: "marczelloo-tools-app:aaaaaaaaaaaa" } } });
   });
@@ -163,7 +163,7 @@ describe("runDeploy", () => {
     const { deps } = harness({ samples: [[crashed]] });
     const outcome = await runDeploy(job("deploy", NEW), null, null, deps);
     expect(outcome).toMatchObject({ status: "failed", orphanImages: [] });
-    expect(outcome.error).toContain("Brak wcześniejszej wersji");
+    expect(outcome.error).toContain("No earlier version");
   });
 
   it("retries the public probe and reports a rollback that also fails", async () => {
@@ -175,7 +175,7 @@ describe("runDeploy", () => {
     const outcome = await runDeploy(job("deploy", NEW), null, previous, down.deps);
     expect(outcome.status).toBe("failed");
     expect(outcome.error).toContain("nie odpowiada");
-    expect(outcome.error).toContain("nie przeszedł bramki");
+    expect(outcome.error).toContain("did not pass the health check");
   });
 });
 
@@ -204,7 +204,7 @@ describe("runApplyEnv", () => {
     const { deps, replacements, logs } = harness({ samples: [[crashed]] });
     const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
     expect(outcome).toMatchObject({ status: "rolled_back", rolledBackTo: OLD, release: null, baseline: null, orphanImages: [] });
-    expect(outcome.error).toContain("Nowe zmienne nie przeszły bramki");
+    expect(outcome.error).toContain("New variables did not pass the health check");
     expect(replacements).toEqual([
       { file: "/p/tools/env/prod.env", content: "NEW_TOKEN=secret" },
       { file: "/p/tools/env/prod.env", content: "OLD_TOKEN=secret" },
@@ -223,7 +223,7 @@ describe("runApplyEnv", () => {
     const { deps } = harness({ samples: [[crashed], [crashed]] });
     const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
     expect(outcome.status).toBe("failed");
-    expect(outcome.error).toContain("przywrócenie poprzednich zmiennych też się nie powiodło");
+    expect(outcome.error).toContain("restoring the previous variables also failed");
   });
 });
 
