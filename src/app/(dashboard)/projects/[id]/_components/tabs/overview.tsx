@@ -35,7 +35,7 @@ function Row({ children }: { children: React.ReactNode }) {
 
 export function OverviewTab({ detail }: { detail: ProjectDetail }) {
   const { project, services, deploys, workItems, agent, config } = detail;
-  const containerOf = (serviceName: string) => agent?.containers.find((container) => container.service === serviceName) ?? null;
+  const containerOf = (service: { name: string; container_id: string | null }) => agent?.containers.find((container) => container.service === service.name || container.name === service.container_id) ?? null;
   const open = workItems.filter((item) => item.status !== "done").slice(0, 5);
   const domains = [config?.tunnel?.hostname, detail.domain].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
 
@@ -65,7 +65,7 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
             <EmptyState icon={Server} title="No services yet" description="Add the docker service this project deploys." />
           ) : (
             services.map((service) => {
-              const container = containerOf(service.name);
+              const container = containerOf(service);
               return (
                 <Row key={service.id}>
                   <StatusDot status={container ? (container.status === "running" ? "ok" : "err") : "idle"} />

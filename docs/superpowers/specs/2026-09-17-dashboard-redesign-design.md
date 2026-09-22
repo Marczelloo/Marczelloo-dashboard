@@ -177,6 +177,6 @@ Changes the owner asked for or approved while the phases were built. They supers
 - **Navigation.** Containers moved under Host (`/containers` redirects to Host › Containers). Features was removed; `/features` redirects to Docs. Deployments joined Workspace as its own page. The version lives in Settings › About, not the sidebar.
 - **Host console**, added at the owner's request. It runs an allowlist of read-mostly commands inside the agent container (Docker inspection and start/stop/restart, `df`, `free`, read-only `git`, file reads inside the projects directory), with no shell, pipes or redirects, behind the PIN and written to the audit log. It is not a terminal on the host, so the no-exec non-goal still holds for the Pi itself.
 - **Deploy steps** show Fetch → Config → Build → Start → Health, plus Rollback when it happens: the agent's real stages. Applying variables is part of Config, and switching a route happens after the health gate, not as a step of its own.
-- **Overview filter** is All / Issues; "Pinned" was dropped with the pinned-projects idea.
+- **Pinned projects** live on the Projects page (a Pinned filter backed by local storage); the Overview filter is All / Issues.
 - **Crimson** marks the one primary action on a view and the live pulse on a dot. Running and deploying use a neutral chip; red is reserved for failure.
 - **Audit log** reads as sentences with filters by kind, time, project and person, and exports CSV. **Docs** were rewritten against the running system. The demo gained GitHub data and one shared fleet fixture.

@@ -150,12 +150,14 @@ export function DeploymentsView({ data }: { data: DeployList }) {
                   {row.commitSha?.slice(0, 7) ?? "—"}
                 </code>
                 <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{row.error ?? row.step ?? row.serviceName ?? ""}</span>
-                <span className="flex basis-full items-center justify-end gap-2 pl-5 text-[11.5px] text-fg-3 sm:ml-auto sm:basis-auto sm:shrink-0 sm:pl-0">
+                <span className="flex min-w-0 basis-full items-center justify-end gap-2 pl-5 text-[11.5px] text-fg-3 sm:ml-auto sm:basis-auto sm:shrink-0 sm:pl-0">
                   <span className="mr-auto min-w-0 truncate sm:mr-0 sm:w-[150px] sm:text-right">{row.triggeredBy}</span>
-                  <span className="w-[62px] text-right tabular-nums">{formatDeployDuration(row.durationMs)}</span>
-                  <span className="w-[76px] truncate text-right text-fg-4">{formatRelativeTime(row.startedAt)}</span>
-                  {row.status === "failed" || row.status === "running" ? <Chip tone={TONE[row.status]}>{row.step ?? row.status}</Chip> : null}
-                  <DeployLogsButton logFile={row.logsKey ?? ""} deployId={row.id} serviceName={row.serviceName ?? "service"} hasLogFile={Boolean(row.logsKey)} />
+                  <span className="hidden w-[62px] shrink-0 text-right tabular-nums sm:inline">{formatDeployDuration(row.durationMs)}</span>
+                  <span className="shrink-0 text-right text-fg-4 sm:w-[76px] sm:truncate">{formatRelativeTime(row.startedAt)}</span>
+                  {row.status === "failed" || row.status === "running" ? <Chip tone={TONE[row.status]} className="max-w-[110px] shrink-0 truncate">{row.step ?? row.status}</Chip> : null}
+                  <span className="shrink-0">
+                    <DeployLogsButton logFile={row.logsKey ?? ""} deployId={row.id} serviceName={row.serviceName ?? "service"} hasLogFile={Boolean(row.logsKey)} />
+                  </span>
                 </span>
               </div>
             ))}

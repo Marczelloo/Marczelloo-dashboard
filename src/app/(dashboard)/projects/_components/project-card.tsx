@@ -13,7 +13,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import type { FleetRow } from "@/server/overview/types";
 
 const EDGE = {
-  deploying: "border-accent/30 bg-[linear-gradient(180deg,rgb(var(--accent)/.05),transparent_45%)]",
+  deploying: "border-line-strong",
   down: "border-err/30 bg-[linear-gradient(180deg,rgb(var(--err)/.05),transparent_45%)]",
   degraded: "border-warn/25 bg-[linear-gradient(180deg,rgb(var(--warn)/.04),transparent_45%)]",
 } as const;
@@ -29,9 +29,8 @@ function StateChip({ row }: { row: FleetRow }) {
     );
   }
   if (attention) return <Chip tone={attention.kind === "down" ? "err" : "warn"}>{attention.kind === "down" ? "Down" : "Degraded"}</Chip>;
-  if (row.containers) return <Chip mono>{`${row.containers.running} / ${row.containers.total}`}</Chip>;
-  // No containers to count: healthy when something watches it, otherwise unwatched.
-  return row.tone === "idle" ? <Chip tone="idle">Not monitored</Chip> : <Chip tone="ok">Healthy</Chip>;
+  // Healthy when something watches it, otherwise unwatched; container counts live in the stats row.
+  return row.tone === "idle" && !row.containers ? <Chip tone="idle">Not monitored</Chip> : <Chip tone="ok">Healthy</Chip>;
 }
 
 function Figure({ label, value }: { label: string; value: number }) {
