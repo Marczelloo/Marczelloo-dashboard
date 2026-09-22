@@ -42,6 +42,11 @@ export interface DeploymentConfig {
    * template); missing or kind "compose" means the repository's compose file.
    */
   build?: BuildSpec | null;
+  /**
+   * Every service joins the edge network, not only the routed one, so workers
+   * without a domain reach shared services (AtlasHub) by container name.
+   */
+  sharedNetwork?: boolean;
   createdAt: string;
   updatedAt: string;
 }

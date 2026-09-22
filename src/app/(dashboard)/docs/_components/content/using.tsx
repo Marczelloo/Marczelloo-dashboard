@@ -53,7 +53,7 @@ export function UsingIt() {
           <Step title="Validates and builds">Checks the Compose file, then builds the images, tagged with the commit.</Step>
           <Step title="Keeps what is live">Tags the images of the running version so there is always something to go back to.</Step>
           <Step title="Starts the new containers">
-            <C>docker compose up -d</C> with the new images, attached to <C>mz-edge</C> when the project has a domain.
+            <C>docker compose up -d</C> with the new images. The service with a domain joins <C>mz-edge</C>; with <em>Every service joins the shared network</em> in the project&apos;s settings, the rest join too and keep their ports.
           </Step>
           <Step title="Waits for health">
             The containers have to stay up without restarting, exiting or reporting <C>unhealthy</C>, and pass their own healthchecks if they have any.
@@ -97,6 +97,9 @@ export function UsingIt() {
             Routes point at the container by name, <C>http://&lt;container&gt;:&lt;port&gt;</C>, over the shared <C>mz-edge</C> network.
           </Fact>
           <Fact label={<C>EDGE_DROP_PORTS=true</C>}>Services with a domain stop publishing a port on the host at all; the tunnel is the only way in.</Fact>
+          <Fact label="Shared services">
+            Containers on <C>mz-edge</C> reach AtlasHub directly at <C>http://atlashub-gateway:4545</C>, without a trip through Cloudflare. Use it as <C>ATLASHUB_API_URL</C> for server-side code only; a browser still needs the public address.
+          </Fact>
           <Fact label={<C>TUNNEL_ORIGIN=loopback</C>}>
             The older mode: routes point at <C>127.0.0.1:&lt;port&gt;</C> on the Pi.
           </Fact>

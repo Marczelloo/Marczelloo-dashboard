@@ -38,6 +38,7 @@ export async function prepareTunnelProbe(config: DeploymentConfig, createMissing
 /**
  * Services of the project that tunnel routes reach; they join the edge network
  * on every job, so a deploy, rollback or env apply never drops them from it.
+ * With sharedNetwork every other service joins as well.
  */
 export async function resolveEdge(config: DeploymentConfig): Promise<DeployTarget["edge"]> {
   const { network, dropPorts } = edgeSettings();
@@ -45,7 +46,7 @@ export async function resolveEdge(config: DeploymentConfig): Promise<DeployTarge
   const [ingress, host, status] = await Promise.all([listCloudflareTunnelRoutes(), getAgentHost(), getAgentStatus()]);
   if (ingress.error) throw new Error(`Could not work out the services for network ${network}: ${ingress.error}`);
   const containers = status.projects[config.composeProject]?.containers ?? [];
-  return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers), dropPorts };
+  return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers), dropPorts, joinAll: config.sharedNetwork === true };
 }
 
 export async function queueAgentDeployment(input: { config: DeploymentConfig; serviceId: string; triggeredBy: string; commitSha?: string }): Promise<{ deployId: string; jobId: string; sha: string }> {

@@ -625,6 +625,26 @@ export async function updateProjectTunnelAction(
   }
 }
 
+/** Every service of the project joins the edge network from the next deploy or env apply on. */
+export async function updateProjectSharedNetworkAction(id: string, enabled: boolean): Promise<ActionResult<{ sharedNetwork: boolean }>> {
+  try {
+    const demoCheck = checkDemoModeBlocked();
+    if (demoCheck.blocked) return demoCheck.result;
+
+    const user = await requirePinVerification();
+    const existing = await getDeploymentConfig(id);
+    if (!existing) return { success: false, error: "This project has no managed GitHub/Docker setup yet." };
+    if (!edgeSettings().network) return { success: false, error: "EDGE_NETWORK is not set, so there is no shared network to join." };
+
+    await saveDeploymentConfig({ ...existing, sharedNetwork: enabled });
+    await auditLogs.logAction(user.email, "update", "project", id, { shared_network: enabled });
+    revalidatePath(`/projects/${id}`);
+    return { success: true, data: { sharedNetwork: enabled } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Could not save the network setting." };
+  }
+}
+
 // ========================================
 // Deploy Operations
 // ========================================

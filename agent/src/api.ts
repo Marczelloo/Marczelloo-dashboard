@@ -38,6 +38,7 @@ export const deployTargetSchema = z.object({
       network: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/),
       services: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/)).max(20),
       dropPorts: z.boolean().default(false),
+      joinAll: z.boolean().default(false),
     })
     .nullable()
     .default(null),

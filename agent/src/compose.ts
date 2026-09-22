@@ -2,7 +2,7 @@ import path from "node:path";
 import type { DeployTarget } from "./types";
 
 export interface ComposeConfigJson {
-  services?: Record<string, { image?: string; build?: unknown; networks?: Record<string, unknown> | null; ports?: Array<{ published?: string | number; target?: number; protocol?: string; host_ip?: string }> }>;
+  services?: Record<string, { image?: string; build?: unknown; network_mode?: string; networks?: Record<string, unknown> | null; ports?: Array<{ published?: string | number; target?: number; protocol?: string; host_ip?: string }> }>;
 }
 
 const COMPOSE_CANDIDATES = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
@@ -66,12 +66,16 @@ export function loopbackPortOverride(config: ComposeConfigJson, port: number): {
   return { service: chosen.service, mapping: `127.0.0.1:${port}:${chosen.target}/tcp` };
 }
 
+type EdgeRequest = NonNullable<DeployTarget["edge"]>;
+
 export interface EdgeAttachment {
   network: string;
   /** Edge services publish no host ports; the tunnel reaches them over the network. */
   dropPorts: boolean;
   /** Service → networks it already uses, kept because a service's network list is replaced as a whole. */
   services: Record<string, string[]>;
+  /** Services that joined only to reach shared services by name; they keep their ports. */
+  joined?: string[];
 }
 
 /**
@@ -81,7 +85,7 @@ export interface EdgeAttachment {
  */
 export function edgeAttachment(
   config: ComposeConfigJson,
-  edge: { network: string; services: string[]; dropPorts?: boolean } | null | undefined,
+  edge: EdgeRequest | null | undefined,
   tunnelPort: number | null = null,
   explicitTunnelService: string | null = null
 ): EdgeAttachment | null {
@@ -93,7 +97,17 @@ export function edgeAttachment(
     if (!definition) throw new Error(`Service ${name} does not exist in the Compose project (network ${edge.network}).`);
     services[name] = Object.keys(definition.networks ?? { default: null }).filter((network) => network !== edge.network);
   }
-  return Object.keys(services).length ? { network: edge.network, dropPorts: Boolean(edge.dropPorts), services } : null;
+  const joined: string[] = [];
+  if (edge.joinAll) {
+    for (const [name, definition] of Object.entries(config.services ?? {})) {
+      // A service sharing the host's or another container's network stack cannot join a network.
+      if (services[name] || definition.network_mode) continue;
+      services[name] = Object.keys(definition.networks ?? { default: null }).filter((network) => network !== edge.network);
+      joined.push(name);
+    }
+  }
+  if (!Object.keys(services).length) return null;
+  return { network: edge.network, dropPorts: Boolean(edge.dropPorts), services, ...(joined.length ? { joined } : {}) };
 }
 
 export function renderOverride(images: Record<string, string>, port: { service: string; mapping: string } | null, edge: EdgeAttachment | null = null): string {
@@ -104,7 +118,7 @@ export function renderOverride(images: Record<string, string>, port: { service: 
     lines.push(`  ${JSON.stringify(name)}:`);
     if (images[name]) lines.push(`    image: ${JSON.stringify(images[name])}`);
     if (port?.service === name) lines.push("    ports: !override", `      - ${JSON.stringify(port.mapping)}`);
-    else if (edge?.dropPorts && edge.services[name]) lines.push("    ports: !reset []");
+    else if (edge?.dropPorts && edge.services[name] && !edge.joined?.includes(name)) lines.push("    ports: !reset []");
     const networks = edge?.services[name];
     if (networks) {
       lines.push("    networks:");
@@ -117,7 +131,7 @@ export function renderOverride(images: Record<string, string>, port: { service: 
 
 export function buildOverride(
   config: ComposeConfigJson,
-  input: { project: string; sha: string; tunnelPort: number | null; tunnelService?: string | null; edge?: { network: string; services: string[]; dropPorts?: boolean } | null }
+  input: { project: string; sha: string; tunnelPort: number | null; tunnelService?: string | null; edge?: EdgeRequest | null }
 ): { yaml: string; images: Record<string, string> } {
   const tag = input.sha.slice(0, 12);
   const images: Record<string, string> = {};

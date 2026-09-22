@@ -89,6 +89,29 @@ describe("renderOverride and buildOverride", () => {
     );
   });
 
+  it("joins every service to the edge network on request, keeping ports of the ones without a route", () => {
+    const config = {
+      services: {
+        app: { build: { context: "." }, ports: [{ published: "3202", target: 3000, host_ip: "127.0.0.1" }] },
+        worker: { build: { context: "." }, networks: { backend: null } },
+        db: { image: "postgres", ports: [{ published: "5432", target: 5432, host_ip: "127.0.0.1" }] },
+        sidecar: { image: "busybox", network_mode: "service:app" },
+      },
+    };
+    const edge = { network: "mz-edge", services: [], dropPorts: true, joinAll: true };
+    expect(edgeAttachment(config, edge, 3202)).toEqual({
+      network: "mz-edge",
+      dropPorts: true,
+      services: { app: ["default"], worker: ["backend"], db: ["default"] },
+      joined: ["worker", "db"],
+    });
+    const yaml = buildOverride(config, { project: "p", sha: SHA, tunnelPort: 3202, edge }).yaml;
+    expect(yaml).toContain('  "app":\n    image: "p-app:0123456789ab"\n    ports: !reset []\n');
+    expect(yaml).toContain('  "db":\n    networks:\n      "default": {}\n      "mz-edge": {}\n');
+    expect(yaml).toContain('  "worker":\n    image: "p-worker:0123456789ab"\n    networks:\n      "backend": {}\n      "mz-edge": {}\n');
+    expect(yaml).not.toContain('"sidecar"');
+  });
+
   it("finds the tunnel service by container port or an explicit name", () => {
     const config = { services: { web: { ports: [{ target: 3000 }] }, api: { ports: [{ target: 4000 }] } } };
     expect(edgeAttachment(config, { network: "mz-edge", services: [] }, 4000)?.services).toEqual({ api: ["default"] });

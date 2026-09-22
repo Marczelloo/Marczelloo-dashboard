@@ -1,7 +1,7 @@
 import { A, C, Callout, CodeBlock, DocSection, EnvTable, Fact, Facts, H3, List, P, type EnvRow } from "../doc-parts";
 
 const CORE: EnvRow[] = [
-  { name: "ATLASHUB_API_URL", what: "The database's REST API.", required: true, example: "https://api-atlashub.example.dev" },
+  { name: "ATLASHUB_API_URL", what: "The database's REST API. On the Pi, the internal address skips Cloudflare.", required: true, example: "http://atlashub-gateway:4545" },
   { name: "ATLASHUB_SECRET_KEY", what: "Its secret key.", required: true, example: "sk_…" },
   { name: "ENCRYPTION_KEY", what: "Encrypts environment variables at rest. 32 bytes, base64.", required: true, example: "openssl rand -base64 32" },
 ];

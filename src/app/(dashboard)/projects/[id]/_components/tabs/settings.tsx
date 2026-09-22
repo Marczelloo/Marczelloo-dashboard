@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Globe, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteProjectAction, updateProjectAction } from "@/app/actions/projects";
+import { deleteProjectAction, updateProjectAction, updateProjectSharedNetworkAction } from "@/app/actions/projects";
 import { FormActions, FormField, FormLayout, FormSection, SectionNav, type FormSectionLink } from "@/components/layout/form-layout";
 import { StatusDot } from "@/components/status-dot";
 import {
@@ -24,6 +24,7 @@ import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { ProjectStatus } from "@/types";
 import type { ProjectDetail } from "@/server/projects/detail";
@@ -39,7 +40,8 @@ const SECTIONS: FormSectionLink[] = [
 const STATUSES: ProjectStatus[] = ["active", "inactive", "maintenance", "archived"];
 const toList = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 
-export function SettingsTab({ detail }: { detail: ProjectDetail }) {
+/** managed: the project deploys through the agent, so its network setting applies. */
+export function SettingsTab({ detail, managed }: { detail: ProjectDetail; managed: boolean }) {
   const router = useRouter();
   const { project } = detail;
   const [form, setForm] = useState({
@@ -56,6 +58,8 @@ export function SettingsTab({ detail }: { detail: ProjectDetail }) {
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sharedNetwork, setSharedNetwork] = useState(detail.config?.sharedNetwork === true);
+  const [savingNetwork, setSavingNetwork] = useState(false);
   const dirty = JSON.stringify(form) !== JSON.stringify({
     name: project.name,
     slug: project.slug,
@@ -93,6 +97,18 @@ export function SettingsTab({ detail }: { detail: ProjectDetail }) {
       router.refresh();
     } else {
       toast.error("Could not save the project", { description: result.error });
+    }
+  };
+
+  const toggleSharedNetwork = async (next: boolean) => {
+    setSavingNetwork(true);
+    const result = await updateProjectSharedNetworkAction(project.id, next);
+    setSavingNetwork(false);
+    if (result.success) {
+      setSharedNetwork(next);
+      toast.success(next ? "Every service joins the shared network" : "Only routed services join the shared network", { description: "Takes effect on the next deploy or environment apply." });
+    } else {
+      toast.error("Could not save the network setting", { description: result.error });
     }
   };
 
@@ -209,6 +225,17 @@ export function SettingsTab({ detail }: { detail: ProjectDetail }) {
               <Link href={`/projects/${project.id}?tab=deployments`}>Releases and rollback</Link>
             </Button>
           </div>
+          {managed && (
+            <label className="flex items-center justify-between gap-3 border-t border-line-subtle pt-3.5 text-[13px]">
+              <span>
+                Every service joins the shared network
+                <span className="block text-[11.5px] text-fg-3">
+                  Workers without a domain can then reach shared services by name, e.g. <code className="text-fg-2">http://atlashub-gateway:4545</code>. Takes effect on the next deploy or environment apply.
+                </span>
+              </span>
+              <Switch checked={sharedNetwork} onChange={(next) => void toggleSharedNetwork(next)} disabled={savingNetwork} aria-label="Every service joins the shared network" />
+            </label>
+          )}
         </FormSection>
 
         <FormSection id="notes" title="Notes" description="Private notes; never shown in the demo.">

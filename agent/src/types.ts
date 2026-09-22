@@ -24,8 +24,10 @@ export interface DeployTarget {
   /**
    * Shared Docker network the tunnel connector reaches containers on. Listed
    * services join it in addition to their own networks. Missing in older jobs.
+   * joinAll: every service joins too (keeping its ports), so workers without a
+   * domain can reach shared services such as AtlasHub by container name.
    */
-  edge?: { network: string; services: string[]; dropPorts?: boolean } | null;
+  edge?: { network: string; services: string[]; dropPorts?: boolean; joinAll?: boolean } | null;
 }
 
 export interface Job {

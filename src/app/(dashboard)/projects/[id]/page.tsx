@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { PageBody } from "@/components/layout/page-header";
 import { Panel } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { isDemoMode } from "@/lib/demo-mode";
 import { getProjectDetail } from "@/server/projects/detail";
 import { ProjectHeader } from "./_components/project-header";
 import { ProjectStatusStrip } from "./_components/project-status-strip";
@@ -57,7 +58,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       {active === "github" && <GitHubTab project={detail.project} />}
       {active === "code" && <CodeTab project={detail.project} />}
       {active === "tasks" && <TasksTab projectId={id} items={detail.workItems} />}
-      {active === "settings" && <SettingsTab detail={detail} />}
+      {active === "settings" && <SettingsTab detail={detail} managed={detail.config !== null || isDemoMode()} />}
     </PageBody>
   );
 }
