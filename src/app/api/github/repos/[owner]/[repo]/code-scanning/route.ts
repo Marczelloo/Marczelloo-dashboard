@@ -4,8 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isGitHubConfigured, GitHubError, githubRequest } from "@/server/github";
+import {
+  isGitHubConfigured,
+  GitHubError,
+  githubRequest,
+} from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import { demoRepoFromParams, pageOptions } from "@/server/demo/github";
 
 interface RouteParams {
   params: Promise<{
@@ -55,9 +61,41 @@ interface CodeScanningAlert {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      const data = await demoRepoFromParams(params);
+      if (!data) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      const query = request.nextUrl.searchParams;
+      const state = query.get("state") || "open";
+      const severity = query.get("severity");
+      let alerts = data.codeScanning;
+      if (state) {
+        alerts = alerts.filter((alert) => alert.state === state);
+      }
+      if (severity) {
+        alerts = alerts.filter(
+          (alert) => alert.rule.security_severity_level === severity,
+        );
+      }
+      const { page, perPage } = pageOptions(query);
+      alerts = alerts.slice((page - 1) * perPage, page * perPage);
+      const by_severity = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
+      alerts.forEach((alert) => {
+        const level = alert.rule.security_severity_level || "none";
+        by_severity[level]++;
+      });
+      return NextResponse.json({
+        data: alerts,
+        summary: { total: alerts.length, by_severity },
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
@@ -66,7 +104,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const state = searchParams.get("state") || "open";
     const severity = searchParams.get("severity");
     const tool = searchParams.get("tool");
-    const perPage = Math.min(parseInt(searchParams.get("per_page") || "30", 10), 100);
+    const perPage = Math.min(
+      parseInt(searchParams.get("per_page") || "30", 10),
+      100,
+    );
     const page = parseInt(searchParams.get("page") || "1", 10);
 
     let url = `/repos/${owner}/${repo}/code-scanning/alerts?state=${state}&per_page=${perPage}&page=${page}`;
@@ -113,9 +154,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           message: "Code scanning is not enabled for this repository",
         });
       }
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch code scanning alerts" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch code scanning alerts" },
+      { status: 500 },
+    );
   }
 }

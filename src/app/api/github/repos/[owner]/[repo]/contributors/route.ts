@@ -4,8 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isGitHubConfigured, listContributors, GitHubError } from "@/server/github";
+import {
+  isGitHubConfigured,
+  listContributors,
+  GitHubError,
+} from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import {
+  demoGithubPage,
+  demoRepoFromParams,
+  pageOptions,
+} from "@/server/demo/github";
 
 interface RouteParams {
   params: Promise<{
@@ -16,9 +26,26 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      const data = await demoRepoFromParams(params);
+      if (!data) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      const result = demoGithubPage(
+        data.contributors,
+        pageOptions(request.nextUrl.searchParams),
+      );
+      return NextResponse.json({
+        data: result.data,
+        pagination: result.pagination,
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
@@ -27,7 +54,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const options = {
       anon: searchParams.get("anon") === "true",
       page: parseInt(searchParams.get("page") || "1", 10),
-      perPage: Math.min(parseInt(searchParams.get("per_page") || "30", 10), 100),
+      perPage: Math.min(
+        parseInt(searchParams.get("per_page") || "30", 10),
+        100,
+      ),
     };
 
     const result = await listContributors(owner, repo, options);
@@ -40,9 +70,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("[GitHub Contributors] Error:", error);
 
     if (error instanceof GitHubError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch contributors" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch contributors" },
+      { status: 500 },
+    );
   }
 }

@@ -6,6 +6,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGitHubConfigured, listBranches, GitHubError } from "@/server/github";
 import { requireAuth } from "@/server/lib/auth";
+import { isDemoMode } from "@/lib/demo-mode";
+import {
+  demoGithubPage,
+  demoRepoFromParams,
+  pageOptions,
+} from "@/server/demo/github";
 
 interface RouteParams {
   params: Promise<{
@@ -16,9 +22,28 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    if (isDemoMode()) {
+      const data = await demoRepoFromParams(params);
+      if (!data) {
+        return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      }
+      const query = request.nextUrl.searchParams;
+      const branches =
+        query.get("protected") === "true"
+          ? data.branches.filter((branch) => branch.protected)
+          : data.branches;
+      const result = demoGithubPage(branches, pageOptions(query));
+      return NextResponse.json({
+        data: result.data,
+        pagination: result.pagination,
+      });
+    }
     await requireAuth();
     if (!isGitHubConfigured()) {
-      return NextResponse.json({ error: "GitHub App not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "GitHub App not configured" },
+        { status: 503 },
+      );
     }
 
     const { owner, repo } = await params;
@@ -27,7 +52,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const options = {
       protected: searchParams.get("protected") === "true" ? true : undefined,
       page: parseInt(searchParams.get("page") || "1", 10),
-      perPage: Math.min(parseInt(searchParams.get("per_page") || "30", 10), 100),
+      perPage: Math.min(
+        parseInt(searchParams.get("per_page") || "30", 10),
+        100,
+      ),
     };
 
     const result = await listBranches(owner, repo, options);
@@ -40,9 +68,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("[GitHub Branches] Error:", error);
 
     if (error instanceof GitHubError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
     }
 
-    return NextResponse.json({ error: "Failed to fetch branches" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch branches" },
+      { status: 500 },
+    );
   }
 }
