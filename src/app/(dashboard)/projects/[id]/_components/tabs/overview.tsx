@@ -175,7 +175,7 @@ function ReleaseSummary({ detail }: { detail: ProjectDetail }) {
   return (
     <Panel className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 p-3.5">
       <div className="min-w-0">
-        <p className="text-[11px] font-medium text-fg-4">{deploying ? "DEPLOYING" : "LIVE RELEASE"}</p>
+        <p className="text-[11.5px] text-fg-3">{deploying ? "Deploying" : "Live release"}</p>
         <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <code className="text-[17px] font-semibold text-fg">{live?.commit_sha?.slice(0, 7) ?? "nothing deployed"}</code>
           {live?.error_message && <span className="text-[13px] text-err">{live.error_message}</span>}

@@ -157,7 +157,7 @@ export function ConsoleTab() {
       </Panel>
 
       <Panel className="flex flex-wrap items-center gap-2 px-3.5 py-3">
-        <span className="text-[11px] font-medium text-fg-4">TRY</span>
+        <span className="text-[11.5px] text-fg-3">Try</span>
         {SUGGESTIONS.map((suggestion) => (
           <button
             key={suggestion}

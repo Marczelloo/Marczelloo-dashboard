@@ -27,7 +27,7 @@ export function ProjectStatusStrip({ detail }: { detail: ProjectDetail }) {
 
   const status =
     attention?.kind === "deploying"
-      ? { text: "Deploying", className: "text-accent-text" }
+      ? { text: "Deploying", className: "text-fg" }
       : attention?.kind === "down"
         ? { text: "Down", className: "text-err" }
         : attention?.kind === "degraded"

@@ -95,7 +95,7 @@ export function ProjectCard({ row, pinned, onTogglePin }: { row: FleetRow; pinne
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-line-subtle pt-2.5 text-[11.5px] text-fg-3">
         <span className="min-w-0 truncate">
           {attention?.kind === "deploying" ? (
-            <span className="text-accent-text">Deploying…</span>
+            <span className="text-fg-2">Deploying…</span>
           ) : row.lastDeploy ? (
             <>
               {formatRelativeTime(row.lastDeploy.at)}
@@ -121,7 +121,7 @@ export function ProjectCard({ row, pinned, onTogglePin }: { row: FleetRow; pinne
               </Link>
             </Button>
           ) : (
-            <Button size="sm" onClick={() => void deploy()}>
+            <Button size="sm" variant="secondary" onClick={() => void deploy()}>
               <Rocket strokeWidth={1.75} />
               Deploy
             </Button>

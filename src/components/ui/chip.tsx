@@ -11,7 +11,7 @@ const chipVariants = cva(
         ok: "border-ok/20 bg-ok/10 text-ok",
         warn: "border-warn/25 bg-warn/10 text-warn",
         err: "border-err/25 bg-err/10 text-err",
-        live: "border-accent/40 bg-accent/10 text-accent-text",
+        live: "border-line-strong bg-transparent text-fg-2",
         idle: "border-line bg-transparent text-fg-3",
       },
       mono: { true: "font-mono text-[11px]", false: "" },

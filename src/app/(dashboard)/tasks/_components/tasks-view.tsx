@@ -15,7 +15,9 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import { parseTaskKey, type TaskList, type TaskPriority, type TaskRow, type TaskStatus } from "@/lib/tasks";
 
-const STATUS_TONE: Record<TaskStatus, Tone> = { open: "idle", in_progress: "live", blocked: "warn", done: "ok" };
+const STATUS_TONE: Record<TaskStatus, Tone> = { open: "idle", in_progress: "idle", blocked: "warn", done: "ok" };
+/** Work in progress is not an alarm: a brighter neutral dot, never the accent. */
+const BUSY = "bg-fg-2";
 const PRIORITY_TONE: Record<TaskPriority, "idle" | "neutral" | "warn" | "err"> = { low: "idle", medium: "neutral", high: "warn", critical: "err" };
 const STATUS_LABEL: Record<TaskStatus, string> = { open: "Open", in_progress: "In progress", blocked: "Blocked", done: "Done" };
 const NO_PROJECT = "none";
@@ -101,7 +103,7 @@ export function TasksView({ data }: { data: TaskList }) {
       <PageBody className="flex flex-col gap-4">
         <Panel className="grid grid-cols-2 divide-line-subtle md:grid-cols-4 md:divide-x [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-line-subtle md:[&>*:nth-child(n+3)]:border-t-0">
           <Summary label="Open" value={counts.open} detail="Not started" />
-          <Summary label="In progress" value={counts.in_progress} detail="Being worked on" tone="live" />
+          <Summary label="In progress" value={counts.in_progress} detail="Being worked on" />
           <Summary label="Blocked" value={counts.blocked} detail={counts.blocked ? "Waiting on something" : "Nothing stuck"} tone={counts.blocked ? "warn" : undefined} />
           <Summary label="Overdue" value={counts.overdue} detail={counts.overdue ? "Past the due date" : "Nothing late"} tone={counts.overdue ? "err" : undefined} />
         </Panel>
@@ -173,7 +175,7 @@ export function TasksView({ data }: { data: TaskList }) {
                     <span className={cn("text-[13px] font-medium", task.status === "done" ? "text-fg-3 line-through" : "text-fg")}>{task.title}</span>
                     {task.status !== "open" && task.status !== "done" && (
                       <span className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
-                        <StatusDot status={STATUS_TONE[task.status]} />
+                        <StatusDot status={STATUS_TONE[task.status]} className={task.status === "in_progress" ? BUSY : undefined} />
                         {STATUS_LABEL[task.status]}
                       </span>
                     )}

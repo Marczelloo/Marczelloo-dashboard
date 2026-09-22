@@ -282,15 +282,9 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
 
   return (
     <>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={handleClick}
-        disabled={isDeploying}
-        className="bg-accent hover:bg-accent/90"
-      >
-        {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-        Deploy Project
+      <Button variant="primary" onClick={handleClick} disabled={isDeploying}>
+        {isDeploying ? <Loader2 className="animate-spin" /> : <Rocket strokeWidth={1.75} />}
+        Deploy
       </Button>
 
       {/* Config Dialog */}
@@ -367,8 +361,8 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
             <Button variant="secondary" onClick={() => setShowConfigDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleDeploy} disabled={!managedDeployment} className="bg-accent hover:bg-accent/90">
-              <Rocket className="h-4 w-4 mr-2" />
+            <Button onClick={handleDeploy} disabled={!managedDeployment}>
+              <Rocket strokeWidth={1.75} />
               Deploy
             </Button>
           </DialogFooter>

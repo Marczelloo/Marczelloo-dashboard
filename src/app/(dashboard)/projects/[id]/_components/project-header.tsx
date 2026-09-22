@@ -15,7 +15,7 @@ export function ProjectHeader({ detail }: { detail: ProjectDetail }) {
   const { project, domain, tone, deploys } = detail;
   const last = deploys[0];
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <h1 className="flex items-center gap-2.5 text-xl font-semibold leading-tight tracking-[-0.02em]">
           <StatusDot status={tone} size="lg" label={detail.attention ? detail.attention.kind : "healthy"} />

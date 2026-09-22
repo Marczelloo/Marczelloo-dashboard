@@ -251,7 +251,7 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
                     line.type === "error" && "text-err font-medium",
                     line.type === "warning" && "text-warn",
                     line.type === "success" && "text-ok",
-                    line.type === "info" && "text-accent-text/80",
+                    line.type === "info" && "text-fg-3",
                     line.type === "normal" && "text-fg-3"
                   )}
                 >

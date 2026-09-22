@@ -64,7 +64,7 @@ export function SettingsView({ data }: { data: SettingsData }) {
             rail={
               <>
                 <Panel className="grid gap-2.5 p-3.5">
-                  <p className="text-[11px] font-medium text-fg-4">THIS INSTANCE</p>
+                  <p className="text-[11.5px] text-fg-3">This instance</p>
                   <p className="flex items-center gap-2 text-[13px]">
                     <span className="text-fg-3">Version</span>
                     <code className="ml-auto text-[12px] text-fg-2">{data.version}</code>
@@ -81,7 +81,7 @@ export function SettingsView({ data }: { data: SettingsData }) {
                   </p>
                 </Panel>
                 <Panel className="grid gap-2 p-3.5">
-                  <p className="text-[11px] font-medium text-fg-4">RELATED</p>
+                  <p className="text-[11.5px] text-fg-3">Related</p>
                   <Link href="/host?tab=settings" className="flex items-center gap-2 text-[13px] text-fg-2 hover:text-fg">
                     <Cpu className="size-4" strokeWidth={1.75} />
                     Host and its connections

@@ -177,7 +177,7 @@ export function AddService({ projectId, projectName }: { projectId: string | nul
           <FormLayout
             rail={
               <Panel className="grid gap-3 p-3.5">
-                <p className="text-[11px] font-medium text-fg-4">WHAT GETS ADDED</p>
+                <p className="text-[11.5px] text-fg-3">What gets added</p>
                 <p className="text-[13px] text-fg-2">
                   Picked containers become docker services of {projectName ? <span className="text-fg">{projectName}</span> : "no project"}, with their compose project and repository path filled
                   in, so deploys and restarts work straight away.
@@ -262,7 +262,7 @@ export function AddService({ projectId, projectName }: { projectId: string | nul
             <FormLayout
               rail={
                 <Panel className="grid gap-2.5 p-3.5">
-                  <p className="text-[11px] font-medium text-fg-4">SERVICE TYPE</p>
+                  <p className="text-[11.5px] text-fg-3">Service type</p>
                   <p className="text-[13px] text-fg-2">{type.blurb}</p>
                 </Panel>
               }

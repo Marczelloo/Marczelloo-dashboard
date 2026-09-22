@@ -115,7 +115,7 @@ export function SettingsTab({ detail }: { detail: ProjectDetail }) {
         rail={
           <>
             <Panel className="grid gap-2.5 p-3.5">
-              <p className="text-[11px] font-medium text-fg-4">PREVIEW IN THE LIST</p>
+              <p className="text-[11.5px] text-fg-3">Preview in the list</p>
               <div className="rounded-md border border-line p-3">
                 <p className="flex items-center gap-2 text-[13.5px] font-semibold">
                   <StatusDot status={detail.tone} />
@@ -130,11 +130,11 @@ export function SettingsTab({ detail }: { detail: ProjectDetail }) {
                   </div>
                 )}
               </div>
-              <p className="text-[11px] font-medium text-fg-4">ADDRESS</p>
+              <p className="text-[11.5px] text-fg-3">Address</p>
               <code className="text-[11.5px] text-fg-2">/projects/{form.slug || project.id}</code>
             </Panel>
             <Panel className="grid gap-2 p-3.5">
-              <p className="text-[11px] font-medium text-fg-4">RELATED</p>
+              <p className="text-[11.5px] text-fg-3">Related</p>
               <Link href={`/projects/${project.id}?tab=domains`} className="flex items-center gap-2 text-[13px] text-fg-2 hover:text-fg">
                 <Globe className="size-4" strokeWidth={1.75} />
                 Domains and tunnel

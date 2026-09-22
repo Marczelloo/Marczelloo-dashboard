@@ -53,7 +53,7 @@ export function PinDialog({ open, onSuccess, onCancel }: PinDialogProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-accent-text" />
+            <Lock className="h-5 w-5 text-fg-2" />
             PIN Required
           </DialogTitle>
           <DialogDescription>Enter your PIN to perform this action</DialogDescription>

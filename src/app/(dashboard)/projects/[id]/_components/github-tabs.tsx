@@ -178,7 +178,7 @@ function Pulls({ base }: { base: string }) {
                 rel="noopener noreferrer"
                 className="flex items-start gap-3 px-3.5 py-2.5 hover:bg-white/[.02] [&+&]:border-t [&+&]:border-line-subtle"
               >
-                <Icon className={status.tone === "ok" ? "mt-0.5 size-4 shrink-0 text-ok" : status.tone === "live" ? "mt-0.5 size-4 shrink-0 text-accent-text" : "mt-0.5 size-4 shrink-0 text-fg-4"} strokeWidth={1.75} />
+                <Icon className={status.tone === "ok" ? "mt-0.5 size-4 shrink-0 text-ok" : status.tone === "live" ? "mt-0.5 size-4 shrink-0 text-fg-2" : "mt-0.5 size-4 shrink-0 text-fg-4"} strokeWidth={1.75} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium">{pull.title}</p>
                   <p className="mt-0.5 truncate text-[11.5px] text-fg-3">

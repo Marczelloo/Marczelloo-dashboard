@@ -14,7 +14,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import type { FleetRow as Row } from "@/server/overview/types";
 import { AttentionDetail } from "./attention-detail";
 
-const EDGE = { deploying: "before:bg-accent bg-[linear-gradient(90deg,rgb(var(--accent)/.06),transparent_55%)]", down: "before:bg-err bg-[linear-gradient(90deg,rgb(var(--err)/.06),transparent_55%)]", degraded: "before:bg-warn bg-[linear-gradient(90deg,rgb(var(--warn)/.05),transparent_55%)]" } as const;
+const EDGE = { deploying: "before:bg-fg-3", down: "before:bg-err bg-[linear-gradient(90deg,rgb(var(--err)/.06),transparent_55%)]", degraded: "before:bg-warn bg-[linear-gradient(90deg,rgb(var(--warn)/.05),transparent_55%)]" } as const;
 
 export const FLEET_COLUMNS = "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(170px,1.3fr)_minmax(140px,1.3fr)_90px_minmax(120px,1fr)_160px]";
 
@@ -61,7 +61,7 @@ export function FleetRow({ row, enterDelay = 0 }: { row: Row; enterDelay?: numbe
         </div>
         <div className="hidden truncate text-[12.5px] text-fg-3 md:block">
           {attention?.kind === "deploying" ? (
-            <span className="text-accent-text">deploying…</span>
+            <span className="text-fg-2">deploying…</span>
           ) : row.lastDeploy ? (
             <>
               {formatRelativeTime(row.lastDeploy.at)}
@@ -81,7 +81,7 @@ export function FleetRow({ row, enterDelay = 0 }: { row: Row; enterDelay?: numbe
             </Button>
           ) : (
             <>
-              <Button size="sm" onClick={() => void deploy()} aria-label={`Deploy ${row.name}`}>
+              <Button size="sm" variant="secondary" onClick={() => void deploy()} aria-label={`Deploy ${row.name}`}>
                 <Rocket strokeWidth={1.75} />
                 <span className="hidden sm:inline">Deploy</span>
               </Button>

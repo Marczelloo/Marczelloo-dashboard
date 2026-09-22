@@ -61,7 +61,7 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
     <div className="space-y-4 rounded-lg border border-line bg-surface-raised/20 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Hammer className="mt-0.5 h-4 w-4 text-accent-text" />
+          <Hammer className="mt-0.5 h-4 w-4 text-fg-3" />
           <div>
             <p className="text-sm font-medium">How it builds</p>
             <p className="text-xs text-fg-3">Detected from the repository's files; correct it before deploying if needed.</p>

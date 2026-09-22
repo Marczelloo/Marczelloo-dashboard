@@ -213,10 +213,10 @@ export function GitHubRepoSelector() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-accent/20">
+      <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent-text"><Github className="h-5 w-5" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface-raised text-fg-2"><Github className="h-5 w-5" /></div>
             <div><CardTitle>Deploy from GitHub</CardTitle><CardDescription>One setup for the repository, how it builds, and its public address.</CardDescription></div>
           </div>
         </CardHeader>
@@ -236,8 +236,8 @@ export function GitHubRepoSelector() {
         </CardContent>
       </Card>
 
-      {selected && <Card className="border-accent/30">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Container className="h-4 w-4 text-accent-text" />Deployment plan</CardTitle><CardDescription>{selected.full_name} will live on the Pi as a Git checkout and a Compose stack.</CardDescription></CardHeader>
+      {selected && <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Container className="h-4 w-4 text-fg-3" />Deployment plan</CardTitle><CardDescription>{selected.full_name} will live on the Pi as a Git checkout and a Compose stack.</CardDescription></CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Branch" icon={<GitBranch className="h-4 w-4" />}><Input value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
@@ -251,7 +251,7 @@ export function GitHubRepoSelector() {
 
           <BuildPlan githubUrl={selected.html_url} branch={branch} runtime={runtime} value={build} onChange={setBuild} />
 
-          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-line bg-surface-raised/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-accent-text" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-fg-3">After the first successful deploy the dashboard adds the route and the DNS record.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
+          {exposure === "cloudflare" && <div className="grid gap-4 rounded-lg border border-line bg-surface-raised/20 p-4 md:grid-cols-2"><div className="md:col-span-2 flex items-start gap-3"><Cloud className="mt-0.5 h-4 w-4 text-fg-3" /><div><p className="text-sm font-medium">Cloudflare Tunnel route</p><p className="text-xs text-fg-3">After the first successful deploy the dashboard adds the route and the DNS record.</p></div></div><Field label="Hostname"><CloudflareHostnameField id="new-project-hostname" value={hostname} onChange={setHostname} /></Field><Field label="Local HTTP port"><Input inputMode="numeric" placeholder="3000" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} /></Field></div>}
 
           {preflight && <div className="rounded-lg border border-line bg-canvas/50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><ShieldCheck className={`h-4 w-4 ${preflight.ok ? "text-ok" : "text-err"}`} /><p className="text-sm font-medium">Preflight {preflight.ok ? "passed" : "needs attention"}</p>{preflight.composeFile && <Chip tone="neutral" className="font-mono">{preflight.composeFile}</Chip>}{preflight.services.map((service) => <Chip key={service} tone="neutral" className="font-mono">{service}</Chip>)}</div><div className="space-y-2">{preflight.messages.map((message, index) => <div key={`${message.text}-${index}`} className="flex gap-2 text-sm"><span className={message.level === "success" ? "text-ok" : message.level === "warning" ? "text-warn" : "text-err"}>{message.level === "success" ? "✓" : message.level === "warning" ? "!" : "×"}</span><span className="text-fg-3">{message.text}</span></div>)}</div></div>}
 

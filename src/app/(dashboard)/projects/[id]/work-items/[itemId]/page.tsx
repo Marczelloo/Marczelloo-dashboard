@@ -163,7 +163,7 @@ export default function WorkItemDetailPage({ params }: WorkItemDetailPageProps) 
           <FormLayout
             rail={
               <Panel className="grid gap-2.5 p-3.5">
-                <p className="text-[11px] font-medium text-fg-4">PREVIEW ON THE BOARD</p>
+                <p className="text-[11.5px] text-fg-3">Preview on the board</p>
                 <div className="rounded-md border border-line bg-canvas p-2.5">
                   <p className="flex items-start gap-2">
                     <StatusDot status={STATUS_TONE[form.status]} className="mt-1.5" />
@@ -176,7 +176,7 @@ export default function WorkItemDetailPage({ params }: WorkItemDetailPageProps) 
                 </div>
                 {item && (
                   <>
-                    <p className="text-[11px] font-medium text-fg-4">TIMELINE</p>
+                    <p className="text-[11.5px] text-fg-3">Timeline</p>
                     <p className="text-[12px] text-fg-3">Created {formatDateTime(item.created_at)}</p>
                     <p className="text-[12px] text-fg-3">Updated {formatRelativeTime(item.updated_at)}</p>
                   </>

@@ -182,9 +182,9 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
 
         {lastCommit && (
           <div className="grid gap-1">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium text-fg-4">
+            <p className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
               <GitCommit className="size-3" strokeWidth={1.75} />
-              LATEST COMMIT
+              Latest commit
             </p>
             <a href={lastCommit.html_url} target="_blank" rel="noopener noreferrer" className="group grid gap-0.5">
               <span className="truncate text-[13px] font-medium group-hover:underline">{lastCommit.commit.message.split("\n")[0]}</span>
@@ -197,9 +197,9 @@ export function GitHubInfo({ githubUrl }: GitHubInfoProps) {
 
         {lastRelease && (
           <div className="grid gap-1">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium text-fg-4">
+            <p className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
               <Tag className="size-3" strokeWidth={1.75} />
-              LATEST RELEASE
+              Latest release
             </p>
             <a href={lastRelease.html_url} target="_blank" rel="noopener noreferrer" className="group flex flex-wrap items-center gap-2 text-[13px]">
               <Chip tone={lastRelease.prerelease ? "warn" : "ok"} mono>

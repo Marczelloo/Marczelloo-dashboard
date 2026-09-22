@@ -102,8 +102,8 @@ export function ProjectForm({ project }: ProjectFormProps) {
       <FormLayout
         rail={
           <Panel className="grid gap-2.5 p-3.5">
-            <p className="text-[11px] font-medium text-fg-4">
-              PREVIEW IN THE LIST
+            <p className="text-[11.5px] text-fg-3">
+              Preview in the list
             </p>
             <div className="rounded-md border border-line p-3">
               <p className="flex items-center gap-2 text-[13.5px] font-semibold">
@@ -131,7 +131,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
                 </div>
               )}
             </div>
-            <p className="text-[11px] font-medium text-fg-4">ADDRESS</p>
+            <p className="text-[11.5px] text-fg-3">Address</p>
             <code className="text-[11.5px] text-fg-2">
               /projects/{slug || "…"}
             </code>

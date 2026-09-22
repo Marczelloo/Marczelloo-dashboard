@@ -10,7 +10,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import type { WorkItem } from "@/types";
 
-const TONE: Record<WorkItem["status"], Tone> = { open: "idle", in_progress: "live", blocked: "warn", done: "ok" };
+const TONE: Record<WorkItem["status"], Tone> = { open: "idle", in_progress: "idle", blocked: "warn", done: "ok" };
 const GROUPS: Array<{ status: WorkItem["status"]; label: string }> = [
   { status: "in_progress", label: "In progress" },
   { status: "blocked", label: "Blocked" },
@@ -56,7 +56,7 @@ export function TasksTab({ projectId, items }: { projectId: string; items: WorkI
               </div>
               {group.map((item) => (
                 <div key={item.id} className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] [&+&]:border-t [&+&]:border-line-subtle">
-                  <StatusDot status={TONE[item.status]} />
+                  <StatusDot status={TONE[item.status]} className={item.status === "in_progress" ? "bg-fg-2" : undefined} />
                   <Link href={`/projects/${projectId}/work-items/${item.id}`} className="min-w-0 truncate hover:underline">
                     {item.title}
                   </Link>

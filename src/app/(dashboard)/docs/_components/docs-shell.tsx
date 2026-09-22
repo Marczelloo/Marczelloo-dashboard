@@ -116,7 +116,7 @@ function DocsNav({ active, onPick }: { active: string; onPick: (id: string) => v
                   type="button"
                   onClick={() => setCollapsed((current) => ({ ...current, [group.id]: open }))}
                   aria-expanded={open}
-                  className="flex w-full items-center justify-between rounded-sm px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-fg-4 transition-colors hover:text-fg-2"
+                  className="flex w-full items-center justify-between rounded-sm px-2.5 py-1 text-[11.5px] font-medium text-fg-4 transition-colors hover:text-fg-2"
                 >
                   {group.label}
                   <ChevronDown className={cn("size-3.5 transition-transform duration-quick", !open && "-rotate-90")} strokeWidth={1.75} />
