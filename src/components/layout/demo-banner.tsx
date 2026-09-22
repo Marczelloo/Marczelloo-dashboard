@@ -68,7 +68,7 @@ export function DemoBanner({ githubUrl = "https://github.com/marczelloo/dashboar
                 <AlertTriangle className="h-5 w-5 text-accent-text" />
               </div>
               <div>
-                <DialogTitle className="text-xl">Welcome to the Demo</DialogTitle>
+                <DialogTitle>Welcome to the Demo</DialogTitle>
                 <Chip tone="neutral" className="mt-1 border-accent/30 text-accent-text">
                   Preview Mode
                 </Chip>

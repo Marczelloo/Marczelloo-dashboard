@@ -124,7 +124,7 @@ export function EnvTable({ title, rows }: { title: string; rows: EnvRow[] }) {
         <div key={row.name} className="grid gap-x-4 gap-y-1 px-3 py-2.5 md:grid-cols-[250px_minmax(0,1fr)] [&+&]:border-t [&+&]:border-line-subtle">
           <div className="flex flex-wrap items-center gap-2">
             <code className="font-mono text-[12px] text-fg">{row.name}</code>
-            {row.required && <span className="text-[10.5px] font-medium uppercase tracking-wide text-warn">required</span>}
+            {row.required && <span className="text-[11px] font-medium text-warn">required</span>}
           </div>
           <div className="grid gap-0.5 text-[12.5px] text-fg-3">
             <span>{row.what}</span>

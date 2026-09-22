@@ -1,135 +1,185 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-10T00:00:00.000+02:00",
+  "generatedAt": "2026-09-22T12:00:00.000+02:00",
   "title": "Design System: Marczelloo Dashboard",
   "extensions": {
     "colorMeta": {
-      "background": { "role": "neutral", "displayName": "Console Black", "canonical": "hsl(0 0% 4%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 15%)", "hsl(0 0% 24%)", "hsl(0 0% 38%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
-      "foreground": { "role": "neutral", "displayName": "Signal White", "canonical": "hsl(0 0% 95%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 25%)", "hsl(0 0% 38%)", "hsl(0 0% 52%)", "hsl(0 0% 66%)", "hsl(0 0% 78%)", "hsl(0 0% 88%)", "hsl(0 0% 95%)"] },
-      "card": { "role": "neutral", "displayName": "Panel Charcoal", "canonical": "hsl(0 0% 7%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 7%)", "hsl(0 0% 12%)", "hsl(0 0% 20%)", "hsl(0 0% 34%)", "hsl(0 0% 52%)", "hsl(0 0% 74%)", "hsl(0 0% 92%)"] },
-      "popover": { "role": "neutral", "displayName": "Raised Charcoal", "canonical": "hsl(0 0% 9%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 14%)", "hsl(0 0% 22%)", "hsl(0 0% 36%)", "hsl(0 0% 54%)", "hsl(0 0% 76%)", "hsl(0 0% 94%)"] },
-      "primary": { "role": "primary", "displayName": "Crimson Action", "canonical": "hsl(0 72% 51%)", "tonalRamp": ["hsl(0 72% 15%)", "hsl(0 72% 25%)", "hsl(0 72% 36%)", "hsl(0 72% 51%)", "hsl(0 72% 62%)", "hsl(0 72% 73%)", "hsl(0 72% 84%)", "hsl(0 72% 95%)"] },
-      "primary-foreground": { "role": "neutral", "displayName": "Action Foreground", "canonical": "hsl(0 0% 100%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 28%)", "hsl(0 0% 42%)", "hsl(0 0% 56%)", "hsl(0 0% 70%)", "hsl(0 0% 82%)", "hsl(0 0% 92%)", "hsl(0 0% 100%)"] },
-      "secondary": { "role": "neutral", "displayName": "Control Graphite", "canonical": "hsl(0 0% 12%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 8%)", "hsl(0 0% 12%)", "hsl(0 0% 22%)", "hsl(0 0% 38%)", "hsl(0 0% 56%)", "hsl(0 0% 76%)", "hsl(0 0% 95%)"] },
-      "muted": { "role": "neutral", "displayName": "Muted Graphite", "canonical": "hsl(0 0% 15%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 15%)", "hsl(0 0% 26%)", "hsl(0 0% 40%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
-      "muted-foreground": { "role": "neutral", "displayName": "Muted Silver", "canonical": "hsl(0 0% 60%)", "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 25%)", "hsl(0 0% 36%)", "hsl(0 0% 48%)", "hsl(0 0% 60%)", "hsl(0 0% 72%)", "hsl(0 0% 84%)", "hsl(0 0% 95%)"] },
-      "border": { "role": "neutral", "displayName": "Hairline Graphite", "canonical": "hsl(0 0% 14%)", "tonalRamp": ["hsl(0 0% 4%)", "hsl(0 0% 9%)", "hsl(0 0% 14%)", "hsl(0 0% 25%)", "hsl(0 0% 40%)", "hsl(0 0% 58%)", "hsl(0 0% 78%)", "hsl(0 0% 95%)"] },
-      "success": { "role": "status", "displayName": "Operational Green", "canonical": "hsl(142 71% 45%)", "tonalRamp": ["hsl(142 71% 15%)", "hsl(142 71% 25%)", "hsl(142 71% 35%)", "hsl(142 71% 45%)", "hsl(142 71% 58%)", "hsl(142 71% 70%)", "hsl(142 71% 83%)", "hsl(142 71% 95%)"] },
-      "warning": { "role": "status", "displayName": "Attention Amber", "canonical": "hsl(38 92% 50%)", "tonalRamp": ["hsl(38 92% 15%)", "hsl(38 92% 25%)", "hsl(38 92% 37%)", "hsl(38 92% 50%)", "hsl(38 92% 62%)", "hsl(38 92% 73%)", "hsl(38 92% 84%)", "hsl(38 92% 95%)"] },
-      "danger": { "role": "status", "displayName": "Failure Crimson", "canonical": "hsl(0 72% 51%)", "tonalRamp": ["hsl(0 72% 15%)", "hsl(0 72% 25%)", "hsl(0 72% 36%)", "hsl(0 72% 51%)", "hsl(0 72% 62%)", "hsl(0 72% 73%)", "hsl(0 72% 84%)", "hsl(0 72% 95%)"] }
+      "canvas": { "role": "neutral", "displayName": "Obsidian", "canonical": "rgb(9 9 11)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(24 24 27)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)"] },
+      "surface": { "role": "neutral", "displayName": "Graphite Panel", "canonical": "rgb(17 17 19)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(24 24 27)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)"] },
+      "surface-raised": { "role": "neutral", "displayName": "Raised Graphite", "canonical": "rgb(24 24 27)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(24 24 27)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)"] },
+      "surface-hover": { "role": "neutral", "displayName": "Hover Graphite", "canonical": "rgb(31 31 35)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(24 24 27)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)"] },
+      "fg": { "role": "neutral", "displayName": "Bright Ink", "canonical": "rgb(237 237 239)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)", "rgb(250 250 251)"] },
+      "fg-2": { "role": "neutral", "displayName": "Soft Ink", "canonical": "rgb(180 180 188)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)", "rgb(250 250 251)"] },
+      "fg-3": { "role": "neutral", "displayName": "Muted Ink", "canonical": "rgb(131 131 140)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)", "rgb(250 250 251)"] },
+      "fg-4": { "role": "neutral", "displayName": "Faint Ink", "canonical": "rgb(86 86 95)", "tonalRamp": ["rgb(9 9 11)", "rgb(17 17 19)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)", "rgb(250 250 251)"] },
+      "accent": { "role": "primary", "displayName": "Signal Crimson", "canonical": "rgb(229 72 77)", "tonalRamp": ["rgb(52 12 14)", "rgb(96 22 25)", "rgb(150 36 40)", "rgb(207 51 57)", "rgb(229 72 77)", "rgb(240 120 124)", "rgb(255 159 162)", "rgb(255 222 223)"] },
+      "accent-solid": { "role": "primary", "displayName": "Pressed Crimson", "canonical": "rgb(207 51 57)", "tonalRamp": ["rgb(52 12 14)", "rgb(96 22 25)", "rgb(150 36 40)", "rgb(207 51 57)", "rgb(217 59 65)", "rgb(229 72 77)", "rgb(255 159 162)", "rgb(255 222 223)"] },
+      "accent-solid-hover": { "role": "primary", "displayName": "Pressed Crimson Hover", "canonical": "rgb(217 59 65)", "tonalRamp": ["rgb(52 12 14)", "rgb(96 22 25)", "rgb(150 36 40)", "rgb(207 51 57)", "rgb(217 59 65)", "rgb(229 72 77)", "rgb(255 159 162)", "rgb(255 222 223)"] },
+      "accent-text": { "role": "primary", "displayName": "Crimson Tint", "canonical": "rgb(255 159 162)", "tonalRamp": ["rgb(52 12 14)", "rgb(96 22 25)", "rgb(150 36 40)", "rgb(207 51 57)", "rgb(229 72 77)", "rgb(240 120 124)", "rgb(255 159 162)", "rgb(255 222 223)"] },
+      "accent-foreground": { "role": "neutral", "displayName": "White on Crimson", "canonical": "#ffffff", "tonalRamp": ["rgb(9 9 11)", "rgb(31 31 35)", "rgb(86 86 95)", "rgb(131 131 140)", "rgb(180 180 188)", "rgb(237 237 239)", "rgb(250 250 251)", "rgb(255 255 255)"] },
+      "ok": { "role": "status", "displayName": "Up Green", "canonical": "rgb(61 214 140)", "tonalRamp": ["rgb(10 40 26)", "rgb(17 72 47)", "rgb(28 112 73)", "rgb(42 160 104)", "rgb(61 214 140)", "rgb(112 228 172)", "rgb(168 240 205)", "rgb(222 250 236)"] },
+      "warn": { "role": "status", "displayName": "Degraded Amber", "canonical": "rgb(245 165 36)", "tonalRamp": ["rgb(48 31 6)", "rgb(88 58 12)", "rgb(140 93 19)", "rgb(196 131 28)", "rgb(245 165 36)", "rgb(248 192 104)", "rgb(251 218 165)", "rgb(254 242 222)"] },
+      "err": { "role": "status", "displayName": "Down Coral", "canonical": "rgb(255 99 105)", "tonalRamp": ["rgb(54 16 18)", "rgb(100 30 33)", "rgb(160 50 54)", "rgb(215 72 78)", "rgb(255 99 105)", "rgb(255 144 148)", "rgb(255 190 192)", "rgb(255 230 231)"] },
+      "line-subtle": { "role": "neutral", "displayName": "Subtle Hairline", "canonical": "rgba(255, 255, 255, 0.055)" },
+      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "rgba(255, 255, 255, 0.085)" },
+      "line-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "rgba(255, 255, 255, 0.14)" }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Page headline", "role": "headline" },
-      "title": { "displayName": "Card title", "role": "title" },
-      "body": { "displayName": "Interface body", "role": "body" },
-      "label": { "displayName": "Compact label", "role": "label" },
-      "mono": { "displayName": "Operational data", "role": "code" }
+      "stat-hero": { "displayName": "Stat hero", "purpose": "The four numbers of the Overview status bar only." },
+      "page-title": { "displayName": "Page title", "purpose": "Page header and project header title; one per page." },
+      "stat": { "displayName": "Stat", "purpose": "Status-bar values on every page except the Overview; README h1." },
+      "dialog-title": { "displayName": "Dialog title", "purpose": "Dialog and alert titles, Docs section titles, README h2." },
+      "panel-title": { "displayName": "Panel title", "purpose": "Panel headers, form section titles, card titles, the wordmark." },
+      "body": { "displayName": "Body", "purpose": "Rows, inputs, nav items, tabs, page descriptions; the most-used size." },
+      "body-strong": { "displayName": "Body medium", "purpose": "Button and tab labels." },
+      "control-sm": { "displayName": "Control small", "purpose": "Small buttons, segmented options, form labels, row timestamps." },
+      "meta": { "displayName": "Meta", "purpose": "Panel notes, form hints and errors, stat labels and details, chip text." },
+      "micro": { "displayName": "Micro", "purpose": "Meter labels, nav group labels, deploy detail lines." },
+      "mono": { "displayName": "Mono", "purpose": "SHAs, domains, container names, ports, paths, log lines." },
+      "mono-count": { "displayName": "Mono count", "purpose": "Counts in nav and segmented options, meter values, keycaps." }
     },
-    "shadows": {
-      "control": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-      "surface": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-      "crimsonGlow": "0 0 20px hsl(0 72% 51% / 0.3)",
-      "crimsonGlowSmall": "0 0 10px hsl(0 72% 51% / 0.2)"
-    },
-    "motion": {
-      "fast": "200ms ease-in-out",
-      "enter": "300ms ease-out",
-      "loading": "2000ms linear infinite"
-    },
-    "breakpoints": {
-      "sm": "640px",
-      "md": "768px",
-      "lg": "1024px",
-      "xl": "1280px",
-      "2xl": "1536px"
-    }
+    "shadows": [
+      { "name": "inset-top", "value": "inset 0 1px 0 rgba(255,255,255,.045)", "purpose": "Top-edge highlight on panels, secondary buttons, the segmented indicator." },
+      { "name": "lift", "value": "0 6px 18px -8px rgba(0,0,0,.6)", "purpose": "Small floating controls: sidebar collapse handle, menus." },
+      { "name": "overlay", "value": "0 16px 40px -12px rgba(0,0,0,.7), 0 4px 12px -4px rgba(0,0,0,.5)", "purpose": "Dialogs, command palette, popovers." },
+      { "name": "primary-press", "value": "inset 0 1px 0 rgba(255,255,255,.18), 0 1px 2px rgba(0,0,0,.4)", "purpose": "Primary button at rest." },
+      { "name": "primary-hover-glow", "value": "inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px -4px rgba(229,72,77,.55)", "purpose": "Primary button on hover." },
+      { "name": "status-halo", "value": "0 0 0 3px rgb(var(--ok) / .1)", "purpose": "Halo around ok, warn and err dots (in their own colour)." },
+      { "name": "live-glow", "value": "0 0 10px rgb(var(--accent) / .8)", "purpose": "Active nav indicator bar; the deploy progress bar uses 12px at .7." }
+    ],
+    "motion": [
+      { "name": "duration-instant", "value": "90ms", "purpose": "Immediate feedback." },
+      { "name": "duration-quick", "value": "140ms", "purpose": "Hover, press, colour changes." },
+      { "name": "duration-base", "value": "200ms", "purpose": "Travelling indicators, switches, route fade, overlay fade." },
+      { "name": "duration-panel", "value": "260ms", "purpose": "Drawer, dialogs, attention detail unfold, sidebar width." },
+      { "name": "duration-layout", "value": "420ms", "purpose": "Fleet table reorder." },
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Default easing for nearly every transition." },
+      { "name": "ease-inout", "value": "cubic-bezier(0.65, 0, 0.35, 1)", "purpose": "Shimmer and reordering." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.34, 1.4, 0.64, 1)", "purpose": "Defined token; reserved for the mark." },
+      { "name": "live-pulse", "value": "live 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite", "purpose": "Ring behind a live dot; scales to 3.2 and fades. Removed under reduced motion." },
+      { "name": "shimmer", "value": "shimmer 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite", "purpose": "Skeleton placeholder." },
+      { "name": "reduced-motion", "value": "animation and transition durations 1ms", "purpose": "Applied globally under prefers-reduced-motion: reduce." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px", "purpose": "Search input goes from full width to 240px; dialog footers go horizontal." },
+      { "name": "md", "value": "768px", "purpose": "Drawer becomes the 56px icon rail; status bars go from 2x2 to four cells." },
+      { "name": "lg", "value": "1024px", "purpose": "Forms gain the section nav and the 300px context rail." },
+      { "name": "xl", "value": "1280px", "purpose": "Full 232px sidebar." }
+    ]
   },
   "components": [
     {
-      "name": "Primary button",
+      "name": "Primary Button",
+      "kind": "button",
       "refersTo": "button-primary",
-      "description": "Główna akcja z karmazynowym wypełnieniem.",
-      "html": "<button class=\"ds-button ds-button-primary\"><span aria-hidden=\"true\">↗</span> Deploy</button>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{height:36px;padding:8px 16px;border:0;border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;cursor:pointer;transition:all 150ms}.ds-button-primary{background:hsl(0 72% 51%);color:white;box-shadow:0 1px 3px rgb(0 0 0 / .1)}.ds-button-primary:hover{background:hsl(0 72% 46%)}.ds-button-primary:active{transform:scale(.98)}"
+      "description": "The one crimson action on a view.",
+      "html": "<button class=\"ds-btn ds-btn-primary\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/></svg>Restart api</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent; font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 140ms cubic-bezier(0.16,1,0.3,1), box-shadow 140ms cubic-bezier(0.16,1,0.3,1), transform 140ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:active { transform: scale(0.97); } .ds-btn:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; } .ds-btn-primary { background: rgb(var(--accent-solid)); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 2px rgba(0,0,0,.4); } .ds-btn-primary:hover { background: rgb(var(--accent-solid-hover)); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 4px 14px -4px rgba(229,72,77,.55); }"
     },
     {
-      "name": "Outline button",
-      "refersTo": "button-outline",
-      "description": "Drugorzędna akcja bez stałego wypełnienia.",
-      "html": "<button class=\"ds-button\">Refresh</button>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{height:36px;padding:8px 16px;border:1px solid hsl(0 0% 14%);border-radius:6px;background:transparent;color:hsl(0 0% 95%);font-size:14px;font-weight:500;box-shadow:0 1px 2px rgb(0 0 0 / .05);cursor:pointer}.ds-button:hover{background:hsl(0 0% 12%)}"
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other visible action.",
+      "html": "<button class=\"ds-btn2\">Live logs</button>",
+      "css": ".ds-btn2 { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: rgb(var(--surface-raised)); color: rgb(var(--fg)); box-shadow: inset 0 1px 0 rgba(255,255,255,.045); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 140ms cubic-bezier(0.16,1,0.3,1), transform 140ms; } .ds-btn2:hover { background: rgb(var(--surface-hover)); } .ds-btn2:active { transform: scale(0.97); } .ds-btn2:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }"
     },
     {
-      "name": "Ghost icon button",
-      "refersTo": "button-ghost",
-      "description": "Kompaktowa akcja icon-only o wymiarach 36 × 36 px.",
-      "html": "<button class=\"ds-button\" aria-label=\"Notifications\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/></svg></button>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-button{width:36px;height:36px;border:0;border-radius:6px;display:grid;place-items:center;background:transparent;color:hsl(0 0% 95%);cursor:pointer}.ds-button:hover{background:hsl(0 0% 12%)}"
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive actions, usually in the danger zone.",
+      "html": "<button class=\"ds-btn-danger\">Delete project</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid rgb(var(--err) / .25); background: rgb(var(--err) / .1); color: rgb(var(--err)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 140ms, border-color 140ms; } .ds-btn-danger:hover { border-color: rgb(var(--err) / .4); background: rgb(var(--err) / .15); } .ds-btn-danger:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }"
     },
     {
-      "name": "Input",
-      "refersTo": "input",
-      "description": "Pole danych z ciemnym tłem i ringiem fokusu.",
-      "html": "<input class=\"ds-input\" value=\"main\" aria-label=\"Branch\">",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-input{box-sizing:border-box;width:240px;height:36px;padding:4px 12px;border:1px solid hsl(0 0% 14%);border-radius:6px;background:hsl(0 0% 4%);color:hsl(0 0% 95%);font-size:14px;box-shadow:0 1px 2px rgb(0 0 0 / .05);outline:none}.ds-input:focus{box-shadow:0 0 0 2px hsl(0 0% 4%),0 0 0 4px hsl(0 72% 51%)}"
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "chip-neutral",
+      "description": "Neutral facts, live for running, tone chips for exceptions only.",
+      "html": "<span class=\"ds-chip\">2 / 2</span> <span class=\"ds-chip ds-chip-live\">Build</span> <span class=\"ds-chip ds-chip-warn\">1 / 2</span> <span class=\"ds-chip ds-chip-err\">failed</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,.02); color: rgb(var(--fg-2)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 11.5px; font-weight: 500; white-space: nowrap; } .ds-chip-live { border-color: var(--line-strong); background: transparent; } .ds-chip-warn { border-color: rgb(var(--warn) / .25); background: rgb(var(--warn) / .1); color: rgb(var(--warn)); } .ds-chip-err { border-color: rgb(var(--err) / .25); background: rgb(var(--err) / .1); color: rgb(var(--err)); }"
     },
     {
-      "name": "Success badge",
-      "refersTo": "badge",
-      "description": "Semantyczny status z subtelnym wypełnieniem.",
-      "html": "<span class=\"ds-badge\">Deployed</span>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:6px;background:hsl(142 71% 45% / .2);color:hsl(142 71% 45%);font-size:12px;line-height:16px;font-weight:600}"
+      "name": "Panel with header and rows",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The container for every row list: one header row, hairline-separated rows.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-head\"><div><h2>Activity</h2><p>Last 24 hours</p></div><a href=\"#\">Audit log</a></div><div class=\"ds-row\"><span class=\"ds-dot ds-dot-ok\"></span><div><strong>Deployed · Dashboard</strong><code>a1b2c3d</code></div><time>24m ago</time></div><div class=\"ds-row\"><span class=\"ds-dot ds-dot-err\"></span><div><strong>Deploy failed · Code Snippets API</strong><code>c3d4e5f</code></div><time>3h ago</time></div></section>",
+      "css": ".ds-panel { border: 1px solid var(--line); border-radius: 10px; background: rgb(var(--surface)); background-image: var(--sheen); box-shadow: inset 0 1px 0 rgba(255,255,255,.045); color: rgb(var(--fg)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; overflow: hidden; } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line-subtle); } .ds-panel-head h2 { margin: 0; font-size: 13.5px; font-weight: 600; } .ds-panel-head p { margin: 2px 0 0; font-size: 11.5px; color: rgb(var(--fg-3)); } .ds-panel-head a { font-size: 12px; color: rgb(var(--fg-2)); text-decoration: none; } .ds-panel-head a:hover { color: rgb(var(--fg)); } .ds-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px; border-top: 1px solid var(--line-subtle); font-size: 13px; transition: background-color 140ms; } .ds-row:first-of-type { border-top: 0; } .ds-row:hover { background: rgba(255,255,255,.022); } .ds-row div { flex: 1; display: grid; gap: 2px; } .ds-row strong { font-weight: 500; } .ds-row code { font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 12px; color: rgb(var(--fg-3)); } .ds-row time { font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 11px; color: rgb(var(--fg-4)); } .ds-dot { width: 7px; height: 7px; border-radius: 9999px; flex-shrink: 0; } .ds-dot-ok { background: rgb(var(--ok)); box-shadow: 0 0 0 3px rgb(var(--ok) / .1); } .ds-dot-err { background: rgb(var(--err)); box-shadow: 0 0 0 3px rgb(var(--err) / .1); }"
     },
     {
-      "name": "Card",
-      "refersTo": "card",
-      "description": "Podstawowa powierzchnia danych z tonalnym tłem.",
-      "html": "<article class=\"ds-card\"><h3>Deployment status</h3><p>Operational summary and recent activity.</p></article>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-card{width:280px;padding:24px;border:1px solid hsl(0 0% 14%);border-radius:8px;background:hsl(0 0% 7%);color:hsl(0 0% 95%);box-shadow:0 1px 3px rgb(0 0 0 / .1)}h3{margin:0;font-size:18px;line-height:1;font-weight:600;letter-spacing:-.025em}p{margin:8px 0 0;color:hsl(0 0% 60%);font-size:14px;line-height:20px}"
+      "name": "Status Bar",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Four hairline-divided stat cells at the top of every list page; 2x2 on phones.",
+      "html": "<div class=\"ds-statbar\"><div><p><span class=\"ds-sdot\"></span>Domains</p><b>3<span> / 3 up</span></b><small>checked just now</small></div><div><p>Incidents</p><b class=\"ds-err\">1</b><small>dashboard · 14m ago</small></div><div><p>Deploys · 7 days</p><b>7</b><small>1 failed</small></div><div><p>Running now</p><b>1</b><small>The agent is working</small></div></div>",
+      "css": ".ds-statbar { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border: 1px solid var(--line); border-radius: 10px; background: rgb(var(--surface)); background-image: var(--sheen); box-shadow: inset 0 1px 0 rgba(255,255,255,.045); color: rgb(var(--fg)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-statbar > div { padding: 14px 18px; min-width: 0; } .ds-statbar > div + div { border-left: 1px solid var(--line-subtle); } .ds-statbar p { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11.5px; color: rgb(var(--fg-3)); } .ds-statbar b { display: block; margin-top: 6px; font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; } .ds-statbar b span { font-size: 13px; font-weight: 500; letter-spacing: normal; color: rgb(var(--fg-4)); } .ds-statbar small { display: block; margin-top: 2px; font-size: 11.5px; color: rgb(var(--fg-3)); } .ds-err { color: rgb(var(--err)); } .ds-sdot { width: 6px; height: 6px; border-radius: 9999px; background: rgb(var(--ok)); box-shadow: 0 0 0 3px rgb(var(--ok) / .1); } @media (max-width: 767px) { .ds-statbar { grid-template-columns: 1fr 1fr; } .ds-statbar > div:nth-child(n+3) { border-top: 1px solid var(--line-subtle); } .ds-statbar > div:nth-child(3) { border-left: 0; } }"
     },
     {
-      "name": "Active navigation item",
-      "refersTo": "navigation-active",
-      "description": "Aktywna pozycja sidebaru z lewym sygnałem primary.",
-      "html": "<a class=\"ds-nav\" href=\"#\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg>Dashboard</a>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-nav{box-sizing:border-box;width:220px;display:flex;align-items:center;gap:12px;padding:10px 12px;border-left:2px solid hsl(0 72% 51%);border-radius:8px;background:hsl(0 72% 51% / .15);color:hsl(0 72% 51%);font-size:14px;font-weight:500;text-decoration:none}"
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Filter field for list pages; full width on phones, 240px from 640px.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input placeholder=\"Search by project, sha or who\" aria-label=\"Search\"></label>",
+      "css": ".ds-search { position: relative; display: block; width: 240px; } .ds-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgb(var(--fg-4)); pointer-events: none; } .ds-search input { width: 100%; height: 32px; padding: 0 10px 0 32px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgb(var(--canvas)); color: rgb(var(--fg)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 13px; transition: border-color 140ms, box-shadow 140ms; } .ds-search input::placeholder { color: rgb(var(--fg-4)); } .ds-search input:hover { border-color: rgba(255,255,255,.2); } .ds-search input:focus-visible { outline: none; border-color: rgb(var(--accent) / .4); box-shadow: 0 0 0 3px rgb(var(--accent) / .15); } @media (max-width: 639px) { .ds-search { width: 100%; } }"
     },
     {
-      "name": "Online status dot",
-      "refersTo": "status-indicator",
-      "description": "Kompaktowy wskaźnik stanu wspierający etykietę tekstową.",
-      "html": "<span class=\"ds-status\"><i aria-hidden=\"true\"></i>Online</span>",
-      "css": ":host{font-family:Inter,ui-sans-serif,system-ui,sans-serif}.ds-status{display:inline-flex;align-items:center;gap:8px;color:hsl(0 0% 95%);font-size:14px}.ds-status i{width:8px;height:8px;border-radius:9999px;background:hsl(142 71% 45%);box-shadow:0 0 8px hsl(142 71% 45% / .5)}"
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-control",
+      "description": "List filter with counts; scrolls instead of wrapping.",
+      "html": "<div class=\"ds-seg\" role=\"radiogroup\" aria-label=\"Status\"><button role=\"radio\" aria-checked=\"true\" class=\"on\">All <span>7</span></button><button role=\"radio\" aria-checked=\"false\">Running <span>1</span></button><button role=\"radio\" aria-checked=\"false\">Failed <span>1</span></button><button role=\"radio\" aria-checked=\"false\">Succeeded <span>5</span></button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; max-width: 100%; overflow-x: auto; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: rgb(var(--canvas)); scrollbar-width: none; } .ds-seg button { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; color: rgb(var(--fg-3)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: color 140ms, background-color 200ms cubic-bezier(0.16,1,0.3,1); } .ds-seg button:hover { color: rgb(var(--fg-2)); } .ds-seg button.on { background: rgb(var(--surface-hover)); color: rgb(var(--fg)); box-shadow: inset 0 1px 0 rgba(255,255,255,.045); } .ds-seg span { font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 10.5px; color: rgb(var(--fg-3)); } .ds-seg button.on span { color: rgb(var(--fg-2)); } .ds-seg button:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "32px items; active gets a glowing 2px crimson bar and a faint white fill.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><a href=\"#\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>Overview</a><p>Workspace</p><a href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\"><path d=\"M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9l-2-3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/></svg>Projects<span>4</span></a><a href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\"><path d=\"M13 5h8M13 12h8M13 19h8M3 17l2 2 4-4M3 7l2 2 4-4\"/></svg>Tasks<span>9</span></a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 1px; width: 216px; padding: 0 8px; background: rgb(var(--canvas)); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-nav p { margin: 0; padding: 12px 10px 4px; font-size: 11px; font-weight: 500; color: rgb(var(--fg-4)); } .ds-nav a { position: relative; display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 6px; color: rgb(var(--fg-2)); font-size: 13px; text-decoration: none; transition: background-color 140ms, color 140ms; } .ds-nav a:hover { background: rgba(255,255,255,.04); color: rgb(var(--fg)); } .ds-nav a[aria-current=page] { background: rgba(255,255,255,.055); color: #fff; } .ds-nav a[aria-current=page]::before { content: \"\"; position: absolute; left: -8px; top: 8px; bottom: 8px; width: 2px; border-radius: 9999px; background: rgb(var(--accent)); box-shadow: 0 0 10px rgb(var(--accent) / .8); } .ds-nav a span { margin-left: auto; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 10.5px; color: rgb(var(--fg-3)); } .ds-nav a:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }"
     }
   ],
   "narrative": {
-    "northStar": "Crimson Control Room",
-    "overview": "Marczelloo Dashboard jest gęstym, ciemnym panelem operacyjnym. Jego charakter wynika z neutralnych, prawie czarnych powierzchni, oszczędnego karmazynowego akcentu i czytelnych stanów systemowych. Interfejs ma wyglądać jak narzędzie do pracy: spokojne w spoczynku, jednoznaczne podczas akcji i alarmujące tylko wtedy, gdy stan naprawdę tego wymaga. Warstwy budują głównie różnice tonalne i cienkie obramowania. Karmazyn prowadzi uwagę do aktywnej nawigacji, głównej akcji, fokusu i kluczowych sygnałów marki. Kompaktowa typografia i 4-pikselowy rytm pozwalają pokazywać dużo informacji bez wizualnego chaosu.",
+    "northStar": "Obsidian Console",
+    "overview": "The dashboard is a dense, near-black operator's console for one owner and one Raspberry Pi. Everything sits on a cool obsidian canvas (a faint 20 px dot grid fades out behind the top of every page) with panels a single tonal step lighter, separated by white hairlines at 5.5 to 14 percent opacity. At rest the screen is grey on black with small green dots. Colour appears only when something is happening or something is wrong, so a healthy fleet reads calm and a failure reads unmistakable.\n\nDensity is deliberate: 13 px body text, 32 px controls, 14 px panel padding, row lists instead of cards. State comes first on every list page: a status bar of four numbers, then grouped panels of rows, with problems ranked to the top and shown next to the one action that fixes them. Crimson is the identity, and it is rationed. It marks the single primary action on a view, the live pulse of a running operation, and thin selection indicators. It never means failure. Failure has its own coral red.\n\nMotion is quick and functional (90 to 420 ms on a strong ease-out). Indicators travel, details unfold, rows reorder. Nothing decorates, and all of it switches off under reduced motion.",
     "keyCharacteristics": [
-      "ciemne, neutralne powierzchnie o małych różnicach jasności",
-      "jeden karmazynowy akcent dla marki, akcji i fokusu",
-      "kompaktowy rytm, cienkie obramowania i promień bazowy 8 px",
-      "wyraźne semantyczne kolory sukcesu, ostrzeżenia i błędu",
-      "ikony konturowe Lucide o grubości linii 2 px"
+      "Obsidian canvas, one tonal step per layer, white hairline borders; a sheen gradient and a 1 px inset top highlight give panels their only depth.",
+      "One crimson accent, rationed to the primary action, the live pulse and selection indicators.",
+      "A separate status palette (ok green, warn amber, err coral) that appears only on exceptions.",
+      "A dense literal type ramp in Geist from 10.5 px to 22 px, with Geist Mono and tabular numerals for anything a machine produced.",
+      "Status bar, panel, row: every list page is built from the same three pieces."
     ],
     "rules": [
-      { "name": "The Signal Color Rule", "body": "Kolory nieneutralne oznaczają akcję albo rzeczywisty stan systemu; nie są dekoracyjnym wypełniaczem.", "section": "colors" },
-      { "name": "The Operational Mono Rule", "body": "Monospace służy danym maszynowym; nawigacja, opisy i akcje pozostają w sans-serif.", "section": "typography" },
-      { "name": "The Flat-at-Rest Rule", "body": "Każda powierzchnia zaczyna jako tonalna i obramowana; silniejszy cień albo glow musi wynikać ze stanu lub hierarchii.", "section": "elevation" }
+      { "name": "The Crimson Budget Rule", "body": "Crimson has three jobs: the one primary action per view, the live pulse of a running operation, and a 2 px selection indicator (nav bar, tab underline, switch, focus). If crimson appears anywhere else, it is a mistake.", "section": "colors" },
+      { "name": "The Red Means Broken Rule", "body": "Failure is Down Coral (err), never Signal Crimson. Running and deploying are not failures: they use the neutral live chip and a crimson pulse dot, never a red chip.", "section": "colors" },
+      { "name": "The Exceptions Only Rule", "body": "Tone chips (ok, warn, err) mark exceptions. A healthy row carries a green dot and no chip; a successful deploy has no status chip; a failed one has an err chip. Plain facts (container count \"2 / 2\", tags) use the neutral chip.", "section": "colors" },
+      { "name": "The Machine Mono Rule", "body": "If the system produced it (SHA, domain, container, port, path, count, log line), set it in Geist Mono with tabular numerals. If a person reads it as language, it stays in Geist.", "section": "typography" },
+      { "name": "The Sentence Case Rule", "body": "No uppercase labels and no kickers above headings. The only uppercase text is the \"DASHBOARD\" line inside the logo lockup, which is part of the mark, not a label style.", "section": "typography" },
+      { "name": "The Flat Panel Rule", "body": "Panels never cast drop shadows. A panel is surface, sheen, inset top and a line border; only overlays and floating handles get a real shadow.", "section": "elevation" },
+      { "name": "The One Primary Rule", "body": "A view has at most one crimson button. Everything else is secondary, ghost or danger.", "section": "components" },
+      { "name": "The Panel Header Rule", "body": "Every panel opens with one header row: a 13.5 px semibold title (optionally led by a 16 px fg-3 icon), an optional 11.5 px fg-3 note under it, actions on the right (ghost links, small buttons or a segmented filter), and a line-subtle hairline beneath. No second header inside the same panel.", "section": "components" }
     ],
     "dos": [
-      "Do korzystaj z istniejących tokenów CSS i komponentów src/components/ui jako źródła prawdy.",
-      "Do używaj Lucide, currentColor, siatki 24 px i stroke 2 px; renderuj zwykle w rozmiarze 16 px.",
-      "Do zachowuj rytm odstępów będący wielokrotnością 4 px i promienie 4/6/8 px.",
-      "Do pokazuj status kolorem, ikoną i czytelną etykietą, zwłaszcza dla deployów i operacji destrukcyjnych.",
-      "Do respektuj prefers-reduced-motion przy dodawaniu nowych animacji."
+      "Do start every list page with the status bar, then grouped panels of rows; put the fix action on the row that needs it.",
+      "Do keep exactly one primary (crimson) button per view; make every other action secondary, ghost or danger.",
+      "Do use Down Coral for failure and the neutral live chip plus a crimson pulse dot for anything running.",
+      "Do give every panel one header row: 13.5 px title, optional 11.5 px note, actions right, hairline below.",
+      "Do use the literal ramp (22, 20, 18, 15, 13.5, 13, 12.5, 12, 11.5, 11, 10.5 px) and nothing between.",
+      "Do set machine data in Geist Mono with tabular numerals.",
+      "Do write dates as \"Tue, Sep 22\" for day headings, \"Sep 22\" within the year, \"14m ago\" for recent events, and clock times in 24 h.",
+      "Do make status bars 2 × 2, segmented controls scroll, search fields full width and rows stack on phones.",
+      "Do use Lucide at 16 px with stroke 1.75."
     ],
     "donts": [
-      "Don't dodawaj drugiego koloru marki, gradientów niezwiązanych z istniejącym znakiem ani dekoracyjnych kolorów statusowych.",
-      "Don't mieszaj Lucide z inną rodziną ikon na tej samej powierzchni.",
-      "Don't używaj emoji jako ikon interfejsu ani ikon bez dostępnej nazwy w przyciskach icon-only.",
-      "Don't zwiększaj promieni do pill poza statusami, avatarami i innymi elementami, które już są kołowe.",
-      "Don't zastępuj tonalnej hierarchii ciężkimi cieniami lub stałym glowem."
+      "Don't use crimson for failure, for decoration, or for a second button on the same view.",
+      "Don't put a tone chip on a healthy or successful item; the green dot is enough.",
+      "Don't add drop shadows to panels or rows; depth is tonal.",
+      "Don't set uppercase labels, eyebrows or kickers; everything is sentence case.",
+      "Don't introduce a second typeface or font sizes outside the ramp.",
+      "Don't use 12-hour clock times.",
+      "Don't animate without a reduced-motion fallback, and don't use the live pulse for anything that is not running right now."
     ]
   }
 }

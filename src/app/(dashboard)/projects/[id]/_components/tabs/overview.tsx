@@ -178,7 +178,7 @@ function ReleaseSummary({ detail }: { detail: ProjectDetail }) {
       <div className="min-w-0">
         <p className="text-[11.5px] text-fg-3">{deploying ? "Deploying" : "Live release"}</p>
         <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          <code className="text-[17px] font-semibold text-fg">{live?.commit_sha?.slice(0, 7) ?? "nothing deployed"}</code>
+          <code className="text-[18px] font-semibold text-fg">{live?.commit_sha?.slice(0, 7) ?? "nothing deployed"}</code>
           {live?.error_message && <span className="text-[13px] text-err">{live.error_message}</span>}
         </p>
         <p className="mt-1 truncate text-[11.5px] text-fg-3">

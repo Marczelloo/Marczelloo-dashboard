@@ -161,7 +161,7 @@ export function ChangelogViewer({ githubUrl }: { githubUrl: string }) {
                   .md
                 </Button>
               </div>
-              <div className="max-h-[360px] overflow-y-auto px-3.5 py-2 text-[13px] leading-relaxed text-fg-2 [&_h1]:mb-2 [&_h1]:text-[14px] [&_h1]:font-semibold [&_h1]:text-fg [&_h2]:mb-1 [&_h2]:mt-3 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-fg [&_li]:ml-4 [&_li]:list-disc [&_p]:my-1.5 [&_a]:underline [&_a]:decoration-line-strong">
+              <div className="max-h-[360px] overflow-y-auto px-3.5 py-2 text-[13px] leading-relaxed text-fg-2 [&_h1]:mb-2 [&_h1]:text-[13.5px] [&_h1]:font-semibold [&_h1]:text-fg [&_h2]:mb-1 [&_h2]:mt-3 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-fg [&_li]:ml-4 [&_li]:list-disc [&_p]:my-1.5 [&_a]:underline [&_a]:decoration-line-strong">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{changelog}</ReactMarkdown>
               </div>
             </div>

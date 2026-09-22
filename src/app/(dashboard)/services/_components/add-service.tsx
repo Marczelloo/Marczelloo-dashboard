@@ -184,7 +184,7 @@ export function AddService({ projectId, projectName }: { projectId: string | nul
                 </p>
                 <div className="rounded-md border border-line p-3">
                   <p className="text-[11px] text-fg-3">Selected</p>
-                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{selected.length}</p>
+                  <p className="mt-0.5 text-[18px] font-semibold tabular-nums">{selected.length}</p>
                   {selected.length > 0 && <p className="mt-1 truncate text-[11.5px] text-fg-3">{selected.map((container) => container.composeService ?? container.name).join(", ")}</p>}
                 </div>
                 <Button onClick={() => void addSelected()} disabled={selected.length === 0} loading={adding}>
