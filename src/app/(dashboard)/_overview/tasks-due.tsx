@@ -3,7 +3,7 @@ import { ListChecks } from "lucide-react";
 import { Panel } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatDate } from "@/lib/utils";
+import { formatShortDate } from "@/lib/utils";
 import type { Task } from "@/server/overview/types";
 
 const PRIORITY_TONE = { low: "idle", medium: "neutral", high: "warn", critical: "err" } as const;
@@ -27,7 +27,7 @@ export function TasksDue({ tasks, now }: { tasks: Task[]; now: string }) {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-fg">{task.title}</span>
                   <span className={overdue ? "text-xs text-err" : "text-xs text-fg-3"}>
-                    {task.status === "blocked" ? "Blocked" : task.dueDate ? `${overdue ? "Overdue · " : "Due "}${formatDate(task.dueDate)}` : "No due date"}
+                    {task.status === "blocked" ? "Blocked" : task.dueDate ? `${overdue ? "Overdue · " : "Due "}${formatShortDate(task.dueDate)}` : "No due date"}
                   </span>
                 </span>
                 <Chip tone={PRIORITY_TONE[task.priority]}>{task.priority}</Chip>

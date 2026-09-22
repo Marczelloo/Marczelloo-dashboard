@@ -8,6 +8,14 @@ export interface HostAlert {
   detail: string;
 }
 
+/** One reading for the host charts: load per core, memory used, temperature. */
+export interface HostSample {
+  at: number;
+  load: number;
+  memory: number;
+  temperature: number | null;
+}
+
 export interface HostSummary {
   generatedAt: string;
   /** False when the agent is not configured or did not answer. */
@@ -15,6 +23,8 @@ export interface HostSummary {
   host: HostInfo | null;
   agent: AgentStatus | null;
   alerts: HostAlert[];
+  /** Earlier readings, when the source keeps any; the live Pi keeps none, the demo does. */
+  history?: HostSample[];
 }
 
 export const GB = 1024 ** 3;

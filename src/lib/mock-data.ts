@@ -109,7 +109,7 @@ export const mockServices: Service[] = [
     url: "http://localhost:3001",
     health_url: "http://localhost:3001/health",
     portainer_endpoint_id: 1,
-    container_id: "atlashub-api-container",
+    container_id: "atlashub-api-1",
     stack_id: 1,
     repo_path: "/home/pi/projects/atlashub",
     compose_project: "atlashub",
@@ -143,7 +143,7 @@ export const mockServices: Service[] = [
     url: "http://localhost:3100",
     health_url: "http://localhost:3100/api/health",
     portainer_endpoint_id: 1,
-    container_id: "dashboard-app-container",
+    container_id: "dashboard-app-1",
     stack_id: 2,
     repo_path: "/home/pi/projects/dashboard",
     compose_project: "dashboard",
@@ -154,15 +154,15 @@ export const mockServices: Service[] = [
   {
     id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
     project_id: "33333333-3333-3333-3333-333333333333",
-    name: "Dashboard Runner",
+    name: "Dashboard API",
     type: "docker",
     url: null,
-    health_url: "http://localhost:8787/health",
+    health_url: "http://localhost:3110/health",
     portainer_endpoint_id: 1,
-    container_id: "dashboard-runner-container",
+    container_id: "dashboard-api-1",
     stack_id: 2,
     repo_path: null,
-    compose_project: null,
+    compose_project: "dashboard",
     deploy_strategy: "manual",
     created_at: daysAgo(60),
     updated_at: daysAgo(10),
@@ -176,7 +176,7 @@ export const mockServices: Service[] = [
     url: "https://api.snippets.marczelloo.dev",
     health_url: "https://api.snippets.marczelloo.dev/health",
     portainer_endpoint_id: 1,
-    container_id: "snippets-api-container",
+    container_id: "snippets-api-1",
     stack_id: 3,
     repo_path: "/home/pi/projects/snippets-api",
     compose_project: "snippets",
@@ -193,7 +193,7 @@ export const mockServices: Service[] = [
     url: "http://localhost:9000",
     health_url: "http://localhost:9000/api/status",
     portainer_endpoint_id: 1,
-    container_id: "portainer-container",
+    container_id: "portainer",
     stack_id: null,
     repo_path: null,
     compose_project: null,
@@ -433,16 +433,16 @@ export const mockUptimeChecks: UptimeCheck[] = [
     ok: true,
     error: null,
   },
-  // Snippets API - degraded
+  // Snippets API - back on the previous release after a failed deploy
   {
     id: "u5555555-5555-5555-5555-555555555555",
     service_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
     checked_at: minutesAgo(5),
-    status_code: 503,
-    latency_ms: 5000,
+    status_code: 200,
+    latency_ms: 142,
     ssl_days_left: 30,
-    ok: false,
-    error: "Service unavailable - maintenance mode",
+    ok: true,
+    error: null,
   },
   // Portainer
   {
@@ -712,65 +712,50 @@ export interface MockEndpoint {
 
 export const mockEndpoints: MockEndpoint[] = [{ Id: 1, Name: "Raspberry Pi" }];
 
-export const mockContainers: MockContainer[] = [
-  {
-    Id: "abc123def456789012345678901234567890abcdef",
-    Names: ["/atlashub-api"],
-    Image: "atlashub:latest",
-    State: "running",
-    Status: "Up 5 days",
-    Created: Math.floor(Date.now() / 1000) - 432000, // 5 days ago
-    Ports: [{ PrivatePort: 3001, PublicPort: 3001, Type: "tcp" }],
-  },
-  {
-    Id: "def456789012345678901234567890abcdef123456",
-    Names: ["/dashboard-app"],
-    Image: "marczelloo-dashboard:latest",
-    State: "running",
-    Status: "Up 2 days",
-    Created: Math.floor(Date.now() / 1000) - 172800, // 2 days ago
-    Ports: [{ PrivatePort: 3100, PublicPort: 3100, Type: "tcp" }],
-  },
-  {
-    Id: "789012345678901234567890abcdef123456789abc",
-    Names: ["/dashboard-runner"],
-    Image: "marczelloo-runner:latest",
-    State: "running",
-    Status: "Up 2 days",
-    Created: Math.floor(Date.now() / 1000) - 172800,
-    Ports: [{ PrivatePort: 8787, PublicPort: 8787, Type: "tcp" }],
-  },
-  {
-    Id: "abcdef123456789012345678901234567890defabc",
-    Names: ["/portainer"],
-    Image: "portainer/portainer-ce:latest",
-    State: "running",
-    Status: "Up 30 days",
-    Created: Math.floor(Date.now() / 1000) - 2592000, // 30 days ago
-    Ports: [
-      { PrivatePort: 9000, PublicPort: 9000, Type: "tcp" },
-      { PrivatePort: 9443, PublicPort: 9443, Type: "tcp" },
-    ],
-  },
-  {
-    Id: "567890123456789012345678901234567890fedcba",
-    Names: ["/redis-cache"],
-    Image: "redis:7-alpine",
-    State: "running",
-    Status: "Up 15 days",
-    Created: Math.floor(Date.now() / 1000) - 1296000, // 15 days ago
-    Ports: [{ PrivatePort: 6379, Type: "tcp" }],
-  },
-  {
-    Id: "fedcba098765432109876543210987654321098765",
-    Names: ["/snippets-api"],
-    Image: "snippets-api:latest",
-    State: "exited",
-    Status: "Exited (1) 3 hours ago",
-    Created: Math.floor(Date.now() / 1000) - 604800, // 7 days ago
-    Ports: [{ PrivatePort: 8080, PublicPort: 8080, Type: "tcp" }],
-  },
+/**
+ * The demo fleet: every container the demo shows, in one place. The Portainer
+ * list, the agent status behind Overview and Monitoring, and the service rows
+ * all read from this, so they tell the same story: AtlasHub is mid-deploy,
+ * the dashboard's api container has crashed, everything else runs.
+ */
+export interface DemoContainer {
+  id: string;
+  name: string;
+  compose: string | null;
+  service: string;
+  image: string;
+  state: "running" | "exited";
+  exitCode: number;
+  since: number;
+  ports: Array<{ PrivatePort: number; PublicPort?: number; Type: string }>;
+}
+
+const DAY_S = 86_400;
+
+export const demoContainers: DemoContainer[] = [
+  { id: "abc123def456789012345678901234567890abcdef", name: "atlashub-api-1", compose: "atlashub", service: "api", image: "atlashub-api:9c1d2e3", state: "running", exitCode: 0, since: 5 * DAY_S, ports: [{ PrivatePort: 3001, Type: "tcp" }] },
+  { id: "567890123456789012345678901234567890fedcba", name: "atlashub-redis-1", compose: "atlashub", service: "redis", image: "redis:7-alpine", state: "running", exitCode: 0, since: 15 * DAY_S, ports: [{ PrivatePort: 6379, Type: "tcp" }] },
+  { id: "def456789012345678901234567890abcdef123456", name: "dashboard-app-1", compose: "dashboard", service: "app", image: "dashboard-app:a1b2c3d", state: "running", exitCode: 0, since: 2 * DAY_S, ports: [{ PrivatePort: 3100, Type: "tcp" }] },
+  { id: "789012345678901234567890abcdef123456789abc", name: "dashboard-api-1", compose: "dashboard", service: "api", image: "dashboard-api:a1b2c3d", state: "exited", exitCode: 137, since: 14 * 60, ports: [{ PrivatePort: 3110, Type: "tcp" }] },
+  { id: "fedcba098765432109876543210987654321098765", name: "snippets-api-1", compose: "snippets", service: "api", image: "snippets-api:f678901", state: "running", exitCode: 0, since: 3 * DAY_S, ports: [{ PrivatePort: 8080, Type: "tcp" }] },
+  { id: "abcdef123456789012345678901234567890defabc", name: "portainer", compose: null, service: "portainer", image: "portainer/portainer-ce:latest", state: "running", exitCode: 0, since: 30 * DAY_S, ports: [{ PrivatePort: 9000, Type: "tcp" }, { PrivatePort: 9443, Type: "tcp" }] },
 ];
+
+function humanAge(seconds: number): string {
+  if (seconds < 3600) return `${Math.round(seconds / 60)} minutes`;
+  if (seconds < DAY_S) return `${Math.round(seconds / 3600)} hours`;
+  return `${Math.round(seconds / DAY_S)} days`;
+}
+
+export const mockContainers: MockContainer[] = demoContainers.map((container) => ({
+  Id: container.id,
+  Names: [`/${container.name}`],
+  Image: container.image,
+  State: container.state,
+  Status: container.state === "running" ? `Up ${humanAge(container.since)}` : `Exited (${container.exitCode}) ${humanAge(container.since)} ago`,
+  Created: Math.floor(Date.now() / 1000) - container.since,
+  Ports: container.ports,
+}));
 
 // ========================================
 // Mock Pi Metrics (for demo mode)

@@ -1,3 +1,4 @@
+import { verbOf } from "@/lib/audit";
 import type { Tone } from "@/lib/tone";
 import type { AuditAction, DeployStatus } from "@/types";
 import type { ActivityItem, OverviewInputs } from "./types";
@@ -12,8 +13,6 @@ const DEPLOY: Record<DeployStatus, { tone: Tone; verb: string }> = {
 
 /** Audit actions worth showing next to deploys; deploys themselves come from the deploys table. */
 const AUDIT_ACTIONS = new Set<AuditAction>(["restart", "stop", "start", "rollback", "delete", "create", "link", "unlink", "import"]);
-
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export function mergeActivity(input: Pick<OverviewInputs, "deploys" | "services" | "projects" | "audit" | "incidents">, limit = 8): ActivityItem[] {
   const projectName = new Map(input.projects.map((project) => [project.id, project.name]));
@@ -50,8 +49,12 @@ export function mergeActivity(input: Pick<OverviewInputs, "deploys" | "services"
 
   for (const entry of input.audit) {
     if (!AUDIT_ACTIONS.has(entry.action)) continue;
-    const name = typeof entry.meta_json?.name === "string" ? entry.meta_json.name : entry.entity_type;
-    items.push({ id: `audit:${entry.id}`, at: entry.at, tone: "idle", title: `${capitalize(entry.action)} · ${name}`, detail: null, href: null });
+    const meta = entry.meta_json;
+    const named = [meta?.name, meta?.title, meta?.project].find((value): value is string => typeof value === "string" && value.length > 0);
+    const project = entry.entity_type === "project" && entry.entity_id ? projectName.get(entry.entity_id) : undefined;
+    const subject = project ?? named;
+    const verb = verbOf(entry.action, entry.entity_type, meta);
+    items.push({ id: `audit:${entry.id}`, at: entry.at, tone: "idle", title: subject ? `${verb} · ${subject}` : verb, detail: null, href: "/audit-log" });
   }
 
   return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);

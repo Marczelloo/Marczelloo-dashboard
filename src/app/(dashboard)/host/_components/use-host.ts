@@ -1,17 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { HostSummary } from "@/lib/host";
+import type { HostSample, HostSummary } from "@/lib/host";
+
+export type { HostSample };
 
 const POLL_MS = 15_000;
 const HISTORY = 40;
-
-export interface HostSample {
-  at: number;
-  load: number;
-  memory: number;
-  temperature: number | null;
-}
 
 /**
  * Keeps the host reading fresh while the tab is visible and remembers the samples
@@ -19,7 +14,7 @@ export interface HostSample {
  */
 export function useHost(initial: HostSummary) {
   const [summary, setSummary] = useState(initial);
-  const [history, setHistory] = useState<HostSample[]>([]);
+  const [history, setHistory] = useState<HostSample[]>(initial.history ?? []);
   const [refreshing, setRefreshing] = useState(false);
   const lastAt = useRef<string | null>(null);
 

@@ -25,7 +25,7 @@ describe("mergeActivity", () => {
 
     expect(items.map((entry) => [entry.id, entry.tone, entry.title])).toEqual([
       ["deploy:d1", "live", "Deploying · Drive"],
-      ["audit:a1", "idle", "Restart · web"],
+      ["audit:a1", "idle", "Restarted service · web"],
       ["incident:i1:end", "ok", "drive.marczelloo.dev recovered"],
       ["incident:i1", "err", "drive.marczelloo.dev down"],
       ["deploy:d2", "err", "Deploy failed · Drive"],

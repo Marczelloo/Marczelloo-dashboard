@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAgentHost, getAgentStatus, isAgentConfigured } from "@/server/agent/client";
-import { demoAgentStatus, demoHostInfo } from "@/server/demo/host";
+import { demoAgentStatus, demoHostHistory, demoHostInfo } from "@/server/demo/host";
 import { ttlCache } from "@/server/lib/ttl-cache";
 import { isDemoMode } from "@/lib/demo-mode";
 import { hostAlerts, type HostSummary } from "@/lib/host";
@@ -14,7 +14,7 @@ const load = ttlCache<HostSummary>(5_000, async () => {
   if (isDemoMode()) {
     const host = demoHostInfo();
     const agent = demoAgentStatus();
-    return { generatedAt: new Date().toISOString(), reachable: true, host, agent, alerts: hostAlerts(host, agent) };
+    return { generatedAt: new Date().toISOString(), reachable: true, host, agent, alerts: hostAlerts(host, agent), history: demoHostHistory() };
   }
 
   if (!isAgentConfigured()) {
