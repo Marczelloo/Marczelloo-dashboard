@@ -15,7 +15,7 @@ export const SHA = /^[0-9a-f]{40}$/;
 
 export function repositoryHttpsUrl(githubUrl: string): string {
   const match = /github\.com[/:]([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i.exec(githubUrl.trim());
-  if (!match) throw new Error("Agent obsługuje tylko repozytoria GitHub.");
+  if (!match) throw new Error("The agent supports GitHub repositories only.");
   return `https://github.com/${match[1]}/${match[2]}.git`;
 }
 
@@ -31,7 +31,7 @@ export function gitAuthEnv(token: string | null): Record<string, string> {
 }
 
 function requireSha(sha: string) {
-  if (!SHA.test(sha)) throw new Error("Nieprawidłowy SHA commita (wymagane 40 znaków).");
+  if (!SHA.test(sha)) throw new Error("Invalid commit SHA (40 characters required).");
 }
 
 export function gitCheckoutStep(repoPath: string, sha: string): CommandStep {
@@ -53,7 +53,7 @@ export function gitSyncSteps(input: { repoPath: string; githubUrl: string; sha: 
       env,
       timeoutMs: 60_000,
       quiet: true,
-      failOnOutput: "Repozytorium na serwerze ma lokalne zmiany w śledzonych plikach — agent ich nie nadpisze.",
+      failOnOutput: "The server repository has local changes in tracked files. The agent will not overwrite them.",
     });
   } else {
     steps.push({ label: "Git clone", command: "git", args: ["clone", "--no-checkout", url, input.repoPath], env, timeoutMs: 600_000 });

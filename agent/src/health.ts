@@ -73,33 +73,33 @@ export function parseServiceImages(json: string): Record<string, string> {
 
 export function assessContainers(samples: ContainerSample[][], elapsedMs: number, options: { stableMs: number; timeoutMs: number }): GateState {
   const latest = samples.at(-1) ?? [];
-  if (!latest.length) return { state: "fail", reason: "Projekt nie ma żadnych kontenerów po uruchomieniu." };
+  if (!latest.length) return { state: "fail", reason: "The project has no containers after startup." };
 
   const baseline = new Map<string, number>();
   for (const round of samples) for (const container of round) if (!baseline.has(container.name)) baseline.set(container.name, container.restartCount);
 
   for (const container of latest) {
     if (container.status === "exited" && container.exitCode !== 0) {
-      return { state: "fail", reason: `Kontener ${container.name} zakończył działanie z kodem ${container.exitCode}.` };
+      return { state: "fail", reason: `Container ${container.name} exited with code ${container.exitCode}.` };
     }
     if (container.status === "dead" || container.status === "restarting") {
-      return { state: "fail", reason: `Kontener ${container.name} jest w stanie ${container.status}.` };
+      return { state: "fail", reason: `Container ${container.name} is ${container.status}.` };
     }
     if (container.restartCount > (baseline.get(container.name) ?? container.restartCount)) {
-      return { state: "fail", reason: `Kontener ${container.name} restartuje się.` };
+      return { state: "fail", reason: `Container ${container.name} is restarting.` };
     }
     if (container.health === "unhealthy") {
-      return { state: "fail", reason: `Kontener ${container.name} zgłasza stan unhealthy.` };
+      return { state: "fail", reason: `Container ${container.name} reports unhealthy.` };
     }
   }
 
-  if (elapsedMs < options.stableMs) return { state: "wait", reason: "Obserwacja stabilności kontenerów." };
+  if (elapsedMs < options.stableMs) return { state: "wait", reason: "Checking container stability." };
 
   const notReady = latest.filter((container) => container.health === "starting" || container.status === "created").map((container) => container.name);
   if (notReady.length) {
     return elapsedMs >= options.timeoutMs
-      ? { state: "fail", reason: `Kontenery nie osiągnęły gotowości: ${notReady.join(", ")}.` }
-      : { state: "wait", reason: `Czekam na healthcheck: ${notReady.join(", ")}.` };
+      ? { state: "fail", reason: `Containers did not become ready: ${notReady.join(", ")}.` }
+      : { state: "wait", reason: `Waiting for health check: ${notReady.join(", ")}.` };
   }
   return { state: "pass" };
 }

@@ -54,7 +54,7 @@ async function runStep(deps: PipelineDeps, step: CommandStep): Promise<CommandRe
   const result = await deps.run(step);
   if (result.code !== 0 && !step.allowFailure) {
     const detail = result.stderr.trim().split("\n").slice(-5).join("\n");
-    throw new StepError(`${step.label}: kod ${result.code}${detail ? `\n${detail}` : ""}`);
+    throw new StepError(`${step.label}: code ${result.code}${detail ? `\n${detail}` : ""}`);
   }
   if (step.failOnOutput && result.stdout.trim()) throw new StepError(step.failOnOutput);
   return result;
@@ -65,7 +65,7 @@ async function composeConfig(job: Job, composeFile: string, deps: PipelineDeps):
   try {
     return JSON.parse(result.stdout) as ComposeConfigJson;
   } catch {
-    throw new StepError("docker compose config zwrócił niepoprawny JSON.");
+    throw new StepError("docker compose config returned invalid JSON.");
   }
 }
 
@@ -80,7 +80,7 @@ function prepareComposeFile(job: Job, deps: PipelineDeps): string {
 }
 
 export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<string | null> {
-  deps.log("=== Bramka zdrowia ===");
+  deps.log("=== Health check ===");
   const started = deps.now();
   const samples: ContainerSample[][] = [];
   for (;;) {
@@ -90,7 +90,7 @@ export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<strin
     if (verdict.state === "fail") return verdict.reason;
     await deps.sleep(deps.gate.intervalMs);
   }
-  deps.log("Kontenery stabilne.");
+  deps.log("Containers are stable.");
 
   // Only probe the domain when its route already points at this port; otherwise
   // the dashboard switches the route after a successful deploy.
@@ -99,10 +99,10 @@ export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<strin
     const probeStarted = deps.now();
     for (;;) {
       const status = await deps.probe(url);
-      deps.log(`Sonda ${url}: ${status ?? "brak odpowiedzi"}`);
+      deps.log(`Probe ${url}: ${status ?? "no response"}`);
       if (assessProbe(status) === "pass") break;
       if (deps.now() - probeStarted >= deps.gate.probeTimeoutMs) {
-        return `Domena ${job.target.tunnel.hostname} nie odpowiada poprawnie (ostatni status: ${status ?? "brak"}).`;
+        return `Domain ${job.target.tunnel.hostname} did not respond correctly (last status: ${status ?? "none"}).`;
       }
       await deps.sleep(deps.gate.intervalMs);
     }
@@ -114,14 +114,14 @@ export async function waitForHealth(job: Job, deps: PipelineDeps): Promise<strin
 async function ensureEdgeNetwork(job: Job, deps: PipelineDeps): Promise<void> {
   const network = job.target.edge?.network;
   if (!network) return;
-  const inspected = await deps.run({ ...dockerStep("Sieć edge", ["network", "inspect", "--format", "{{.Name}}", network], 30_000, true), allowFailure: true });
+  const inspected = await deps.run({ ...dockerStep("Edge network", ["network", "inspect", "--format", "{{.Name}}", network], 30_000, true), allowFailure: true });
   if (inspected.code === 0) return;
-  await runStep(deps, dockerStep(`Tworzenie sieci ${network}`, ["network", "create", network], 30_000));
+  await runStep(deps, dockerStep(`Create network ${network}`, ["network", "create", network], 30_000));
 }
 
 async function upAndCheck(job: Job, files: string[], deps: PipelineDeps): Promise<string | null> {
   // --pull missing: a service with pull_policy "always" must not replace the image just built.
-  await runStep(deps, dockerStep("Uruchomienie", [...composeArgs(job.target, files), "up", "-d", "--no-build", "--pull", "missing"], 10 * 60_000));
+  await runStep(deps, dockerStep("Start containers", [...composeArgs(job.target, files), "up", "-d", "--no-build", "--pull", "missing"], 10 * 60_000));
   return waitForHealth(job, deps);
 }
 
@@ -139,13 +139,13 @@ async function restoreRelease(job: Job, release: Release, deps: PipelineDeps): P
 function envFilePath(job: Job, name: string): string {
   const repoPath = path.posix.resolve(job.target.repoPath);
   const filePath = path.posix.resolve(repoPath, name);
-  if (!filePath.startsWith(`${repoPath}/`)) throw new StepError("Plik zmiennych musi leżeć w katalogu repozytorium.");
+  if (!filePath.startsWith(`${repoPath}/`)) throw new StepError("Environment file must be inside the repository.");
   return filePath;
 }
 
 async function readHead(job: Job, deps: PipelineDeps): Promise<string | null> {
   const result = await runStep(deps, {
-    label: "Aktualny commit",
+    label: "Current commit",
     command: "git",
     args: ["-C", job.target.repoPath, "rev-parse", "HEAD"],
     env: gitAuthEnv(null),
@@ -170,7 +170,7 @@ async function captureBaseline(job: Job, liveSha: string | null, previous: Relea
     const imageId = running[service];
     if (!imageId) continue;
     const reference = `${builtImage.slice(0, builtImage.lastIndexOf(":"))}:${liveSha.slice(0, 12)}`;
-    await runStep(deps, dockerStep(`Kopia bieżącej wersji ${service}`, ["image", "tag", imageId, reference], 60_000));
+    await runStep(deps, dockerStep(`Snapshot of current ${service}`, ["image", "tag", imageId, reference], 60_000));
     images[service] = reference;
   }
   return Object.keys(images).length ? { sha: liveSha, images, deployedAt: new Date(deps.now()).toISOString() } : null;
@@ -181,12 +181,12 @@ function failed(error: string, baseline: Release | null = null): JobOutcome {
 }
 
 async function rollbackAfterFailure(job: Job, target: Release | null, baseline: Release | null, reason: string, builtImages: Record<string, string>, deps: PipelineDeps): Promise<JobOutcome> {
-  if (!target || target.sha === job.sha) return failed(`${reason} Brak wcześniejszej wersji do przywrócenia.`, baseline);
+  if (!target || target.sha === job.sha) return failed(`${reason} No earlier version to restore.`, baseline);
   const short = target.sha.slice(0, 7);
-  deps.log(`=== Rollback do ${short} ===`);
+  deps.log(`=== Rollback to ${short} ===`);
   try {
     const restoreFailure = await restoreRelease(job, target, deps);
-    if (restoreFailure) return failed(`${reason} Rollback do ${short} nie przeszedł bramki: ${restoreFailure}`, baseline);
+    if (restoreFailure) return failed(`${reason} Rollback to ${short} did not pass the health check: ${restoreFailure}`, baseline);
     const kept = new Set(Object.values(target.images));
     return {
       status: "rolled_back",
@@ -197,7 +197,7 @@ async function rollbackAfterFailure(job: Job, target: Release | null, baseline: 
       orphanImages: Object.values(builtImages).filter((image) => !kept.has(image)),
     };
   } catch (error) {
-    return failed(`${reason} Rollback do ${short} nie powiódł się: ${describeError(error)}`, baseline);
+    return failed(`${reason} Rollback to ${short} failed: ${describeError(error)}`, baseline);
   }
 }
 
@@ -210,7 +210,7 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
   try {
     const repoExists = deps.exists(`${target.repoPath}/.git`);
     if (!repoExists && deps.exists(target.repoPath)) {
-      throw new StepError(`Katalog ${target.repoPath} istnieje, ale nie jest repozytorium Git.`);
+      throw new StepError(`Directory ${target.repoPath} exists but is not a Git repository.`);
     }
     const liveSha = repoExists ? await readHead(job, deps) : null;
     for (const step of gitSyncSteps({ repoPath: target.repoPath, githubUrl: target.githubUrl, sha: job.sha, token, repoExists })) {
@@ -226,7 +226,7 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
     const files = [composeFile, file];
 
     await ensureEdgeNetwork(job, deps);
-    await runStep(deps, dockerStep("Walidacja Compose", [...composeArgs(target, files), "config", "-q"], 120_000));
+    await runStep(deps, dockerStep("Validate Compose", [...composeArgs(target, files), "config", "-q"], 120_000));
     await runStep(deps, dockerStep("Build", [...composeArgs(target, files), "build"], 45 * 60_000));
 
     baseline = await captureBaseline(job, liveSha, previous, images, deps);
@@ -248,7 +248,7 @@ export async function runDeploy(job: Job, token: string | null, previous: Releas
 export async function runRollback(job: Job, release: Release, deps: PipelineDeps): Promise<JobOutcome> {
   try {
     const failure = await restoreRelease(job, release, deps);
-    if (failure) return failed(`Przywrócona wersja ${release.sha.slice(0, 7)} nie przeszła bramki: ${failure}`);
+    if (failure) return failed(`Restored version ${release.sha.slice(0, 7)} did not pass the health check: ${failure}`);
     return { status: "succeeded", error: null, rolledBackTo: null, release: { ...release, deployedAt: new Date(deps.now()).toISOString() }, baseline: null, orphanImages: [] };
   } catch (error) {
     return failed(describeError(error));
@@ -265,25 +265,25 @@ export async function runApplyEnv(job: Job, release: Release, envFile: EnvFile, 
   let changed = false;
   let failure: string;
   try {
-    deps.log(`=== Zapis ${envFile.name} ===`);
+    deps.log(`=== Write ${envFile.name} ===`);
     deps.replaceFile(filePath, envFile.content);
     changed = true;
     const gateFailure = await restoreRelease(job, release, deps);
     if (!gateFailure) return { status: "succeeded", error: null, rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
-    failure = `Nowe zmienne nie przeszły bramki: ${gateFailure}`;
+    failure = `New variables did not pass the health check: ${gateFailure}`;
   } catch (error) {
     if (!changed) return failed(describeError(error));
-    failure = `Nowe zmienne nie przeszły bramki: ${describeError(error)}`;
+    failure = `New variables did not pass the health check: ${describeError(error)}`;
   }
 
-  deps.log(`=== Przywracanie poprzedniego ${envFile.name} ===`);
+  deps.log(`=== Restore previous ${envFile.name} ===`);
   try {
     if (envFile.previous === null) deps.removeFile(filePath);
     else deps.replaceFile(filePath, envFile.previous);
     const restoreFailure = await restoreRelease(job, release, deps);
-    if (restoreFailure) return failed(`${failure}; przywrócenie poprzednich zmiennych też się nie powiodło: ${restoreFailure}`);
+    if (restoreFailure) return failed(`${failure}; restoring the previous variables also failed: ${restoreFailure}`);
     return { status: "rolled_back", error: failure, rolledBackTo: release.sha, release: null, baseline: null, orphanImages: [] };
   } catch (error) {
-    return failed(`${failure}; przywrócenie poprzednich zmiennych też się nie powiodło: ${describeError(error)}`);
+    return failed(`${failure}; restoring the previous variables also failed: ${describeError(error)}`);
   }
 }

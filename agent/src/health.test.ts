@@ -69,7 +69,7 @@ describe("assessContainers", () => {
   });
 
   it("fails on crashes, restarts and unhealthy containers", () => {
-    expect(assessContainers([[sample({ status: "exited", exitCode: 1 })]], 1_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("kodem 1") });
+    expect(assessContainers([[sample({ status: "exited", exitCode: 1 })]], 1_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("code 1") });
     expect(assessContainers([[sample()], [sample({ restartCount: 1 })]], 10_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("restartuje") });
     expect(assessContainers([[sample({ status: "restarting" })]], 1_000, options)).toMatchObject({ state: "fail" });
     expect(assessContainers([[sample({ health: "unhealthy" })]], 1_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("unhealthy") });
@@ -78,7 +78,7 @@ describe("assessContainers", () => {
 
   it("waits for a starting healthcheck until the timeout", () => {
     expect(assessContainers([[sample({ health: "starting" })]], 60_000, options)).toMatchObject({ state: "wait" });
-    expect(assessContainers([[sample({ health: "starting" })]], 180_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("gotowości") });
+    expect(assessContainers([[sample({ health: "starting" })]], 180_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("become ready") });
   });
 });
 

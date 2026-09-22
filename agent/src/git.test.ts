@@ -30,7 +30,7 @@ describe("gitSyncSteps", () => {
       ["-C", base.repoPath, "fetch", "--no-tags", "https://github.com/Marczelloo/Marczelloo-Tools.git", SHA],
       ["-C", base.repoPath, "checkout", "--detach", SHA],
     ]);
-    expect(steps[0]).toMatchObject({ quiet: true, failOnOutput: expect.stringContaining("lokalne zmiany") });
+    expect(steps[0]).toMatchObject({ quiet: true, failOnOutput: expect.stringContaining("local changes") });
     expect(JSON.stringify(steps.map((step) => step.args))).not.toContain("ghs_secret");
   });
 

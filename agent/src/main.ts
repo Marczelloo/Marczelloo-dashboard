@@ -82,7 +82,7 @@ async function cleanUp(job: Job, before: string[], after: string[], orphanImages
   } catch {
     // Cleanup is best-effort and must not affect a completed job.
   }
-  store.appendLog(job.id, `[agent] Sprzątanie: usunięto ${removed} obrazów\n`);
+  store.appendLog(job.id, `[agent] Cleanup: removed ${removed} images\n`);
 }
 
 async function execute(job: Job): Promise<JobOutcome> {
@@ -128,14 +128,14 @@ async function execute(job: Job): Promise<JobOutcome> {
   if (job.kind === "apply-env") {
     const envFile = envFiles.get(job.id);
     if (!envFile) {
-      return { status: "failed", error: "Treść zmiennych została utracona po restarcie agenta — zapisz zmienne ponownie.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+      return { status: "failed", error: "Variable content was lost after the agent restarted. Save the variables again.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
     }
     const release = releases.find((candidate) => candidate.sha === job.sha);
-    if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+    if (!release) return { status: "failed", error: "The release to restore is no longer in agent history.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
     return runApplyEnv(job, release, envFile, deps);
   }
   const release = releases.find((candidate) => candidate.sha === job.sha);
-  if (!release) return { status: "failed", error: "Wydanie do przywrócenia zniknęło z historii agenta.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+  if (!release) return { status: "failed", error: "The release to restore is no longer in agent history.", rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
   return runRollback(job, release, deps);
 }
 
@@ -152,9 +152,9 @@ async function work() {
     try {
       outcome = await execute(job);
     } catch (error) {
-      outcome = { status: "failed", error: `Błąd wewnętrzny agenta: ${error instanceof Error ? error.message : String(error)}`, rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
+      outcome = { status: "failed", error: `Internal agent error: ${error instanceof Error ? error.message : String(error)}`, rolledBackTo: null, release: null, baseline: null, orphanImages: [] };
     }
-    store.appendLog(job.id, `[agent] Wynik: ${outcome.status}${outcome.error ? ` — ${outcome.error}` : ""}\n`);
+    store.appendLog(job.id, `[agent] Result: ${outcome.status}${outcome.error ? ` — ${outcome.error}` : ""}\n`);
     mutate((current) => finishJob(current, job.id, outcome, iso()));
     tokens.delete(job.id);
     envFiles.delete(job.id);

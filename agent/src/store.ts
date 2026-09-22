@@ -55,7 +55,7 @@ export class FileStore {
   }
 
   private logPath(jobId: string): string {
-    if (!JOB_ID.test(jobId)) throw new Error("Nieprawidłowy identyfikator zadania.");
+    if (!JOB_ID.test(jobId)) throw new Error("Invalid job ID.");
     return path.join(this.logDir, `${jobId}.log`);
   }
 }

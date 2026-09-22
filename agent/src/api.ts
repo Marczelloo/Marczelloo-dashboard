@@ -11,17 +11,17 @@ export const deployTargetSchema = z.object({
   repoPath: z
     .string()
     .regex(/^\/[A-Za-z0-9._/@+-]+$/)
-    .refine((value) => !value.split("/").includes(".."), "repoPath nie może zawierać ..")
+    .refine((value) => !value.split("/").includes(".."), "repoPath cannot contain ..")
     .transform((value) => value.replace(/\/+$/, "")),
   githubUrl: z.string().regex(/github\.com[/:][A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/, "Wymagane repozytorium GitHub."),
   branch: z
     .string()
     .regex(/^[A-Za-z0-9._/-]+$/)
-    .refine((value) => !value.startsWith("-") && !value.includes(".."), "Nieprawidłowa gałąź."),
+    .refine((value) => !value.startsWith("-") && !value.includes(".."), "Invalid branch."),
   composeFile: z
     .string()
     .regex(/^[A-Za-z0-9][A-Za-z0-9_./-]*$/)
-    .refine((value) => !value.includes(".."), "Nieprawidłowy plik Compose.")
+    .refine((value) => !value.includes(".."), "Invalid Compose file.")
     .nullable(),
   profiles: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)).max(10),
   tunnel: z
@@ -69,7 +69,7 @@ export const jobRequestSchema = z.discriminatedUnion("kind", [
         .string()
         .max(200)
         .regex(ENV_FILE_NAME)
-        .refine((value) => !value.split("/").some((segment) => segment === "." || segment === ".."), "Nieprawidłowa nazwa pliku zmiennych."),
+        .refine((value) => !value.split("/").some((segment) => segment === "." || segment === ".."), "Invalid environment file name."),
       content: z.string().max(MAX_ENV_FILE_CONTENT),
       previous: z.string().max(MAX_ENV_FILE_CONTENT).nullable(),
     }),

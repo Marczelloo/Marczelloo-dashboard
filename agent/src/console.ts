@@ -57,8 +57,8 @@ const FORBIDDEN = /[;&|<>`$(){}\\!*?~\n\r]/;
 /** Splits on whitespace, honouring quotes, and refuses anything a shell would interpret. */
 export function parseCommand(input: string): string[] {
   const line = input.trim();
-  if (!line) throw new ConsoleError("Pusta komenda.");
-  if (line.length > MAX_INPUT) throw new ConsoleError("Komenda jest zbyt długa.");
+  if (!line) throw new ConsoleError("Type a command first.");
+  if (line.length > MAX_INPUT) throw new ConsoleError("Command is too long.");
 
   const argv: string[] = [];
   let current = "";
@@ -87,11 +87,11 @@ export function parseCommand(input: string): string[] {
       }
       continue;
     }
-    if (FORBIDDEN.test(character)) throw new ConsoleError(`Znak ${character} nie jest dozwolony — konsola nie uruchamia powłoki.`);
+    if (FORBIDDEN.test(character)) throw new ConsoleError(`Character ${character} is not allowed. The console does not run a shell.`);
     current += character;
     started = true;
   }
-  if (quote) throw new ConsoleError("Niedomknięty cudzysłów.");
+  if (quote) throw new ConsoleError("Unclosed quote.");
   if (started) argv.push(current);
   return argv;
 }
@@ -117,45 +117,45 @@ const looksLikePath = (value: string) => value.startsWith("/") || value.startsWi
 /** Rejects anything outside the allowlist; returns the argv that may run. */
 export function checkCommand(argv: string[], allowedRoot: string): string[] {
   const [command, ...args] = argv;
-  if (!command) throw new ConsoleError("Pusta komenda.");
-  if (args.some((argument) => argument.includes(".."))) throw new ConsoleError("Ścieżki względne w górę drzewa nie są dozwolone.");
+  if (!command) throw new ConsoleError("Type a command first.");
+  if (args.some((argument) => argument.includes(".."))) throw new ConsoleError("Parent relative paths are not allowed.");
 
   if (command === "docker") {
     const [subcommand] = args;
     if (!subcommand || !DOCKER_ALLOWED.has(subcommand)) {
-      throw new ConsoleError(`docker ${subcommand ?? ""} nie jest dozwolone. Dozwolone: ${[...DOCKER_ALLOWED].sort().join(", ")}.`);
+      throw new ConsoleError(`docker ${subcommand ?? ""} is not allowed. Allowed: ${[...DOCKER_ALLOWED].sort().join(", ")}.`);
     }
     const nested = DOCKER_SUB_ALLOWED[subcommand];
     if (nested) {
       const verb = firstVerb(args.slice(1));
       if (!verb || !nested.has(verb)) {
-        throw new ConsoleError(`docker ${subcommand} ${verb ?? ""} nie jest dozwolone. Dozwolone: ${[...nested].sort().join(", ")}.`);
+        throw new ConsoleError(`docker ${subcommand} ${verb ?? ""} is not allowed. Allowed: ${[...nested].sort().join(", ")}.`);
       }
     }
     return argv;
   }
 
   if (!SIMPLE_ALLOWED.has(command)) {
-    throw new ConsoleError(`${command} nie jest dozwolone. Dozwolone: docker, ${[...SIMPLE_ALLOWED].sort().join(", ")}.`);
+    throw new ConsoleError(`${command} is not allowed. Allowed: docker, ${[...SIMPLE_ALLOWED].sort().join(", ")}.`);
   }
 
   if (command === "git") {
     const allowed = new Set(["status", "log", "remote", "branch", "rev-parse", "show", "diff", "config"]);
     const subcommand = args.find((argument) => !argument.startsWith("-") && argument !== "-C" && !looksLikePath(argument));
-    if (!subcommand || !allowed.has(subcommand)) throw new ConsoleError(`git ${subcommand ?? ""} nie jest dozwolone (tylko odczyt).`);
+    if (!subcommand || !allowed.has(subcommand)) throw new ConsoleError(`git ${subcommand ?? ""} is not allowed (read only).`);
   }
 
   if (PATH_CONFINED.has(command)) {
     for (const argument of args) {
       if (argument.startsWith("-")) continue;
       if (!looksLikePath(argument)) continue;
-      if (!argument.startsWith(`${allowedRoot}/`)) throw new ConsoleError(`${command} może czytać tylko pliki w ${allowedRoot}.`);
+      if (!argument.startsWith(`${allowedRoot}/`)) throw new ConsoleError(`${command} can only read files in ${allowedRoot}.`);
     }
   }
 
   for (const argument of args) {
     if (argument.startsWith("/") && !argument.startsWith(`${allowedRoot}/`) && PATH_CONFINED.has(command)) {
-      throw new ConsoleError(`Ścieżka poza ${allowedRoot} nie jest dozwolona.`);
+      throw new ConsoleError(`Path outside ${allowedRoot} is not allowed.`);
     }
   }
 
@@ -165,7 +165,7 @@ export function checkCommand(argv: string[], allowedRoot: string): string[] {
 /** Runs one allowlisted command and captures its output. */
 export async function runConsoleCommand(input: unknown, allowedRoot: string, run: ConsoleRun): Promise<ConsoleCommandResult> {
   const command = (input as { command?: unknown } | null)?.command;
-  if (typeof command !== "string") throw new ConsoleError("Brak komendy.");
+  if (typeof command !== "string") throw new ConsoleError("Type a command first.");
   const argv = checkCommand(parseCommand(command), allowedRoot);
   const startedAt = Date.now();
   const result = await run({ command: argv[0], args: argv.slice(1), timeoutMs: TIMEOUT_MS, quiet: true }, () => {});

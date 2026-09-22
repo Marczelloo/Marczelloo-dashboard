@@ -4,12 +4,12 @@ export const DEPLOY_PHASES: DeployPhase[] = ["fetch", "config", "build", "start"
 
 /** Agent step labels (agent/src/pipeline.ts, agent/src/git.ts) grouped into the phases the UI shows. */
 const RULES: Array<[RegExp, DeployPhase]> = [
-  [/^(Rollback do |Przywracanie )/, "rollback"],
-  [/^(Aktualny commit|Sprawdzenie lokalnych zmian|Git )/, "fetch"],
-  [/^(Compose config|Sieć edge|Walidacja Compose|Zapis )/, "config"],
+  [/^(Rollback to |Restore previous |Rollback do |Przywracanie )/, "rollback"],
+  [/^(Current commit|Check local changes|Git |Aktualny commit|Sprawdzenie lokalnych zmian)/, "fetch"],
+  [/^(Compose config|Edge network|Validate Compose|Write |Sieć edge|Walidacja Compose|Zapis )/, "config"],
   [/^Build$/, "build"],
-  [/^Uruchomienie$/, "start"],
-  [/^Bramka zdrowia$/, "health"],
+  [/^(Start containers|Uruchomienie)$/, "start"],
+  [/^(Health check|Bramka zdrowia)$/, "health"],
 ];
 
 export function deployPhase(step: string | null | undefined): DeployPhase | null {
