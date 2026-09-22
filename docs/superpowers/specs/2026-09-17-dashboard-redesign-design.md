@@ -168,3 +168,15 @@ Mechanical page restyles in phases 6–7 are candidates for delegation to Codex 
 - **Big-bang feel.** Phases 1–2 change every page's frame at once; token aliases keep old pages legible until their phase lands.
 - **Demo drift.** Mock data must grow with the new aggregates or the public demo breaks; each aggregate ships with its demo shape.
 - **Scope.** Settings (805 lines), Docs (768) and GitHub tabs (921) are large; they are restyled on the new primitives, not redesigned feature by feature.
+
+## Decisions after approval (2026-09-18 – 2026-09-22)
+
+Changes the owner asked for or approved while the phases were built. They supersede the sections above where they differ, and `DESIGN.md` records the result.
+
+- **Projects list is a tile grid**, approved in phase 4; the fleet table stays the Overview's.
+- **Navigation.** Containers moved under Host (`/containers` redirects to Host › Containers). Features was removed; `/features` redirects to Docs. Deployments joined Workspace as its own page. The version lives in Settings › About, not the sidebar.
+- **Host console**, added at the owner's request. It runs an allowlist of read-mostly commands inside the agent container (Docker inspection and start/stop/restart, `df`, `free`, read-only `git`, file reads inside the projects directory), with no shell, pipes or redirects, behind the PIN and written to the audit log. It is not a terminal on the host, so the no-exec non-goal still holds for the Pi itself.
+- **Deploy steps** show Fetch → Config → Build → Start → Health, plus Rollback when it happens: the agent's real stages. Applying variables is part of Config, and switching a route happens after the health gate, not as a step of its own.
+- **Overview filter** is All / Issues; "Pinned" was dropped with the pinned-projects idea.
+- **Crimson** marks the one primary action on a view and the live pulse on a dot. Running and deploying use a neutral chip; red is reserved for failure.
+- **Audit log** reads as sentences with filters by kind, time, project and person, and exports CSV. **Docs** were rewritten against the running system. The demo gained GitHub data and one shared fleet fixture.
