@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { GitCommitHorizontal, Rocket, Search } from "lucide-react";
+import { GitCommitHorizontal, Rocket } from "lucide-react";
 import { DeployLogsButton } from "@/components/features/deploy-logs-button";
 import { StatusDot } from "@/components/status-dot";
-import { Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { formatRelativeTime } from "@/lib/utils";
+import { Chip, EmptyState, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SearchInput } from "@/components/ui";
+import { formatDay, formatRelativeTime } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import { formatDeployDuration, type DeployList, type DeployRow } from "@/lib/deploys";
 import type { DeployStatus } from "@/types";
@@ -29,7 +29,6 @@ function dayOf(row: DeployRow) {
   return row.startedAt.slice(0, 10);
 }
 
-const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" });
 
 /** Every deploy across every project, newest first. */
 export function DeploymentsView({ data }: { data: DeployList }) {
@@ -104,8 +103,7 @@ export function DeploymentsView({ data }: { data: DeployList }) {
           ]}
         />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Search className="size-4 text-fg-4" strokeWidth={1.75} />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by project, sha or who" className="h-8 w-[230px]" aria-label="Search deploys" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search by project, sha or who" />
           <Select value={project} onValueChange={setProject}>
             <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by project">
               <SelectValue />
@@ -134,7 +132,7 @@ export function DeploymentsView({ data }: { data: DeployList }) {
         days.map((group) => (
           <Panel key={group.day}>
             <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-3.5 py-2.5">
-              <h2 className="text-[13px] font-semibold">{DAY.format(new Date(group.day))}</h2>
+              <h2 className="text-[13px] font-semibold">{formatDay(group.day)}</h2>
               <span className="font-mono text-[11px] text-fg-3">{group.rows.length}</span>
             </div>
             {group.rows.map((row) => (
@@ -151,9 +149,9 @@ export function DeploymentsView({ data }: { data: DeployList }) {
                   <GitCommitHorizontal className="size-3.5 text-fg-4" strokeWidth={1.75} />
                   {row.commitSha?.slice(0, 7) ?? "—"}
                 </code>
-                <span className="min-w-0 truncate text-[12px] text-fg-3">{row.error ?? row.step ?? row.serviceName ?? ""}</span>
-                <span className="ml-auto flex shrink-0 items-center gap-2 text-[11.5px] text-fg-3">
-                  <span className="w-[86px] truncate text-right">{row.triggeredBy}</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{row.error ?? row.step ?? row.serviceName ?? ""}</span>
+                <span className="flex basis-full items-center justify-end gap-2 pl-5 text-[11.5px] text-fg-3 sm:ml-auto sm:basis-auto sm:shrink-0 sm:pl-0">
+                  <span className="mr-auto min-w-0 truncate sm:mr-0 sm:w-[150px] sm:text-right">{row.triggeredBy}</span>
                   <span className="w-[62px] text-right tabular-nums">{formatDeployDuration(row.durationMs)}</span>
                   <span className="w-[76px] truncate text-right text-fg-4">{formatRelativeTime(row.startedAt)}</span>
                   {row.status === "failed" || row.status === "running" ? <Chip tone={TONE[row.status]}>{row.step ?? row.status}</Chip> : null}

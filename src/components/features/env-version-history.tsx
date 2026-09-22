@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateTime } from "@/lib/utils";
+
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, History, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +17,6 @@ interface EnvVersion {
   createdAt: string;
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
 /** Env file versions of an agent-deployed project; restoring goes through the agent's health gate. */
 export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string; refreshKey: number }) {
@@ -101,7 +102,7 @@ export function EnvVersionHistory({ serviceId, refreshKey }: { serviceId: string
                       {index === 0 && <Chip tone="ok">current</Chip>}
                     </p>
                     <p className="truncate text-[11.5px] text-fg-3">
-                      {item.note ?? "no note"} · {item.keyCount} keys · {item.createdBy} · {dateFormat.format(new Date(item.createdAt))}
+                      {item.note ?? "no note"} · {item.keyCount} keys · {item.createdBy} · {formatDateTime(item.createdAt)}
                     </p>
                   </div>
                   {item.file && index > 0 && (

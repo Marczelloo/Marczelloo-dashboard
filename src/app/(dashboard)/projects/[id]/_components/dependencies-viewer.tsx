@@ -80,6 +80,7 @@ export function DependenciesViewer({ githubUrl }: { githubUrl: string }) {
         <p className="p-3.5 text-[13px] text-fg-3">{notice ?? "No dependency graph for this repository."}</p>
       ) : (
         <>
+          {(ecosystems.length > 1 || total > 12) && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-3.5 py-2.5">
             {ecosystems.length > 1 && (
               <SegmentedControl<string>
@@ -91,6 +92,7 @@ export function DependenciesViewer({ githubUrl }: { githubUrl: string }) {
             )}
             {total > 12 && <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter packages" aria-label="Filter packages" className="h-8 min-w-0 flex-1" />}
           </div>
+          )}
           <div className="max-h-[360px] overflow-y-auto py-1">
             {packages.length === 0 ? (
               <p className="px-3.5 py-2 text-[13px] text-fg-3">Nothing matches “{query}”.</p>

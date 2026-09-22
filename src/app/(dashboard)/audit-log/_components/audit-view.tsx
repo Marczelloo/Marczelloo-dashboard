@@ -3,11 +3,11 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Download, History, Loader2, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, Download, History, Loader2, RefreshCw } from "lucide-react";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import { Button, Chip, EmptyState, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SearchInput } from "@/components/ui";
 import { AUDIT_CATEGORIES, toCsv, type AuditCategory, type AuditList, type AuditRow, type AuditTone } from "@/lib/audit";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatDay, formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 type Category = "all" | AuditCategory;
@@ -15,7 +15,6 @@ type Range = "24h" | "7d" | "30d" | "all";
 
 const RANGE_MS: Record<Range, number> = { "24h": 86_400_000, "7d": 7 * 86_400_000, "30d": 30 * 86_400_000, all: Number.POSITIVE_INFINITY };
 const DOT: Record<AuditTone, "ok" | "warn" | "err" | "idle"> = { ok: "ok", warn: "warn", err: "err", neutral: "idle" };
-const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" });
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 function Segment({ label, children, detail }: { label: string; children: React.ReactNode; detail?: string }) {
@@ -194,8 +193,7 @@ export function AuditView({ data }: { data: AuditList }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Search className="size-4 text-fg-4" strokeWidth={1.75} />
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events, names, commands" className="h-8 w-[240px]" aria-label="Search events" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search events, names, commands" />
         <Select value={range} onValueChange={(value) => setRange(value as Range)}>
           <SelectTrigger className="h-8 w-[140px]" aria-label="Time range">
             <SelectValue />
@@ -251,7 +249,7 @@ export function AuditView({ data }: { data: AuditList }) {
         days.map((group) => (
           <Panel key={group.day}>
             <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-3.5 py-2.5">
-              <h2 className="text-[13px] font-semibold">{DAY.format(new Date(`${group.day}T12:00:00`))}</h2>
+              <h2 className="text-[13px] font-semibold">{formatDay(`${group.day}T12:00:00`)}</h2>
               <span className="font-mono text-[11px] text-fg-3">{group.rows.length}</span>
             </div>
             {group.rows.map((row) => (

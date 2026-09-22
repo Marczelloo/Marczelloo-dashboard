@@ -48,3 +48,4 @@ export { UptimeStrip, type UptimeState } from "./uptime-strip";
 export { Meter } from "./meter";
 export { Kbd } from "./kbd";
 export { Switch } from "./switch";
+export { SearchInput } from "./search-input";

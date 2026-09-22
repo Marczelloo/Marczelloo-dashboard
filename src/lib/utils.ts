@@ -23,6 +23,19 @@ export function formatDate(date: string | Date): string {
 /**
  * Format a date string to include time
  */
+const DAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+const SHORT_DATE_FORMAT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/** Heading for a day of events: "Tue, Sep 22". */
+export function formatDay(date: string | Date): string {
+  return DAY_FORMAT.format(typeof date === "string" ? new Date(date) : date);
+}
+
+/** A date inside the current year: "Sep 22". */
+export function formatShortDate(date: string | Date): string {
+  return SHORT_DATE_FORMAT.format(typeof date === "string" ? new Date(date) : date);
+}
+
 export function formatDateTime(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString("en-US", {

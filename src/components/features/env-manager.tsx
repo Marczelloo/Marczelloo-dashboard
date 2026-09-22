@@ -592,13 +592,13 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Key className="h-4 w-4" />
-            Environment Variables
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-2">
+            <Key className="size-4 text-fg-3" strokeWidth={1.75} />
+            Variables
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="truncate">
             {serviceName || "Service"} • {selectedFile}
             {lastSynced && (
               <span className="ml-2 text-xs">

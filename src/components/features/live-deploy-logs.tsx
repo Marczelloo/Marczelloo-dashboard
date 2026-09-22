@@ -247,7 +247,7 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
                 <div
                   key={line.id}
                   className={cn(
-                    "whitespace-pre-wrap break-all leading-relaxed",
+                    "whitespace-pre-wrap break-words leading-relaxed",
                     line.type === "error" && "text-err font-medium",
                     line.type === "warning" && "text-warn",
                     line.type === "success" && "text-ok",

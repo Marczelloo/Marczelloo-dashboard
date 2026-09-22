@@ -214,7 +214,7 @@ export function GitHubRepoSelector() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface-raised text-fg-2"><Github className="h-5 w-5" /></div>
             <div><CardTitle>Deploy from GitHub</CardTitle><CardDescription>One setup for the repository, how it builds, and its public address.</CardDescription></div>
@@ -224,7 +224,7 @@ export function GitHubRepoSelector() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3"><CardTitle className="text-base">Repository</CardTitle><Button variant="ghost" size="sm" onClick={fetchRepos} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Repository</CardTitle><Button variant="ghost" size="sm" onClick={fetchRepos} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button></CardHeader>
         <CardContent className="p-0">
           {loading ? <div className="space-y-0">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="flex gap-3 border-t p-4"><Skeleton className="h-9 w-9 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-2/3" /></div></div>)}</div> :
             filteredRepos.length === 0 ? <div className="py-10 text-center text-sm text-fg-3"><Code2 className="mx-auto mb-3 h-8 w-8 opacity-50" />No matching repositories</div> :

@@ -23,7 +23,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   const indicator = useIndicator(ref, '[data-active="true"]');
 
   return (
-    <div ref={ref} role="radiogroup" aria-label={aria["aria-label"]} className={cn("relative inline-flex gap-0.5 rounded-md border border-line bg-canvas p-0.5", className)}>
+    <div ref={ref} role="radiogroup" aria-label={aria["aria-label"]} className={cn("relative inline-flex max-w-full gap-0.5 overflow-x-auto rounded-md border border-line bg-canvas p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
       {indicator && (
         <span
           aria-hidden
@@ -42,7 +42,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
             data-active={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "relative z-[1] inline-flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-medium transition-colors duration-quick ease-out",
+              "relative z-[1] inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[6px] px-2.5 py-1 text-xs font-medium transition-colors duration-quick ease-out",
               active ? "text-fg" : "text-fg-3 hover:text-fg-2"
             )}
           >

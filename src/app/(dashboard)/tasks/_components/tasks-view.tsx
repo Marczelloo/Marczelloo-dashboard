@@ -10,8 +10,8 @@ import { deleteWorkItemAction, updateWorkItemAction } from "@/app/actions/work-i
 import { draftOf, newTaskDraft, TaskDialog, type TaskDraft } from "@/components/features/task-dialog";
 import { PageBody, PageHeader } from "@/components/layout/page-header";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { Button, Chip, EmptyState, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SearchInput } from "@/components/ui";
+import { cn, formatRelativeTime, formatShortDate } from "@/lib/utils";
 import type { Tone } from "@/lib/tone";
 import { parseTaskKey, type TaskList, type TaskPriority, type TaskRow, type TaskStatus } from "@/lib/tasks";
 
@@ -21,7 +21,6 @@ const BUSY = "bg-fg-2";
 const PRIORITY_TONE: Record<TaskPriority, "idle" | "neutral" | "warn" | "err"> = { low: "idle", medium: "neutral", high: "warn", critical: "err" };
 const STATUS_LABEL: Record<TaskStatus, string> = { open: "Open", in_progress: "In progress", blocked: "Blocked", done: "Done" };
 const NO_PROJECT = "none";
-const DATE = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" });
 
 type Filter = "all" | TaskStatus;
 
@@ -122,7 +121,7 @@ export function TasksView({ data }: { data: TaskList }) {
             ]}
           />
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tasks" className="h-8 w-[180px]" aria-label="Search tasks" />
+            <SearchInput value={query} onChange={setQuery} placeholder="Search tasks" />
             <Select value={project} onValueChange={setProject}>
               <SelectTrigger className="h-8 w-[190px]" aria-label="Filter by project">
                 <SelectValue />
@@ -187,7 +186,7 @@ export function TasksView({ data }: { data: TaskList }) {
                   {task.dueDate && (
                     <Chip tone={isOverdue(task) ? "err" : "neutral"}>
                       {isOverdue(task) ? "overdue " : ""}
-                      {DATE.format(new Date(task.dueDate))}
+                      {formatShortDate(task.dueDate)}
                     </Chip>
                   )}
                   <Chip tone={PRIORITY_TONE[task.priority]}>{task.priority}</Chip>

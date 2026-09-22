@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Plus, Search, Server } from "lucide-react";
+import { ExternalLink, Plus, Server } from "lucide-react";
 import { StatusDot } from "@/components/status-dot";
-import { Button, Chip, EmptyState, Input, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import { Button, Chip, EmptyState, Panel, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SearchInput } from "@/components/ui";
 import type { ServiceList, ServiceRow } from "@/server/services/list";
 
 type Filter = "all" | "docker" | "vercel" | "external";
@@ -117,8 +117,7 @@ export function ServicesList({ data }: { data: ServiceList }) {
           ]}
         />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Search className="size-4 text-fg-4" strokeWidth={1.75} />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" className="h-8 w-[190px]" aria-label="Search services" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search services" />
           <Select value={project} onValueChange={setProject}>
             <SelectTrigger className="h-8 w-[190px]" aria-label="Filter by project">
               <SelectValue />
@@ -167,7 +166,7 @@ export function ServicesList({ data }: { data: ServiceList }) {
                 <span className="ml-auto flex shrink-0 items-center gap-2">
                   {row.restarts > 0 && <Chip tone="warn">{row.restarts} restarts</Chip>}
                   <Chip mono>{row.type}</Chip>
-                  <Chip tone={toneOf(row) === "idle" ? "idle" : toneOf(row)}>{stateOf(row)}</Chip>
+                  {row.running !== true && <Chip tone={toneOf(row) === "idle" ? "idle" : toneOf(row)}>{stateOf(row)}</Chip>}
                 </span>
               </div>
             ))}

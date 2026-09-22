@@ -1,12 +1,12 @@
 import { Meter } from "@/components/ui/meter";
 import { Panel } from "@/components/ui/card";
 import { StatusDot } from "@/components/status-dot";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Overview } from "@/server/overview/types";
 
-function Segment({ label, children, detail, dot }: { label: string; children: React.ReactNode; detail?: string; dot?: React.ReactNode }) {
+function Segment({ label, children, detail, dot, className }: { label: string; children: React.ReactNode; detail?: string; dot?: React.ReactNode; className?: string }) {
   return (
-    <div className="min-w-0 px-[18px] py-3.5">
+    <div className={cn("min-w-0 px-[18px] py-3.5", className)}>
       <p className="flex items-center gap-2 text-[11.5px] text-fg-3">
         {dot}
         {label}
@@ -33,7 +33,7 @@ export function StatusBar({ overview }: { overview: Overview }) {
       <Segment label="Incidents" detail={incidents.newest ? `${incidents.newest.label} · ${formatRelativeTime(incidents.newest.since)}` : "none open"}>
         <span className={incidents.open > 0 ? "text-err" : undefined}>{incidents.open}</span>
       </Segment>
-      <Segment label="Deploys · 7 days" detail={deploys7d.failed ? `${deploys7d.failed} failed` : "no failures"}>
+      <Segment label="Deploys · 7 days" className="col-span-2 md:col-span-1" detail={deploys7d.failed ? `${deploys7d.failed} failed` : "no failures"}>
         {deploys7d.total}
       </Segment>
       <div className="col-span-2 min-w-0 px-[18px] py-3.5 md:col-span-1">

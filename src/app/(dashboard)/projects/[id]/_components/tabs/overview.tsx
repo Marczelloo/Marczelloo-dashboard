@@ -44,10 +44,11 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
       <div className="flex flex-col gap-4">
         <ReleaseSummary detail={detail} />
         <Section
-          title={`Services (${services.length})`}
+          title="Services"
           icon={Server}
           action={
             <span className="flex items-center gap-3">
+              <span className="font-mono text-[11px] text-fg-3">{services.length}</span>
               <Link href={`/projects/${project.id}?tab=logs`} className="text-xs text-fg-3 hover:text-fg">
                 Logs
               </Link>
@@ -74,7 +75,7 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
                   {service.url && <span className="truncate font-mono text-[11.5px] text-fg-3">{service.url}</span>}
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Chip mono>{service.type}</Chip>
-                    {container && <Chip tone={container.status === "running" ? "ok" : "err"}>{container.status}</Chip>}
+                    {container && container.status !== "running" && <Chip tone="err">{container.status}</Chip>}
                   </span>
                 </Row>
               );
@@ -101,7 +102,7 @@ export function OverviewTab({ detail }: { detail: ProjectDetail }) {
                 <span className="min-w-0 truncate text-fg-3">{deploy.error_message ?? deploy.triggered_by}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-2 text-[11.5px] text-fg-3">
                   {formatRelativeTime(deploy.started_at)}
-                  <Chip tone={DEPLOY_TONE[deploy.status]}>{deploy.status}</Chip>
+                  {deploy.status !== "success" && <Chip tone={DEPLOY_TONE[deploy.status]}>{deploy.status}</Chip>}
                 </span>
               </Row>
             ))

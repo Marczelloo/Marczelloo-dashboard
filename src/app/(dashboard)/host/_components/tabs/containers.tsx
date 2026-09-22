@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Container, Loader2, Play, RotateCcw, ScrollText, Search, Square } from "lucide-react";
+import { Container, Loader2, Play, RotateCcw, ScrollText, Square } from "lucide-react";
 import { toast } from "sonner";
 import { StatusDot } from "@/components/status-dot";
 import { LogConsole } from "@/components/features/log-console";
-import { Button, Chip, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Input, Panel, SegmentedControl, Skeleton } from "@/components/ui";
+import { Button, Chip, Dialog, DialogContent, DialogHeader, DialogTitle, EmptyState, Panel, SegmentedControl, Skeleton, SearchInput } from "@/components/ui";
 
 interface HostContainer {
   id: string;
@@ -120,8 +120,7 @@ export function ContainersTab() {
           ]}
         />
         <div className="ml-auto flex items-center gap-2">
-          <Search className="size-4 text-fg-4" strokeWidth={1.75} />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search containers" className="h-8 w-[200px]" aria-label="Search containers" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search containers" />
         </div>
       </div>
 

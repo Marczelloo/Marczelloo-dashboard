@@ -182,7 +182,7 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
           <p className="py-10 text-center text-[13px] text-fg-3">{lines.length ? "No line matches the filter." : "No output yet."}</p>
         ) : (
           visible.map((line) => (
-            <p key={line.key} className="flex gap-2.5 whitespace-pre-wrap break-all px-1 py-px hover:bg-white/[.03]">
+            <p key={line.key} className="flex gap-2.5 whitespace-pre-wrap break-words px-1 py-px hover:bg-white/[.03]">
               {line.time && <span className="shrink-0 text-fg-4">{line.time}</span>}
               {scope === "all" && sources.length > 1 && <span className="shrink-0 text-fg-3">{line.source}</span>}
               <span className={cn("min-w-0", line.tone === "err" && "text-err", line.tone === "warn" && "text-warn", line.tone === "default" && "text-fg-2")}>{line.text}</span>
