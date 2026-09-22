@@ -11,18 +11,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Logs API] Request: endpointId=${endpointId}, containerId=${containerId}, tail=${tail}`);
 
-    if (!endpointId || !containerId) {
-      return NextResponse.json({ error: "Missing required parameters: endpointId and containerId" }, { status: 400 });
+    if (!containerId) {
+      return NextResponse.json({ error: "Missing required parameter: containerId" }, { status: 400 });
     }
 
     if (isDemoMode()) {
       return NextResponse.json({ logs: demoContainerLogs(String(containerId), Number(tail), Boolean(timestamps)), timestamp: new Date().toISOString() });
-    }
-
-    // Validate endpointId is a number
-    const endpointNum = parseInt(String(endpointId), 10);
-    if (isNaN(endpointNum)) {
-      return NextResponse.json({ error: "endpointId must be a number" }, { status: 400 });
     }
 
     // Import portainer dynamically to catch module errors
@@ -32,6 +26,17 @@ export async function POST(request: NextRequest) {
     } catch (importError) {
       console.error("[Logs API] Failed to import portainer client:", importError);
       return NextResponse.json({ error: "Portainer client initialization failed" }, { status: 500 });
+    }
+
+    // Containers read from the agent carry no endpoint; the Pi has one Docker endpoint.
+    let endpointNum = endpointId ? parseInt(String(endpointId), 10) : Number.NaN;
+    if (endpointId && isNaN(endpointNum)) {
+      return NextResponse.json({ error: "endpointId must be a number" }, { status: 400 });
+    }
+    if (isNaN(endpointNum)) {
+      const endpoints = await portainer.getEndpoints().catch(() => []);
+      if (!endpoints[0]) return NextResponse.json({ error: "Portainer has no Docker endpoint" }, { status: 503 });
+      endpointNum = endpoints[0].Id;
     }
 
     console.log(`[Logs API] Fetching logs for container ${containerId} on endpoint ${endpointNum}`);
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest) {
       const errorMessage = portainerError instanceof Error ? portainerError.message : "Portainer request failed";
 
       if (errorMessage.includes("404")) {
-        return NextResponse.json({ error: "Container not found" }, { status: 404 });
+        return NextResponse.json({ error: `Container ${containerId} no longer exists` }, { status: 404 });
       }
       if (errorMessage.includes("401") || errorMessage.includes("403") || errorMessage.includes("token")) {
         return NextResponse.json({ error: "Portainer auth failed. Check token in Settings." }, { status: 401 });

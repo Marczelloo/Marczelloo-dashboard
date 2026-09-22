@@ -57,7 +57,7 @@ export function AttentionDetail({ row }: { row: FleetRow }) {
           </span>
         </div>
         <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-white/[.06]">
-          <div className="h-full rounded-full bg-accent shadow-[0_0_12px_rgb(var(--accent)/.7)] transition-[width] duration-1000 ease-out" style={{ width: `${progress}%` }} />
+          <div className="h-full rounded-full bg-info shadow-[0_0_12px_rgb(var(--info)/.6)] transition-[width] duration-1000 ease-out" style={{ width: `${progress}%` }} />
         </div>
       </div>
     );

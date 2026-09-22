@@ -15,6 +15,7 @@ const config: Config = {
         ok: rgb("ok"),
         warn: rgb("warn"),
         err: rgb("err"),
+        info: rgb("info"),
         line: { DEFAULT: "var(--line)", subtle: "var(--line-subtle)", strong: "var(--line-strong)" },
       },
       borderRadius: { xs: "4px", sm: "6px", md: "8px", lg: "10px", xl: "14px" },

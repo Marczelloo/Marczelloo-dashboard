@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { ShellData } from "@/server/shell";
 import { CommandPalette } from "./command-palette";
 import { MobileDrawer } from "./mobile-drawer";
+import { AgentActivityProvider } from "./agent-activity";
 import { SelfDeploymentProvider, useSelfDeployment } from "./self-deployment";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
@@ -46,16 +47,18 @@ export function AppShell({ data, children }: { data: ShellData; children: React.
 
   return (
     <SelfDeploymentProvider>
-      <div className="group/shell relative min-h-screen bg-canvas">
-        <div aria-hidden className="dot-grid pointer-events-none fixed inset-x-0 top-0 h-[420px]" />
-        <ShellSidebar mode={mode} counts={data.counts} onToggleMode={toggleMode} className="hidden md:flex" />
-        <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} counts={data.counts} />
-        <div className={cn("relative flex min-h-screen flex-col transition-[padding] duration-panel ease-out md:pl-14", mode === "expanded" && "xl:pl-[232px]")}>
-          <TopBar onOpenMenu={() => setDrawerOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
-          <main className="relative flex-1">{children}</main>
+      <AgentActivityProvider>
+        <div className="group/shell relative min-h-screen bg-canvas">
+          <div aria-hidden className="dot-grid pointer-events-none fixed inset-x-0 top-0 h-[420px]" />
+          <ShellSidebar mode={mode} counts={data.counts} onToggleMode={toggleMode} className="hidden md:flex" />
+          <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} counts={data.counts} />
+          <div className={cn("relative flex min-h-screen flex-col transition-[padding] duration-panel ease-out md:pl-14", mode === "expanded" && "xl:pl-[232px]")}>
+            <TopBar onOpenMenu={() => setDrawerOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
+            <main className="relative flex-1">{children}</main>
+          </div>
+          <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} projects={data.projects} />
         </div>
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} projects={data.projects} />
-      </div>
+      </AgentActivityProvider>
     </SelfDeploymentProvider>
   );
 }

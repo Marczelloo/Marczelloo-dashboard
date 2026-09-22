@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { waitForAgentJob } from "@/lib/agent-activity";
 import { PinDialog } from "@/components/pin-dialog";
 import { EnvVersionHistory } from "./env-version-history";
 
@@ -258,6 +259,29 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
   }, [repoPath, selectedFile, serviceId]);
 
   // Save all changes to both database and file, then restart
+  /** Keeps one toast updated while the agent applies the file, then shows what is really in it. */
+  const followApply = useCallback(
+    async (jobId: string, version: number, fileName: string) => {
+      const id = toast.loading(`Applying version ${version}`, { description: "The agent writes the file, recreates the services and checks their health." });
+      const outcome = await waitForAgentJob(jobId);
+      if (!outcome) {
+        toast.warning("Still applying", { id, description: "The result will appear in the deploy history." });
+      } else if (outcome.status === "succeeded") {
+        toast.success(`Version ${version} applied`, { id, description: "The services are running with the new variables." });
+      } else {
+        toast.error(outcome.status === "rolled_back" ? "Change rolled back" : "Apply failed", {
+          id,
+          description: outcome.error ?? "The previous file is back in place.",
+          duration: 15_000,
+        });
+      }
+      // A rollback puts the previous file back; show what is on disk now.
+      await loadFromBothSources(fileName);
+      setHistoryKey((value) => value + 1);
+    },
+    [loadFromBothSources]
+  );
+
   const saveAll = useCallback(async () => {
     if (!repoPath) return false;
 
@@ -359,9 +383,11 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       // 3. Apply. Agent projects are already queued: the agent writes the file,
       // recreates the services and restores the previous file if they do not come up healthy.
       if (fileResult.agent) {
-        toast.success(fileResult.unchanged ? "No changes to the file" : `Variables queued on the agent (version ${fileResult.agent.version})`, {
-          description: "The agent writes the file, recreates the services and checks their health. On failure it puts the previous file back; the result is in the deploy history.",
-        });
+        if (fileResult.unchanged || !fileResult.agent.jobId) {
+          toast.info("No changes to the file");
+        } else {
+          void followApply(fileResult.agent.jobId as string, fileResult.agent.version as number, selectedFile);
+        }
         setHistoryKey((value) => value + 1);
       } else if (fileResult.unchanged) {
         toast.info("No changes to the file");
@@ -372,7 +398,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
 
           if (applyResponse.ok && applyResult.success) {
             toast.success("Variables saved and applied", {
-              description: `Odtworzono: ${(applyResult.services || []).join(", ")}`,
+              description: `Recreated: ${(applyResult.services || []).join(", ")}`,
             });
           } else if (applyResponse.status === 409) {
             toast.info(applyResult.error || "File saved; the change takes effect on the next deploy.");
@@ -404,7 +430,7 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
     } finally {
       setSaving(false);
     }
-  }, [repoPath, selectedFile, serviceId, serverVars, workingVars]);
+  }, [repoPath, selectedFile, serviceId, serverVars, workingVars, followApply]);
 
   // Discard unsaved changes
   function handleDiscard() {

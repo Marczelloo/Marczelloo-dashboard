@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAgentActivity } from "@/components/layout/agent-activity";
 import type { Overview } from "@/server/overview/types";
 
 const POLL_MS = 15_000;
 
-/** Refreshes the overview every 15 s while the tab is visible, and immediately when it becomes visible. */
+/**
+ * Refreshes the overview every 15 s while the tab is visible, immediately when it
+ * becomes visible, and as soon as the agent starts or finishes a job.
+ */
 export function useOverview(initial: Overview | null): Overview | null {
   const [overview, setOverview] = useState(initial);
+  const { generation } = useAgentActivity();
 
   useEffect(() => {
     let cancelled = false;
@@ -21,6 +26,8 @@ export function useOverview(initial: Overview | null): Overview | null {
         // Keep showing the last good overview.
       }
     };
+    // A job just started or finished: read it now rather than on the next tick.
+    if (generation > 0) void refresh();
     const interval = setInterval(refresh, POLL_MS);
     const onVisible = () => void refresh();
     document.addEventListener("visibilitychange", onVisible);
@@ -29,7 +36,7 @@ export function useOverview(initial: Overview | null): Overview | null {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [generation]);
 
   return overview;
 }

@@ -18,6 +18,7 @@ colors:
   ok: "rgb(61 214 140)"
   warn: "rgb(245 165 36)"
   err: "rgb(255 99 105)"
+  info: "rgb(96 165 250)"
   line-subtle: "rgba(255, 255, 255, 0.055)"
   line: "rgba(255, 255, 255, 0.085)"
   line-strong: "rgba(255, 255, 255, 0.14)"
@@ -278,6 +279,7 @@ The palette is a cool near-neutral greyscale with one crimson and three status h
 - **Up Green** (ok): healthy dots (with a 3 px halo at 10 percent), up hours in the uptime strip (at 70 percent), ok chips.
 - **Degraded Amber** (warn): degraded states, meters past their threshold (disk at 85 percent or more, temperature at 70° or more), high-priority tasks.
 - **Down Coral** (err): failures, open incidents, down hours, danger buttons and the danger-zone section. Deliberately lighter and pinker than Signal Crimson so "broken" never reads as "brand".
+- **Working Blue** (info): work in progress only — the dot of a deploying project, the running-job indicator and progress bars. Never crimson, so a deploy in flight cannot be mistaken for a failure.
 
 ### Neutral
 

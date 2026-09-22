@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAgentActivity } from "@/components/layout/agent-activity";
 import type { HostSample, HostSummary } from "@/lib/host";
 
 export type { HostSample };
@@ -17,6 +18,7 @@ export function useHost(initial: HostSummary) {
   const [history, setHistory] = useState<HostSample[]>(initial.history ?? []);
   const [refreshing, setRefreshing] = useState(false);
   const lastAt = useRef<string | null>(null);
+  const { generation } = useAgentActivity();
 
   const record = useCallback((next: HostSummary) => {
     setSummary(next);
@@ -54,6 +56,11 @@ export function useHost(initial: HostSummary) {
     // Seeding the history from the first render only; later samples arrive through refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Containers change when a job starts or ends; show it without waiting for the next tick.
+  useEffect(() => {
+    if (generation > 0) void refresh();
+  }, [generation, refresh]);
 
   useEffect(() => {
     const tick = () => {

@@ -52,7 +52,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       <ProjectTabs projectId={id} active={active} />
       {active === "overview" && <OverviewTab detail={detail} />}
       {active === "deployments" && <DeploymentsTab detail={detail} />}
-      {active === "logs" && <LogsTab services={detail.services} />}
+      {active === "logs" && <LogsTab detail={detail} />}
       {active === "environment" && <EnvironmentTab service={detail.primaryService} repoPath={detail.config?.repoPath ?? null} />}
       {active === "domains" && <DomainsTab projectId={id} />}
       {active === "github" && <GitHubTab project={detail.project} />}

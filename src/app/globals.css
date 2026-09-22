@@ -21,6 +21,8 @@
     --ok: 61 214 140;
     --warn: 245 165 36;
     --err: 255 99 105;
+    /* Work in progress (deploys, running jobs); never red, so it cannot read as a failure. */
+    --info: 96 165 250;
     --line-subtle: rgba(255, 255, 255, 0.055);
     --line: rgba(255, 255, 255, 0.085);
     --line-strong: rgba(255, 255, 255, 0.14);
@@ -96,7 +98,7 @@
     position: absolute;
     inset: 0;
     border-radius: 9999px;
-    background: rgb(var(--accent));
+    background: rgb(var(--info));
     animation: live 1.8s var(--ease-out) infinite;
   }
 

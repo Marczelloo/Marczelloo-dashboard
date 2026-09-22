@@ -29,6 +29,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { deployProjectAction, checkDeployLogAction, getManagedDeploymentConfigAction } from "@/app/actions/projects";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { JumpToLatest } from "./jump-to-latest";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 interface DeployProjectButtonProps {
   projectId: string;
@@ -52,6 +55,8 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
   const [isStreaming, setIsStreaming] = useState(false);
   const [managedDeployment, setManagedDeployment] = useState<{ repoPath: string; composeProject: string; branch: string } | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const router = useRouter();
+  const { ref: followRef, onScroll: onFollowScroll, paused: followPaused, jump: jumpToLatest } = useStickToBottom(output);
 
   // Parse GitHub URL to get owner/repo
   const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
@@ -142,10 +147,13 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
       eventSourceRef.current = null;
 
       if (data.timedOut) {
-        toast.warning("Build monitoring timed out", { description: "Check container status manually" });
+        toast.warning("Stopped following the deploy", { description: "It is still running; the deploy history shows the result." });
+      } else if (data.success) {
+        toast.success(`${projectName} deployed`);
       } else {
-        toast.success(`${projectName} build completed!`);
+        toast.error(`${projectName} deploy failed`, { description: "The previous release is still live; the log above shows why." });
       }
+      router.refresh();
 
       // Update deploy record if we have an ID
       if (deployId) {
@@ -228,9 +236,8 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
         const nextLogFile = result.data.logFile;
         if (nextLogFile) {
           setLogFile(nextLogFile);
-          toast.success("Build started in background", {
-            description: "Use Check Status to monitor progress",
-          });
+          toast.success("Deploy queued", { description: "Following the agent's log live." });
+          router.refresh();
         }
       } else {
         setError(result.error || "Deployment failed");
@@ -383,7 +390,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               Deploy: {projectName}
               {buildComplete && <CheckCircle2 className="h-5 w-5 text-ok" />}
               {isStreaming && (
-                <span className="flex items-center gap-1 text-sm font-normal text-accent-text">
+                <span className="flex items-center gap-1 text-sm font-normal text-info">
                   <Radio className="h-4 w-4 animate-pulse" />
                   Live
                 </span>
@@ -429,7 +436,8 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
               </div>
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-auto bg-surface-raised/50 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+          <div ref={followRef} onScroll={onFollowScroll} className="min-h-0 flex-1 overflow-auto rounded-md border border-line bg-canvas p-4 font-mono text-xs whitespace-pre-wrap text-fg-2">
             {isDeploying ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-fg-3" />
@@ -440,6 +448,8 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
             ) : (
               output || "No output"
             )}
+          </div>
+          <JumpToLatest visible={followPaused} onClick={jumpToLatest} />
           </div>
         </DialogContent>
       </Dialog>

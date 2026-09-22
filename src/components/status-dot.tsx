@@ -15,7 +15,7 @@ const SIZE = { sm: "size-1.5", md: "size-[7px]", lg: "size-2.5" };
 
 const TONE: Record<Tone, string> = {
   ok: "bg-ok shadow-[0_0_0_3px_rgb(var(--ok)/.1)]",
-  live: "bg-accent",
+  live: "bg-info shadow-[0_0_0_3px_rgb(var(--info)/.12)]",
   warn: "bg-warn shadow-[0_0_0_3px_rgb(var(--warn)/.1)]",
   err: "bg-err shadow-[0_0_0_3px_rgb(var(--err)/.1)]",
   idle: "bg-fg-4",

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ChevronDown, ChevronUp, Loader2, AlertTriangle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { JumpToLatest } from "./jump-to-latest";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 interface LiveDeployLogsProps {
   logFile: string;
@@ -86,25 +88,9 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
   const [lines, setLines] = useState<LogLine[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const lineIdRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
-
-  // Auto-scroll to bottom when new logs arrive
-  const scrollToBottom = useCallback(() => {
-    if (logsEndRef.current && containerRef.current) {
-      const container = containerRef.current;
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-      if (isNearBottom) {
-        logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [lines, scrollToBottom]);
+  const { ref: followRef, onScroll: onFollowScroll, paused: followPaused, jump: jumpToLatest } = useStickToBottom(lines);
 
   // Connect to SSE stream
   useEffect(() => {
@@ -197,7 +183,7 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
       >
         <div className="flex items-center gap-2 text-xs">
           {isRunning && isConnected ? (
-            <Loader2 className="h-3 w-3 animate-spin text-warn" />
+            <Loader2 className="h-3 w-3 animate-spin text-info" />
           ) : (
             <span className="h-3 w-3 rounded-full bg-fg-3/30" />
           )}
@@ -227,7 +213,8 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
 
       {/* Log content */}
       {expanded && (
-        <div ref={containerRef} className="max-h-[200px] overflow-auto bg-surface-raised/20 p-3 font-mono text-xs">
+        <div className="relative">
+        <div ref={followRef} onScroll={onFollowScroll} className="max-h-[260px] overflow-auto bg-canvas p-3 font-mono text-xs">
           {error ? (
             <div className="text-err">{error}</div>
           ) : lines.length === 0 ? (
@@ -258,9 +245,10 @@ export function LiveDeployLogs({ logFile, isRunning, defaultExpanded = true, cla
                   {line.text}
                 </div>
               ))}
-              <div ref={logsEndRef} />
             </div>
           )}
+        </div>
+        <JumpToLatest visible={followPaused} onClick={jumpToLatest} />
         </div>
       )}
     </div>

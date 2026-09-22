@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, ScrollText } from "lucide-react";
 import { Button, Chip, EmptyState, Input, Panel, SegmentedControl } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { JumpToLatest } from "./jump-to-latest";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 /** One container whose logs this console can read. */
 export interface LogSource {
   id: string;
   label: string;
-  endpointId: number;
+  /** Portainer endpoint; null lets the server use the Pi's only endpoint. */
+  endpointId: number | null;
   containerId: string;
 }
 
@@ -61,9 +64,9 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
   const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [lines, setLines] = useState<LogLine[]>([]);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const scroller = useRef<HTMLDivElement>(null);
 
   const selected = useMemo(() => (scope === "all" ? sources : sources.filter((source) => source.id === scope)), [scope, sources]);
   const key = selected.map((source) => source.containerId).join(",");
@@ -72,7 +75,8 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
     if (!selected.length) return;
     setLoading(true);
     try {
-      const results = await Promise.all(
+      // One container gone (removed service, renamed stack) must not hide the others.
+      const results = await Promise.allSettled(
         selected.map(async (source) => {
           const response = await fetch("/api/containers/logs", {
             method: "POST",
@@ -80,13 +84,18 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
             body: JSON.stringify({ endpointId: source.endpointId, containerId: source.containerId, tail: Number(tail), timestamps: true }),
           });
           const data = (await response.json().catch(() => ({}))) as { logs?: string; error?: string };
-          if (!response.ok) throw new Error(data.error ?? `${source.label}: logs unavailable`);
+          if (!response.ok) throw new Error(`${source.label}: ${data.error ?? "logs unavailable"}`);
           return (data.logs ?? "").split("\n").map((raw, index) => parseLine(raw, source.label, index));
         })
       );
-      const merged = results.flat().filter((line): line is LogLine => line !== null);
+      const failures = results.flatMap((result) => (result.status === "rejected" ? [result.reason instanceof Error ? result.reason.message : "logs unavailable"] : []));
+      if (failures.length === results.length) throw new Error(failures[0] ?? "Could not read the logs");
+      const merged = results
+        .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+        .filter((line): line is LogLine => line !== null);
       merged.sort((a, b) => a.sort - b.sort);
       setLines(merged);
+      setWarnings(failures);
       setError(null);
       setFetchedAt(TIME.format(Date.now()));
     } catch (cause) {
@@ -121,10 +130,7 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
     });
   }, [filter, level, lines]);
 
-  useEffect(() => {
-    const node = scroller.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [visible]);
+  const { ref: followRef, onScroll: onFollowScroll, paused: followPaused, jump: jumpToLatest } = useStickToBottom(visible);
 
   if (!sources.length) {
     return (
@@ -171,24 +177,30 @@ export function LogConsole({ sources, className, height = "h-[clamp(260px,calc(1
         </div>
       </div>
 
-      <div ref={scroller} className={cn("overflow-auto bg-canvas px-3 py-2 font-mono text-[11.5px] leading-[1.65]", height)}>
-        {error ? (
-          <p className="py-8 text-center text-[13px] text-err">{error}</p>
-        ) : loading && !lines.length ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="size-5 animate-spin text-fg-3" />
-          </div>
-        ) : !visible.length ? (
-          <p className="py-10 text-center text-[13px] text-fg-3">{lines.length ? "No line matches the filter." : "No output yet."}</p>
-        ) : (
-          visible.map((line) => (
-            <p key={line.key} className="flex gap-2.5 whitespace-pre-wrap break-words px-1 py-px hover:bg-white/[.03]">
-              {line.time && <span className="shrink-0 text-fg-4">{line.time}</span>}
-              {scope === "all" && sources.length > 1 && <span className="shrink-0 text-fg-3">{line.source}</span>}
-              <span className={cn("min-w-0", line.tone === "err" && "text-err", line.tone === "warn" && "text-warn", line.tone === "default" && "text-fg-2")}>{line.text}</span>
-            </p>
-          ))
-        )}
+      {warnings.length > 0 && !error && (
+        <p className="border-b border-line-subtle bg-warn/[.06] px-3 py-1.5 text-[11.5px] text-warn">{warnings.join(" · ")}</p>
+      )}
+      <div className="relative">
+        <div ref={followRef} onScroll={onFollowScroll} className={cn("overflow-auto bg-canvas px-3 py-2 font-mono text-[11.5px] leading-[1.65]", height)}>
+          {error ? (
+            <p className="py-8 text-center text-[13px] text-err">{error}</p>
+          ) : loading && !lines.length ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="size-5 animate-spin text-fg-3" />
+            </div>
+          ) : !visible.length ? (
+            <p className="py-10 text-center text-[13px] text-fg-3">{lines.length ? "No line matches the filter." : "No output yet."}</p>
+          ) : (
+            visible.map((line) => (
+              <p key={line.key} className="flex gap-2.5 whitespace-pre-wrap break-words px-1 py-px hover:bg-white/[.03]">
+                {line.time && <span className="shrink-0 text-fg-4">{line.time}</span>}
+                {scope === "all" && sources.length > 1 && <span className="shrink-0 text-fg-3">{line.source}</span>}
+                <span className={cn("min-w-0", line.tone === "err" && "text-err", line.tone === "warn" && "text-warn", line.tone === "default" && "text-fg-2")}>{line.text}</span>
+              </p>
+            ))
+          )}
+        </div>
+        <JumpToLatest visible={followPaused} onClick={jumpToLatest} />
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-line-subtle px-3 py-2 text-[11px] text-fg-3">
