@@ -1,16 +1,13 @@
-# Marczelloo Dashboard brand assets
+# Marczelloo Dashboard brand
 
-This directory documents the visual system already implemented by the application. It is not imported by the Next.js runtime and does not alter production styling.
+The dashboard's look is called **Obsidian Console**: near-black surfaces, one crimson accent, status in green, amber and red, Geist Sans and Geist Mono.
 
-- `brandboard.html` — standalone, searchable visual brandboard.
-- `icon-inventory.json` — source-backed inventory of every icon component used by the application.
+- `brandboard.html` — the brandboard the redesign was built from: colour tokens, type ramp, the Frame ring M mark, components and page patterns. It is hand-authored; open it in a browser.
+- `DESIGN.md` (repository root) — the design system as built, recorded from the running app. When the board and the app disagree, the app and `DESIGN.md` win.
+- `.impeccable/design.json` — machine-readable extensions of `DESIGN.md` for the Impeccable tooling.
 
-The production site mark lives at `src/app/icon.svg`; `src/app/apple-icon.png` is its generated 180 × 180 touch-icon variant.
+Where the system lives in code:
 
-Regenerate both artifacts after visual or icon changes:
-
-```powershell
-node scripts/generate-brandboard.mjs
-```
-
-The canonical written rules and token definitions live in the repository root at `DESIGN.md`. Machine-readable design extensions live at `.impeccable/design.json`.
+- Tokens: `src/app/globals.css` (CSS variables) and `tailwind.config.ts` (Tailwind names: `canvas`, `surface`, `fg`–`fg-4`, `accent`, `ok`, `warn`, `err`, `line`).
+- Components: `src/components/ui` (Button, Chip, Panel, SegmentedControl, Meter, Switch, …) and `src/components/layout` (shell, page header, form layout).
+- Site mark: `src/app/icon.svg`; `src/app/apple-icon.png` is its 180 × 180 touch icon.
