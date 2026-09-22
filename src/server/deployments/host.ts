@@ -94,10 +94,10 @@ async function projectContainers(composeProject: string): Promise<string[]> {
  */
 export async function allocateDeploymentPort(preferredPort: number, composeProject: string): Promise<number> {
   if (!Number.isInteger(preferredPort) || preferredPort < 1 || preferredPort > 65535) {
-    throw new Error("Port wdrożenia musi być liczbą od 1 do 65535.");
+    throw new Error("The deploy port must be a number from 1 to 65535.");
   }
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(composeProject)) {
-    throw new Error("Nieprawidłowa nazwa projektu Docker Compose.");
+    throw new Error("Invalid Compose project name.");
   }
   const [host, own] = await Promise.all([getAgentHost(), projectContainers(composeProject)]);
   return pickDeploymentPort(preferredPort, host.publishedPorts, own);
@@ -106,19 +106,19 @@ export async function allocateDeploymentPort(preferredPort: number, composeProje
 function requireSafeConfig(config: DeploymentConfig) {
   validateRepoPath(config.repoPath);
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(config.composeProject)) {
-    throw new Error("Nieprawidłowa nazwa projektu Docker Compose.");
+    throw new Error("Invalid Compose project name.");
   }
   if (!/^[A-Za-z0-9._/-]+$/.test(config.branch) || config.branch.startsWith("-") || config.branch.includes("..")) {
-    throw new Error("Nieprawidłowa nazwa brancha.");
+    throw new Error("Invalid branch name.");
   }
   if (config.composeFile && (!/^[A-Za-z0-9][A-Za-z0-9_.\/-]*$/.test(config.composeFile) || config.composeFile.includes(".."))) {
-    throw new Error("Nieprawidłowa ścieżka pliku Compose.");
+    throw new Error("Invalid Compose file path.");
   }
   if (config.profiles.some((profile) => !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(profile))) {
-    throw new Error("Nieprawidłowy profil Docker Compose.");
+    throw new Error("Invalid Compose profile.");
   }
   if (config.tunnel && (!Number.isInteger(config.tunnel.localPort) || config.tunnel.localPort < 1 || config.tunnel.localPort > 65535)) {
-    throw new Error("Port tunelu musi być liczbą od 1 do 65535.");
+    throw new Error("The tunnel port must be a number from 1 to 65535.");
   }
 }
 
@@ -133,7 +133,7 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
   try {
     cloneAccess = Boolean(await getRepositoryCloneToken(config.githubUrl));
   } catch (error) {
-    cloneError = error instanceof Error ? error.message : "GitHub App nie potwierdził dostępu do repozytorium.";
+    cloneError = error instanceof Error ? error.message : "The GitHub App did not confirm access to the repository.";
   }
 
   const tunnel = config.tunnel?.enabled ? config.tunnel : null;
@@ -144,28 +144,28 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
       : Promise.resolve(false),
   ]);
 
-  if (probe.repoState === "missing") messages.push({ level: "success", text: "Katalog jeszcze nie istnieje — agent utworzy go przez git clone." });
-  if (probe.repoState === "directory") messages.push({ level: "error", text: "Docelowy katalog istnieje, ale nie jest repozytorium Git. Wybierz inną ścieżkę." });
-  if (probe.repoState === "git") messages.push({ level: "success", text: "Znaleziono istniejące repozytorium Git." });
-  if (cloneAccess) messages.push({ level: "success", text: "GitHub App potwierdził dostęp do repozytorium dla tego wdrożenia." });
-  else messages.push({ level: "error", text: cloneError || "GitHub App nie ma dostępu do tego repozytorium. Dodaj je do instalacji aplikacji GitHub." });
+  if (probe.repoState === "missing") messages.push({ level: "success", text: "The directory does not exist yet; the agent will create it with git clone." });
+  if (probe.repoState === "directory") messages.push({ level: "error", text: "The target directory exists but is not a Git repository. Choose another path." });
+  if (probe.repoState === "git") messages.push({ level: "success", text: "Found an existing Git repository." });
+  if (cloneAccess) messages.push({ level: "success", text: "The GitHub App can reach this repository." });
+  else messages.push({ level: "error", text: cloneError || "The GitHub App cannot reach this repository. Add it to the App's installation." });
 
   if (generated) {
     const build = config.build!;
     const kind = build.kind === "dockerfile" ? `Dockerfile (${build.dockerfile})` : `szablon ${build.framework ?? build.kind}`;
-    messages.push({ level: "success", text: `Compose zostanie wygenerowany przez dashboard: ${kind}.` });
+    messages.push({ level: "success", text: `The dashboard will generate the Compose file: ${kind}.` });
   } else if (probe.composeFile && probe.composeValid) {
     messages.push({ level: "success", text: `Compose poprawny: ${probe.composeFile}.` });
   } else if (probe.composeFile) {
-    messages.push({ level: "error", text: "Plik Compose nie przechodzi `docker compose config`." });
+    messages.push({ level: "error", text: "The Compose file does not pass `docker compose config`." });
   } else if (probe.repoState !== "missing") {
-    messages.push({ level: "error", text: "Nie znaleziono compose.yaml, compose.yml ani docker-compose.yml." });
+    messages.push({ level: "error", text: "No compose.yaml, compose.yml or docker-compose.yml found." });
   } else {
-    messages.push({ level: "warning", text: "Compose zostanie wykryty po pierwszym klonowaniu; można wskazać jego ścieżkę ręcznie." });
+    messages.push({ level: "warning", text: "The Compose file will be found after the first clone; you can also give its path." });
   }
 
-  if (tunnel && !getManagedTunnelSettings()) messages.push({ level: "error", text: "Włączono Cloudflare Tunnel, ale dashboard nie ma skonfigurowanego Cloudflare API." });
-  if (tunnel && portInUse) messages.push({ level: "warning", text: `Port ${tunnel.localPort} jest zajęty przez inny projekt; przy wdrożeniu zostanie wybrany wolny.` });
+  if (tunnel && !getManagedTunnelSettings()) messages.push({ level: "error", text: "A domain is set, but the dashboard has no Cloudflare API configured." });
+  if (tunnel && portInUse) messages.push({ level: "warning", text: `Port ${tunnel.localPort} is used by another project; a free one will be picked on deploy.` });
 
   return {
     ok: !messages.some((message) => message.level === "error"),
@@ -179,11 +179,11 @@ export async function preflightDeployment(config: DeploymentConfig): Promise<Dep
 }
 
 export async function updateCloudflareTunnelRoute(update: CloudflareRouteUpdate): Promise<{ changed: boolean }> {
-  if (!getManagedTunnelSettings()) throw new Error("Cloudflare API nie jest skonfigurowane (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
+  if (!getManagedTunnelSettings()) throw new Error("The Cloudflare API is not configured (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
   let service: string | null = null;
   if (update.hostname && update.localPort && edgeSettings().containerOrigins) {
     service = update.config ? await resolveTunnelOrigin(update.config) : await resolveContainerOrigin(update.localPort);
-    if (!service) throw new Error(`Żaden kontener nie publikuje portu ${update.localPort}, więc trasy ${update.hostname} nie da się skierować na kontener.`);
+    if (!service) throw new Error(`No container publishes port ${update.localPort}, so ${update.hostname} cannot be routed to one.`);
   }
   const { changed, dns } = await applyManagedRouteUpdate({ hostname: update.hostname, localPort: update.localPort, removeHostnames: update.removeHostnames, service });
   if (dns.length) console.log(`[Cloudflare] ${dns.join(", ")}`);
@@ -196,6 +196,6 @@ export async function listCloudflareTunnelRoutes(): Promise<{ configured: boolea
     const rules = await listManagedRoutes();
     return { configured: true, routes: rules.flatMap((rule) => (rule.hostname ? [{ hostname: rule.hostname, service: rule.service }] : [])) };
   } catch (error) {
-    return { configured: true, routes: [], error: error instanceof Error ? error.message : "Nie udało się odczytać tunelu z Cloudflare API." };
+    return { configured: true, routes: [], error: error instanceof Error ? error.message : "Could not read the tunnel from the Cloudflare API." };
   }
 }

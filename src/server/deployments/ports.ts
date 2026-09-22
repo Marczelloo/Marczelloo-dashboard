@@ -12,7 +12,7 @@ export function pickDeploymentPort(preferredPort: number, published: PublishedPo
   const taken = new Set(published.filter((binding) => !own.has(binding.container)).map((binding) => binding.hostPort));
   const candidates = [preferredPort, ...Array.from({ length: 1000 }, (_, index) => 3000 + index)];
   const port = candidates.find((candidate) => !taken.has(candidate));
-  if (port === undefined) throw new Error("Nie znaleziono wolnego portu w zakresie 3000-3999.");
+  if (port === undefined) throw new Error("No free port in 3000-3999.");
   return port;
 }
 

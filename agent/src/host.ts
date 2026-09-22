@@ -67,11 +67,11 @@ function isInside(root: string, candidate: string): boolean {
 /** Pure lexical validation performed before any filesystem access. */
 export function validateRepoPathInput(repoPath: unknown, allowedRoot: string): string {
   if (typeof repoPath !== "string" || !path.posix.isAbsolute(repoPath) || repoPath.split("/").includes("..")) {
-    throw new HostOperationError("Nieprawidłowa ścieżka repozytorium.");
+    throw new HostOperationError("Invalid repository path.");
   }
   const normalizedRoot = path.posix.resolve(allowedRoot);
   const normalizedRepo = path.posix.resolve(repoPath);
-  if (!isInside(normalizedRoot, normalizedRepo)) throw new HostOperationError("Repozytorium musi leżeć w katalogu projektów.");
+  if (!isInside(normalizedRoot, normalizedRepo)) throw new HostOperationError("The repository must be inside the projects directory.");
   return normalizedRepo;
 }
 
@@ -88,17 +88,17 @@ export async function validateRepoPath(repoPath: unknown, allowedRoot: string, g
   }
   try {
     const realRepo = await getRealpath(normalizedRepo);
-    if (!isInside(realRoot, realRepo)) throw new HostOperationError("Repozytorium musi leżeć w katalogu projektów.");
+    if (!isInside(realRoot, realRepo)) throw new HostOperationError("The repository must be inside the projects directory.");
     return realRepo;
   } catch (error) {
     if (error instanceof HostOperationError) throw error;
-    if (!isMissing(error)) throw new HostOperationError("Nie można sprawdzić ścieżki repozytorium.");
+    if (!isMissing(error)) throw new HostOperationError("Could not check the repository path.");
     return normalizedRepo;
   }
 }
 
 export function validateEnvFilename(filename: unknown): string {
-  if (typeof filename !== "string" || !ENV_FILE.test(filename)) throw new HostOperationError("Nieprawidłowa nazwa pliku środowiskowego.");
+  if (typeof filename !== "string" || !ENV_FILE.test(filename)) throw new HostOperationError("Invalid environment file name.");
   return filename;
 }
 
@@ -110,7 +110,7 @@ export function validateComposeFilename(composeFile: unknown): string | null {
     path.posix.isAbsolute(composeFile) ||
     composeFile.split("/").includes("..")
   ) {
-    throw new HostOperationError("Nieprawidłowa ścieżka pliku Compose.");
+    throw new HostOperationError("Invalid Compose file path.");
   }
   return composeFile;
 }
@@ -220,7 +220,7 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
         return { files: entries.filter((entry) => entry.isFile() && ENV_FILE.test(entry.name)).map((entry) => entry.name).sort() };
       } catch (error) {
         if (isMissing(error)) return { files: [] };
-        throw new HostOperationError("Nie można odczytać katalogu repozytorium.");
+        throw new HostOperationError("Could not read the repository directory.");
       }
     },
 
@@ -231,14 +231,14 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
       try {
         const info = await deps.lstat(target);
         if (!info.isFile()) return { exists: false, content: "" };
-        if (info.size > MAX_ENV_BYTES) throw new HostOperationError("Plik środowiskowy jest zbyt duży.", 413);
+        if (info.size > MAX_ENV_BYTES) throw new HostOperationError("The environment file is too large.", 413);
         const data = await deps.readFile(target);
-        if (data.length > MAX_ENV_BYTES) throw new HostOperationError("Plik środowiskowy jest zbyt duży.", 413);
+        if (data.length > MAX_ENV_BYTES) throw new HostOperationError("The environment file is too large.", 413);
         return { exists: true, content: data.toString("utf8") };
       } catch (error) {
         if (error instanceof HostOperationError) throw error;
         if (isMissing(error)) return { exists: false, content: "" };
-        throw new HostOperationError("Nie można odczytać pliku środowiskowego.");
+        throw new HostOperationError("Could not read the environment file.");
       }
     },
 
@@ -253,7 +253,7 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
           try { await deps.stat(path.posix.join(repoPath, ".git")); repoState = "git"; } catch { /* not a Git work tree */ }
         }
       } catch (error) {
-        if (!isMissing(error)) throw new HostOperationError("Nie można sprawdzić repozytorium.");
+        if (!isMissing(error)) throw new HostOperationError("Could not check the repository.");
       }
 
       let composeFile: string | null = null;
@@ -263,11 +263,11 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
         try {
           const target = path.posix.join(repoPath, candidate);
           const resolved = await deps.realpath(target);
-          if (!isInside(repoPath, resolved)) throw new HostOperationError("Plik Compose musi leżeć w repozytorium.");
+          if (!isInside(repoPath, resolved)) throw new HostOperationError("The Compose file must be inside the repository.");
           if ((await deps.stat(resolved)).isFile()) { composeFile = candidate; composeAbsolute = resolved; break; }
         } catch (error) {
           if (error instanceof HostOperationError) throw error;
-          if (!isMissing(error)) throw new HostOperationError("Nie można sprawdzić pliku Compose.");
+          if (!isMissing(error)) throw new HostOperationError("Could not check the Compose file.");
         }
       }
       if (!composeFile || !composeAbsolute) return { repoState, composeFile: null, composeValid: null, services: [], profiles: [], ports: [] };
@@ -340,12 +340,12 @@ export function createHostOperations(allowedRoot: string, dependencies: Partial<
 
     async restartContainer(input: unknown) {
       const name = (input as { name?: unknown } | null)?.name;
-      if (typeof name !== "string" || !CONTAINER_NAME.test(name)) throw new HostOperationError("Nieprawidłowa nazwa kontenera.");
-      if (name === "marczelloo-agent") throw new HostOperationError("Nie można zrestartować kontenera agenta.");
+      if (typeof name !== "string" || !CONTAINER_NAME.test(name)) throw new HostOperationError("Invalid container name.");
+      if (name === "marczelloo-agent") throw new HostOperationError("The agent cannot restart its own container.");
       const inspected = await deps.run(command("docker inspect compose project", ["inspect", "--format", "{{index .Config.Labels \"com.docker.compose.project\"}}", name]), silent);
-      if (inspected.code !== 0 || !inspected.stdout.trim()) throw new HostOperationError("Nie znaleziono zarządzanego kontenera.", 404);
+      if (inspected.code !== 0 || !inspected.stdout.trim()) throw new HostOperationError("Managed container not found.", 404);
       const restarted = await deps.run(command("docker restart", ["restart", "--time", "30", name], 90_000), silent);
-      if (restarted.code !== 0) throw new HostOperationError("Nie udało się zrestartować kontenera.");
+      if (restarted.code !== 0) throw new HostOperationError("Could not restart the container.");
       return { ok: true };
     },
   };

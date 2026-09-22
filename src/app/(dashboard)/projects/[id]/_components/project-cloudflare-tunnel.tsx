@@ -20,9 +20,9 @@ type TunnelData = {
 
 const statusMeta: Record<TunnelStatus, { label: string; variant: "success" | "warning" | "secondary" | "danger" }> = {
   active: { label: "Aktywny", variant: "success" },
-  pending: { label: "Wymaga wdrożenia", variant: "warning" },
-  not_configured: { label: "Nie skonfigurowano", variant: "secondary" },
-  unavailable: { label: "Niedostępny", variant: "danger" },
+  pending: { label: "Needs a deploy", variant: "warning" },
+  not_configured: { label: "Not configured", variant: "secondary" },
+  unavailable: { label: "Unavailable", variant: "danger" },
 };
 
 export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
@@ -38,7 +38,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
     setLoading(true);
     const result = await getProjectTunnelStatusAction(projectId);
     if (!result.success || !result.data) {
-      toast.error("Nie udało się odczytać Cloudflare Tunnel", { description: result.error });
+      toast.error("Could not read the tunnel", { description: result.error });
       setData(null);
     } else {
       setData(result.data);
@@ -63,15 +63,15 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
     });
     setSaving(false);
     if (!result.success) {
-      toast.error("Nie zapisano ustawień tunelu", { description: result.error });
+      toast.error("Could not save the route", { description: result.error });
       return;
     }
-    toast.success(enabled ? "Cloudflare Tunnel zaktualizowany" : "Trasa Cloudflare Tunnel usunięta", {
+    toast.success(enabled ? "Route saved" : "Route removed", {
       description: result.data?.deployQueued
         ? "Nowy port zostanie wystawiony po automatycznym deployu projektu."
         : result.data?.changed
-          ? "Trasa tunelu zaktualizowana."
-          : "Konfiguracja była już aktualna.",
+          ? "The tunnel route was updated."
+          : "It was already up to date.",
     });
     setEditing(false);
     await load();
@@ -94,25 +94,25 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="grid gap-3 sm:grid-cols-3" aria-label="Ładowanie konfiguracji tunelu">
+          <div className="grid gap-3 sm:grid-cols-3" aria-label="Loading the route">
             {["domena", "port", "ingress"].map((item) => <div key={item} className="h-16 animate-pulse rounded-md border border-border/50 bg-secondary/30" />)}
           </div>
         ) : !data ? (
           <div className="flex items-center justify-between gap-4 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
-            <span>Nie można teraz odczytać stanu tunelu.</span>
-            <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw /> Spróbuj ponownie</Button>
+            <span>The tunnel cannot be read right now.</span>
+            <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw /> Try again</Button>
           </div>
         ) : !data.supportsManagedDeployment ? (
           <div className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <p>Najpierw połącz ten projekt z repozytorium GitHub i Docker Compose. Dopiero wtedy Dashboard może bezpiecznie zarządzać jego trasą Tunnel.</p>
+            <p>Connect this project to a GitHub repository and a Compose file first; only then can the dashboard manage its route.</p>
           </div>
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 sm:grid-cols-3">
-              <StatusValue icon={<Cloud />} label="Domena" value={activeHostname || "—"} mono />
-              <StatusValue icon={<Server />} label="Port lokalny" value={data.tunnel?.localPort ? `127.0.0.1:${data.tunnel.localPort}` : "—"} mono />
-              <StatusValue icon={<CheckCircle2 />} label="Ingress" value={data.actualRoute?.service || "Brak wpisu"} mono />
+              <StatusValue icon={<Cloud />} label="Domain" value={activeHostname || "—"} mono />
+              <StatusValue icon={<Server />} label="Local port" value={data.tunnel?.localPort ? `127.0.0.1:${data.tunnel.localPort}` : "—"} mono />
+              <StatusValue icon={<CheckCircle2 />} label="Ingress" value={data.actualRoute?.service || "No route"} mono />
             </div>
 
             {data.status === "pending" && (
@@ -124,7 +124,7 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
             {data.status === "unavailable" && (
               <div className="flex gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-muted-foreground">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <p>{data.error || "Nie udało się odczytać tras Cloudflare Tunnel."}</p>
+                <p>{data.error || "Could not read the tunnel routes."}</p>
               </div>
             )}
 
@@ -132,18 +132,18 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
               <div className="flex flex-wrap gap-2 border-t border-border/50 pt-4">
                 {activeHostname && data.status === "active" && (
                   <a href={`https://${activeHostname}`} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm"><ExternalLink /> Otwórz domenę</Button>
+                    <Button variant="outline" size="sm"><ExternalLink /> Open domain</Button>
                   </a>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Pencil /> Edytuj tunel</Button>
-                <Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw /> Odśwież status</Button>
+                <Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw /> Refresh</Button>
               </div>
             ) : (
               <form className="space-y-4 border-t border-border/50 pt-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
                 <div className="flex items-center justify-between gap-4 rounded-md border border-border/60 bg-secondary/20 p-3">
                   <div>
                     <Label htmlFor="tunnel-enabled">Wystaw przez Cloudflare Tunnel</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">Wyłączenie usuwa zarządzany wpis ingress, ale nie zatrzymuje kontenera.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Turning this off removes the route; the container keeps running.</p>
                   </div>
                   <button
                     id="tunnel-enabled"
@@ -154,25 +154,25 @@ export function ProjectCloudflareTunnel({ projectId }: { projectId: string }) {
                     className={`relative h-8 w-14 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${enabled ? "border-primary bg-primary" : "border-border bg-background"}`}
                   >
                     <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-7" : "translate-x-1"}`} />
-                    <span className="sr-only">{enabled ? "Wyłącz Cloudflare Tunnel" : "Włącz Cloudflare Tunnel"}</span>
+                    <span className="sr-only">{enabled ? "Turn the route off" : "Turn the route on"}</span>
                   </button>
                 </div>
                 {enabled && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="tunnel-hostname">Domena</Label>
+                      <Label htmlFor="tunnel-hostname">Domain</Label>
                       <CloudflareHostnameField id="tunnel-hostname" value={hostname} onChange={setHostname} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tunnel-port">Port lokalny</Label>
+                      <Label htmlFor="tunnel-port">Local port</Label>
                       <Input id="tunnel-port" inputMode="numeric" value={localPort} onChange={(event) => setLocalPort(event.target.value.replace(/\D/g, ""))} placeholder="3202" />
-                      <p className="text-xs text-muted-foreground">Zajęty port zostanie zastąpiony pierwszym wolnym z zakresu 3000–3999.</p>
+                      <p className="text-xs text-muted-foreground">A port already in use is replaced with the first free one in 3000–3999.</p>
                     </div>
                   </div>
                 )}
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="ghost" onClick={() => { setEditing(false); void load(); }} disabled={saving}>Anuluj</Button>
-                  <Button type="submit" loading={saving} disabled={enabled && (!hostname.trim() || !localPort)}>Zapisz ustawienia</Button>
+                  <Button type="button" variant="ghost" onClick={() => { setEditing(false); void load(); }} disabled={saving}>Cancel</Button>
+                  <Button type="submit" loading={saving} disabled={enabled && (!hostname.trim() || !localPort)}>Save route</Button>
                 </div>
               </form>
             )}

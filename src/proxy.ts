@@ -14,10 +14,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json({ success: false, error: "Wymagane logowanie przez Cloudflare Access." }, { status: 401 });
+    return NextResponse.json({ success: false, error: "Sign in through Cloudflare Access first." }, { status: 401 });
   }
 
-  return new NextResponse("Brak dostępu. Otwórz dashboard przez https://dashboard.marczelloo.dev i zaloguj się przez Cloudflare Access.", {
+  return new NextResponse("Access denied. Open the dashboard at https://dashboard.marczelloo.dev and sign in through Cloudflare Access.", {
     status: 403,
     headers: { "content-type": "text/plain; charset=utf-8" },
   });

@@ -172,7 +172,7 @@ describe("agent HTTP API", () => {
     const { call } = await start();
     const response = await call("/jobs", { method: "POST", body: JSON.stringify(applyEnv) });
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: "Projekt nie ma jeszcze wydania agenta — najpierw wykonaj deploy." });
+    expect(await response.json()).toEqual({ error: "The project has no agent release yet. Deploy it first." });
   });
 
   it("keeps env contents in memory and does not supersede apply-env with a deploy", async () => {

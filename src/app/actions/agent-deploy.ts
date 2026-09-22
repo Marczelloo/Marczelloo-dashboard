@@ -17,8 +17,8 @@ type Engine = "script" | "agent";
 
 function failure(error: unknown): Result<never> {
   if (error instanceof AuthError) return { success: false, error: error.message, code: error.code };
-  if (error instanceof z.ZodError) return { success: false, error: error.errors[0]?.message ?? "Nieprawidłowe dane." };
-  return { success: false, error: error instanceof Error ? error.message : "Operacja nie powiodła się." };
+  if (error instanceof z.ZodError) return { success: false, error: error.errors[0]?.message ?? "Invalid data." };
+  return { success: false, error: error instanceof Error ? error.message : "The operation failed." };
 }
 
 export async function getDeployEngineAction(projectId: string): Promise<
@@ -42,7 +42,7 @@ export async function getDeployEngineAction(projectId: string): Promise<
       try {
         ({ releases, activeJob } = await getAgentProject(config.composeProject));
       } catch (error) {
-        agentError = error instanceof Error ? error.message : "Agent jest niedostępny.";
+        agentError = error instanceof Error ? error.message : "The agent is unavailable.";
       }
     }
     return { success: true, data: { managed: true, engine: config.engine ?? "script", agentConfigured, releases, activeJob, agentError } };
@@ -56,13 +56,13 @@ export async function rollbackProjectAction(projectId: string, sha?: string): Pr
     const demo = checkDemoModeBlocked();
     if (demo.blocked) return demo.result;
     const user = await requirePinVerification();
-    if (sha !== undefined && !/^[0-9a-f]{40}$/.test(sha)) return { success: false, error: "Nieprawidłowy SHA wydania." };
+    if (sha !== undefined && !/^[0-9a-f]{40}$/.test(sha)) return { success: false, error: "Invalid release SHA." };
 
     const config = await getDeploymentConfig(projectId);
-    if (!config || config.engine !== "agent") return { success: false, error: "Rollback działa tylko dla projektów wdrażanych przez agenta." };
+    if (!config || config.engine !== "agent") return { success: false, error: "Rollback works only for projects the agent deploys." };
     const serviceRows = await services.getServicesByProjectId(projectId);
     const service = serviceRows.find((row) => row.compose_project === config.composeProject) ?? serviceRows.find((row) => row.type === "docker");
-    if (!service) return { success: false, error: "Projekt nie ma serwisu Docker — wykonaj najpierw wdrożenie." };
+    if (!service) return { success: false, error: "The project has no Docker service yet. Deploy it first." };
 
     const queued = await queueAgentRollback({ config, serviceId: service.id, triggeredBy: user.email, sha });
     await auditLogs.logAction(user.email, "rollback", "project", projectId, { deploy_id: queued.deployId, job_id: queued.jobId, sha: queued.sha });

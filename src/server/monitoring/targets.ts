@@ -54,7 +54,7 @@ export function buildTargets(sources: TargetSources): MonitorTarget[] {
   };
 
   return [
-    { key: "agent", kind: "agent", label: "Agent wdrożeń", projectId: null, composeProject: null, host: null },
+    { key: "agent", kind: "agent", label: "Deploy agent", projectId: null, composeProject: null, host: null },
     { key: "disk", kind: "disk", label: "Dysk Pi", projectId: null, composeProject: null, host: null },
     ...agentConfigs.map((config): MonitorTarget => ({ key: `containers:${config.composeProject}`, kind: "containers", label: config.composeProject, projectId: config.projectId, composeProject: config.composeProject, host: null })),
     ...uniqueHosts.map((host) => hostTarget("domain", host)),

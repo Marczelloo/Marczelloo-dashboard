@@ -19,7 +19,7 @@ export async function probeDomain(host: string): Promise<{ statusCode: number | 
   } catch (error) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : null;
-    return { statusCode: null, latencyMs: Date.now() - started, error: timedOut ? "Brak odpowiedzi w 10 s" : cause ?? (error instanceof Error ? error.message : "Błąd połączenia") };
+    return { statusCode: null, latencyMs: Date.now() - started, error: timedOut ? "No answer within 10 s" : cause ?? (error instanceof Error ? error.message : "Connection error") };
   }
 }
 
@@ -37,7 +37,7 @@ export function probeTls(host: string): Promise<{ validTo: string | null; error:
       const validTo = certificate?.valid_to ? new Date(certificate.valid_to) : null;
       finish(validTo && !Number.isNaN(validTo.getTime()) ? { validTo: validTo.toISOString(), error: null } : { validTo: null, error: "brak certyfikatu" });
     });
-    socket.on("timeout", () => finish({ validTo: null, error: "Brak odpowiedzi w 10 s" }));
+    socket.on("timeout", () => finish({ validTo: null, error: "No answer within 10 s" }));
     socket.on("error", (error) => finish({ validTo: null, error: error.message }));
   });
 }

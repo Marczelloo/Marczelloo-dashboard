@@ -17,8 +17,8 @@ export interface HostnameGuardInput {
 export function hostnameConflict(input: HostnameGuardInput): string | null {
   const host = input.hostname.trim().toLowerCase();
   const owner = input.owners.find((candidate) => candidate.projectId !== input.projectId && candidate.hostname.toLowerCase() === host);
-  if (owner) return `Domena ${host} należy już do projektu „${owner.projectName}”.`;
+  if (owner) return `${host} already belongs to the project "${owner.projectName}".`;
   if (input.ownedHostnames.some((owned) => owned.toLowerCase() === host)) return null;
   const route = input.routes.find((candidate) => candidate.hostname.toLowerCase() === host);
-  return route ? `Domena ${host} jest już wystawiona w tunelu (${route.service}). Usuń tę trasę albo wybierz inną domenę.` : null;
+  return route ? `${host} is already routed through the tunnel (${route.service}). Remove that route or pick another domain.` : null;
 }

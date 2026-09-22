@@ -14,16 +14,16 @@ export function planDeployUpdate(event: AgentEvent): DeployUpdatePlan {
       return { status: "success", errorMessage: null, notify: "success" };
     case "rolled_back":
       if (event.kind === "apply-env") {
-        return { status: "failed", errorMessage: `Nowe zmienne nie przeszły bramki zdrowia — przywrócono poprzedni plik. ${event.error ?? ""}`.trim(), notify: "failed" };
+        return { status: "failed", errorMessage: `New variables failed the health check; the previous file is back. ${event.error ?? ""}`.trim(), notify: "failed" };
       }
       return {
         status: "failed",
-        errorMessage: `Bramka zdrowia nie przeszła — przywrócono ${event.rolledBackTo?.slice(0, 7) ?? "poprzednią wersję"}. ${event.error ?? ""}`.trim(),
+        errorMessage: `Health check failed; rolled back to ${event.rolledBackTo?.slice(0, 7) ?? "the previous version"}. ${event.error ?? ""}`.trim(),
         notify: "failed",
       };
     case "superseded":
       return { status: "cancelled", errorMessage: event.error, notify: null };
     default:
-      return { status: "failed", errorMessage: event.error ?? "Wdrożenie nie powiodło się.", notify: "failed" };
+      return { status: "failed", errorMessage: event.error ?? "The deploy failed.", notify: "failed" };
   }
 }

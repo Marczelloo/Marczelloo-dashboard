@@ -112,7 +112,7 @@ export function validateBuildSpec(spec: BuildSpec): string[] {
   const errors: string[] = [];
 
   if (spec.port !== null && (!Number.isInteger(spec.port) || spec.port < 1 || spec.port > 65535)) {
-    errors.push("Port musi być liczbą całkowitą od 1 do 65535.");
+    errors.push("The port must be a whole number from 1 to 65535.");
   }
 
   for (const [label, command] of [
@@ -120,22 +120,22 @@ export function validateBuildSpec(spec: BuildSpec): string[] {
     ["Polecenie budowania", spec.buildCommand],
     ["Polecenie uruchomienia", spec.startCommand],
   ] as const) {
-    if (command !== null && !isSafeCommand(command)) errors.push(`${label} jest nieprawidłowe.`);
+    if (command !== null && !isSafeCommand(command)) errors.push(`${label} is not valid.`);
   }
 
   for (const [label, path] of [
-    ["Katalog wynikowy", spec.outputDir],
-    ["Ścieżka Dockerfile", spec.dockerfile],
-    ["Ścieżka Compose", spec.composeFile],
+    ["Output directory", spec.outputDir],
+    ["Dockerfile path", spec.dockerfile],
+    ["Compose path", spec.composeFile],
   ] as const) {
-    if (path !== null && !isRelativePath(path)) errors.push(`${label} musi być ścieżką względną bez „..”.`);
+    if (path !== null && !isRelativePath(path)) errors.push(`${label} must be a relative path without "..".`);
   }
 
-  if (spec.kind === "dockerfile" && !spec.dockerfile) errors.push("Dla Dockerfile wymagane jest wskazanie pliku Dockerfile.");
-  if (spec.kind === "compose" && !spec.composeFile) errors.push("Dla Compose wymagane jest wskazanie pliku Compose.");
-  if (spec.kind === "static" && !spec.outputDir) errors.push("Dla strony statycznej wymagany jest katalog wynikowy.");
+  if (spec.kind === "dockerfile" && !spec.dockerfile) errors.push("A Dockerfile build needs the Dockerfile path.");
+  if (spec.kind === "compose" && !spec.composeFile) errors.push("A Compose build needs the Compose file path.");
+  if (spec.kind === "static" && !spec.outputDir) errors.push("A static site needs its output directory.");
   if ((spec.kind === "node" || spec.kind === "python") && !spec.startCommand) {
-    errors.push("Dla tej aplikacji wymagane jest polecenie uruchomienia.");
+    errors.push("This app needs a start command.");
   }
 
   return errors;
@@ -147,7 +147,7 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
   if (composeFile) {
     const spec = emptySpec("compose");
     spec.composeFile = composeFile;
-    return { spec, reasons: [`Wykryto plik Compose: ${composeFile}.`] };
+    return { spec, reasons: [`Compose file found: ${composeFile}.`] };
   }
 
   const dockerfile = ["Dockerfile", "dockerfile"].find((name) => files.has(name));
@@ -157,7 +157,7 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
     const exposedPort = /^\s*EXPOSE\s+(\d{1,5})(?:\s|\/|$)/im.exec(snapshot.dockerfileContent ?? "")?.[1];
     const parsedPort = exposedPort ? Number(exposedPort) : null;
     spec.port = parsedPort && parsedPort <= 65535 ? parsedPort : runtime === "web" ? 3000 : null;
-    return { spec, reasons: [`Wykryto ${dockerfile}${parsedPort ? ` z portem ${spec.port}` : ""}.`] };
+    return { spec, reasons: [`Found ${dockerfile}${parsedPort ? ` exposing port ${spec.port}` : ""}.`] };
   }
 
   const packageJson = asPackageJson(snapshot.packageJson);
@@ -185,7 +185,7 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
       spec.outputDir = "dist";
       spec.port = 8080;
       const detected = framework === "vite" ? "Vite" : "Astro";
-      return { spec, reasons: [`Wykryto statyczny projekt ${detected} (${packageManager === "npm" ? "package.json" : `${packageManager}-lockfile`}).`] };
+      return { spec, reasons: [`Static ${detected} project detected (${packageManager === "npm" ? "package.json" : `${packageManager}-lockfile`}).`] };
     }
 
     spec.buildCommand = scripts.build ? runCommand(packageManager, "build") : null;
@@ -194,7 +194,7 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
       : `node ${typeof packageJson.main === "string" && packageJson.main ? packageJson.main : "index.js"}`;
     spec.port = runtime === "web" ? 3000 : null;
     const frameworkName = framework ? framework === "next" ? "Next.js" : framework : "Node.js";
-    return { spec, reasons: [`Wykryto ${frameworkName} (${packageManager === "npm" ? "npm" : `${packageManager}-lockfile`}).`] };
+    return { spec, reasons: [`${frameworkName} detected (${packageManager === "npm" ? "npm" : `${packageManager}-lockfile`}).`] };
   }
 
   if (snapshot.requirementsTxt !== null || snapshot.pyprojectToml !== null) {
@@ -210,22 +210,22 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
       spec.startCommand = files.has("app/")
         ? "uvicorn app.main:app --host 0.0.0.0 --port 8000"
         : "uvicorn main:app --host 0.0.0.0 --port 8000";
-      return { spec, reasons: ["Wykryto FastAPI."] };
+      return { spec, reasons: ["FastAPI detected."] };
     }
     if (/\bflask\b/.test(source)) {
       spec.framework = "flask";
       spec.startCommand = "gunicorn -b 0.0.0.0:8000 app:app";
-      return { spec, reasons: ["Wykryto Flask."] };
+      return { spec, reasons: ["Flask detected."] };
     }
     if (/\bdjango\b/.test(source)) {
       spec.framework = "django";
-      return { spec, reasons: ["Wykryto Django; wskaż polecenie uruchomienia z nazwą projektu."] };
+      return { spec, reasons: ["Django detected; give the start command with the project name."] };
     }
 
     spec.startCommand = files.has("main.py") ? "python main.py" : files.has("bot.py") ? "python bot.py" : files.has("app.py") ? "python app.py" : null;
     return {
       spec,
-      reasons: [spec.startCommand ? "Wykryto projekt Python." : "Wykryto projekt Python; wskaż polecenie uruchomienia."],
+      reasons: [spec.startCommand ? "Python project detected." : "Python project detected; give the start command."],
     };
   }
 
@@ -233,8 +233,8 @@ export function detectBuild(snapshot: RepositorySnapshot, runtime: DeploymentRun
     const spec = emptySpec("static");
     spec.outputDir = ".";
     spec.port = 8080;
-    return { spec, reasons: ["Wykryto statyczną stronę HTML."] };
+    return { spec, reasons: ["Static HTML site detected."] };
   }
 
-  return { spec: null, reasons: ["Nie rozpoznano typu projektu — dodaj Dockerfile albo docker-compose.yml."] };
+  return { spec: null, reasons: ["Could not tell what kind of project this is. Add a Dockerfile or docker-compose.yml."] };
 }

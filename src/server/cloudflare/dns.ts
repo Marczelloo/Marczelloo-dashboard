@@ -46,12 +46,12 @@ export function planTunnelDns(hostname: string, records: CloudflareDnsRecord[], 
   const addressing = own.filter((record) => record.type === "CNAME" || record.type === "A" || record.type === "AAAA");
   const cname = addressing.find((record) => record.type === "CNAME");
   if (!cname || addressing.length > 1) {
-    return { kind: "conflict", message: `${host} ma już rekordy ${own.map((record) => record.type).join(", ")} — dashboard ich nie nadpisze.` };
+    return { kind: "conflict", message: `${host} already has ${own.map((record) => record.type).join(", ")} records; the dashboard will not overwrite them.` };
   }
   const content = cname.content.toLowerCase();
   if (content === tunnelTarget(tunnelId)) return cname.proxied ? { kind: "none" } : { kind: "update", recordId: cname.id };
   if (legacyTunnelIds.some((id) => content === tunnelTarget(id))) return { kind: "update", recordId: cname.id };
-  return { kind: "conflict", message: `${host} wskazuje na ${cname.content} — dashboard nie nadpisze obcego rekordu.` };
+  return { kind: "conflict", message: `${host} points at ${cname.content}; the dashboard will not overwrite a record it does not own.` };
 }
 
 /** Only CNAMEs pointing at this tunnel are removed together with a route. */

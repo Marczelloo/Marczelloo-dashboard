@@ -47,7 +47,7 @@ export function gitSyncSteps(input: { repoPath: string; githubUrl: string; sha: 
 
   if (input.repoExists) {
     steps.push({
-      label: "Sprawdzenie lokalnych zmian",
+      label: "Check local changes",
       command: "git",
       args: ["-C", input.repoPath, "status", "--porcelain", "--untracked-files=no"],
       env,

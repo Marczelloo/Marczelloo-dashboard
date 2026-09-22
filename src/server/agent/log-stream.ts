@@ -41,7 +41,7 @@ export function agentLogStream(jobId: string, signal: AbortSignal): Response {
           if (!send("status", { running: !complete, offset, success, agentStatus: job.status })) break;
           if (complete) break;
         } catch {
-          if (!send("error", { message: "Nie udało się odczytać logu agenta" })) break;
+          if (!send("error", { message: "Could not read the agent log" })) break;
         }
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }

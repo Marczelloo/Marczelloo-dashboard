@@ -63,7 +63,7 @@ describe("formatEnvValue", () => {
   });
 
   it("refuses values combining $ with apostrophe or newline", () => {
-    expect(() => formatEnvValue("it's $5")).toThrow(/ręcznie/);
+    expect(() => formatEnvValue("it's $5")).toThrow(/by hand/);
   });
 
   it("round-trips through the parser", () => {

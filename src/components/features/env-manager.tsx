@@ -375,36 +375,36 @@ export function EnvManager({ serviceId, serviceName, repoPath }: EnvManagerProps
       // 3. Apply. Agent projects are already queued: the agent writes the file,
       // recreates the services and restores the previous file if they do not come up healthy.
       if (fileResult.agent) {
-        toast.success(fileResult.unchanged ? "Brak zmian w pliku" : `Zmienne w kolejce agenta (wersja ${fileResult.agent.version})`, {
-          description: "Agent zapisze plik, odtworzy usługi i sprawdzi ich zdrowie. Przy błędzie przywróci poprzedni plik — wynik w historii wdrożeń.",
+        toast.success(fileResult.unchanged ? "No changes to the file" : `Variables queued on the agent (version ${fileResult.agent.version})`, {
+          description: "The agent writes the file, recreates the services and checks their health. On failure it puts the previous file back; the result is in the deploy history.",
         });
         setHistoryKey((value) => value + 1);
       } else if (fileResult.unchanged) {
-        toast.info("Brak zmian w pliku");
+        toast.info("No changes to the file");
       } else if (serviceId) {
         try {
           const applyResponse = await fetch(`/api/services/${serviceId}/apply-env`, { method: "POST" });
           const applyResult = await applyResponse.json().catch(() => ({}));
 
           if (applyResponse.ok && applyResult.success) {
-            toast.success("Zmienne zapisane i zastosowane", {
+            toast.success("Variables saved and applied", {
               description: `Odtworzono: ${(applyResult.services || []).join(", ")}`,
             });
           } else if (applyResponse.status === 409) {
-            toast.info(applyResult.error || "Plik zapisany; zmiany wejdą przy najbliższym wdrożeniu.");
+            toast.info(applyResult.error || "File saved; the change takes effect on the next deploy.");
           } else {
             if (applyResult.requirePin) setShowPinDialog(true);
-            toast.warning("Plik zapisany, ale nie udało się zastosować zmian", {
+            toast.warning("File saved, but the change was not applied", {
               description: applyResult.error || `Status: ${applyResponse.status}`,
             });
           }
         } catch (applyError) {
-          toast.warning("Plik zapisany, ale żądanie zastosowania zmian nie powiodło się", {
-            description: applyError instanceof Error ? applyError.message : "Błąd sieci",
+          toast.warning("File saved, but applying it failed", {
+            description: applyError instanceof Error ? applyError.message : "Network error",
           });
         }
       } else {
-        toast.success("Zmienne zapisane");
+        toast.success("Variables saved");
       }
 
       // 4. Update server state

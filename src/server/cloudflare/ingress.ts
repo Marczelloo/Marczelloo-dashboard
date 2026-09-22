@@ -17,13 +17,13 @@ export function isSafeHostname(value: string): boolean {
 }
 
 export function localService(port: number): string {
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Port tunelu musi być liczbą od 1 do 65535.");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("The tunnel port must be a number from 1 to 65535.");
   return `http://127.0.0.1:${port}`;
 }
 
 export function assertCatchAll(rules: TunnelIngressRule[]): void {
   const last = rules.at(-1);
-  if (!last || last.hostname || last.path) throw new Error("Konfiguracja tunelu musi kończyć się regułą bez hostname (catch-all).");
+  if (!last || last.hostname || last.path) throw new Error("The tunnel configuration must end with a catch-all rule without a hostname.");
 }
 
 const matches = (rule: TunnelIngressRule, hostname: string) => rule.hostname?.toLowerCase() === hostname;
@@ -35,7 +35,7 @@ const matches = (rule: TunnelIngressRule, hostname: string) => rule.hostname?.to
  */
 export function upsertHostnameRoute(rules: TunnelIngressRule[], hostname: string, service: string): TunnelIngressRule[] {
   const host = hostname.trim().toLowerCase();
-  if (!isSafeHostname(host)) throw new Error("Nieprawidłowa domena Cloudflare Tunnel.");
+  if (!isSafeHostname(host)) throw new Error("Invalid tunnel domain.");
   assertCatchAll(rules);
   const primary = rules.find((rule) => matches(rule, host) && !rule.path);
   if (!primary) return [...rules.slice(0, -1), { hostname: host, service }, rules.at(-1)!];

@@ -60,7 +60,7 @@ export function shouldPersist(stored: TargetState | null, next: TargetState, now
 }
 
 const KIND_LABEL: Record<MonitorKind, string> = {
-  agent: "Deployment agent",
+  agent: "Deploy agent",
   disk: "Pi disk",
   containers: "Containers",
   domain: "Domain",

@@ -7,8 +7,8 @@ import { Badge, Button, Input, Label, Select, SelectContent, SelectItem, SelectT
 import type { BuildKind, BuildSpec } from "@/server/deployments/detect";
 
 const KIND_LABEL: Record<BuildKind, string> = {
-  compose: "Własny docker-compose",
-  dockerfile: "Własny Dockerfile",
+  compose: "Own Compose file",
+  dockerfile: "Own Dockerfile",
   node: "Aplikacja Node.js (szablon)",
   static: "Strona statyczna (nginx)",
   python: "Aplikacja Python (szablon)",
@@ -39,7 +39,7 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
     setDetecting(true);
     try {
       const result = await detectRepositoryBuildAction({ githubUrl, branch, runtime });
-      setReasons(result.success ? result.reasons : [result.error ?? "Nie udało się odczytać repozytorium."]);
+      setReasons(result.success ? result.reasons : [result.error ?? "Could not read the repository."]);
       if (result.success) onChange(result.spec);
     } finally {
       setDetecting(false);
@@ -63,8 +63,8 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
         <div className="flex items-start gap-3">
           <Hammer className="mt-0.5 h-4 w-4 text-primary" />
           <div>
-            <p className="text-sm font-medium">Sposób budowania</p>
-            <p className="text-xs text-muted-foreground">Wykryty z plików w repozytorium; możesz go poprawić przed wdrożeniem.</p>
+            <p className="text-sm font-medium">How it builds</p>
+            <p className="text-xs text-muted-foreground">Detected from the repository's files; correct it before deploying if needed.</p>
           </div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={() => void detect()} disabled={detecting}>
@@ -83,7 +83,7 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
         <div className="space-y-2">
           <Label>Typ</Label>
           <Select value={value?.kind ?? ""} onValueChange={(kind) => onChange({ ...EMPTY, ...(value ?? {}), kind: kind as BuildKind })}>
-            <SelectTrigger><SelectValue placeholder="Nie rozpoznano — wybierz" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Not recognised; choose one" /></SelectTrigger>
             <SelectContent>
               {(Object.keys(KIND_LABEL) as BuildKind[]).map((kind) => <SelectItem key={kind} value={kind}>{KIND_LABEL[kind]}</SelectItem>)}
             </SelectContent>
@@ -93,7 +93,7 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
 
         {templated && (
           <div className="space-y-2">
-            <Label htmlFor="build-port">Port aplikacji w kontenerze</Label>
+            <Label htmlFor="build-port">App port inside the container</Label>
             <Input id="build-port" inputMode="numeric" placeholder="brak (bot/worker)" value={value.port ?? ""} onChange={(event) => set({ port: event.target.value ? Number(event.target.value.replace(/\D/g, "")) || null : null })} />
           </div>
         )}
@@ -120,14 +120,14 @@ export function BuildPlan({ githubUrl, branch, runtime, value, onChange }: { git
 
         {(value?.kind === "node" || value?.kind === "python") && (
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="build-start">Uruchomienie</Label>
+            <Label htmlFor="build-start">Start command</Label>
             <Input id="build-start" className="font-mono text-xs" value={text("startCommand")} onChange={(event) => set({ startCommand: nullable(event.target.value) })} />
           </div>
         )}
 
         {value?.kind === "static" && (
           <div className="space-y-2">
-            <Label htmlFor="build-output">Katalog z gotową stroną</Label>
+            <Label htmlFor="build-output">Built site directory</Label>
             <Input id="build-output" className="font-mono text-xs" value={text("outputDir")} onChange={(event) => set({ outputDir: nullable(event.target.value) })} />
           </div>
         )}

@@ -301,7 +301,7 @@ export function DeployProjectButton({ projectId, projectName, githubUrl }: Deplo
             <DialogDescription>
               {managedDeployment
                 ? `Managed deployment: ${managedDeployment.repoPath} · Compose ${managedDeployment.composeProject}`
-                : "Projekt nie ma konfiguracji wdrożenia — utwórz ją w „Deploy z GitHuba”."}
+                : "The project has no deploy configuration. Set it up from New project → From GitHub."}
             </DialogDescription>
           </DialogHeader>
 

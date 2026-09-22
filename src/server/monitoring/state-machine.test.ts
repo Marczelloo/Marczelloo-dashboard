@@ -5,7 +5,7 @@ import type { MonitorTarget, Observation, TargetState } from "./types";
 const target: MonitorTarget = { key: "domain:a.dev", kind: "domain", label: "a.dev", projectId: "p1", composeProject: "a", host: "a.dev" };
 const ok: Observation = { outcome: "ok", detail: { latencyMs: 10 } };
 const fail: Observation = { outcome: "fail", reason: "HTTP 502", detail: { statusCode: 502 } };
-const warn: Observation = { outcome: "warning", reason: "Certyfikat wygasa za 10 dni", detail: {} };
+const warn: Observation = { outcome: "warning", reason: "Certificate expires in 10 days", detail: {} };
 const t = (minute: number) => new Date(Date.UTC(2026, 8, 17, 12, minute)).toISOString();
 
 function run(observations: Observation[], options: { muted?: boolean; start?: TargetState | null } = {}) {
@@ -49,8 +49,8 @@ describe("advance", () => {
 
   it("goes to warning immediately and does not repeat the transition", () => {
     const { state, transitions } = run([ok, warn, warn]);
-    expect(state).toMatchObject({ status: "warning", lastError: "Certyfikat wygasa za 10 dni" });
-    expect(transitions).toEqual([{ from: "ok", to: "warning", reason: "Certyfikat wygasa za 10 dni", previousSince: t(0) }]);
+    expect(state).toMatchObject({ status: "warning", lastError: "Certificate expires in 10 days" });
+    expect(transitions).toEqual([{ from: "ok", to: "warning", reason: "Certificate expires in 10 days", previousSince: t(0) }]);
   });
 
   it("uses a threshold of one for tls and disk", () => {
@@ -79,13 +79,13 @@ describe("notificationFor", () => {
     const payload = notificationFor(target, { from: "ok", to: "down", reason: "HTTP 502", previousSince: t(0) }, t(5), "Portfolio");
     expect(payload).toMatchObject({ color: "danger" });
     expect(payload?.title).toContain("a.dev");
-    expect(payload?.fields).toEqual(expect.arrayContaining([{ name: "Projekt", value: "Portfolio", inline: true }, { name: "Przyczyna", value: "HTTP 502", inline: false }]));
+    expect(payload?.fields).toEqual(expect.arrayContaining([{ name: "Project", value: "Portfolio", inline: true }, { name: "Reason", value: "HTTP 502", inline: false }]));
   });
 
   it("includes the outage duration on recovery", () => {
     const payload = notificationFor(target, { from: "down", to: "ok", reason: null, previousSince: t(0) }, t(12), null);
     expect(payload).toMatchObject({ color: "success" });
-    expect(payload?.fields).toEqual(expect.arrayContaining([{ name: "Czas trwania", value: "12 min", inline: true }]));
+    expect(payload?.fields).toEqual(expect.arrayContaining([{ name: "Duration", value: "12 min", inline: true }]));
   });
 
   it("stays silent for the first successful check", () => {

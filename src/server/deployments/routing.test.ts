@@ -18,7 +18,7 @@ describe("parseLocalPortFromService", () => {
 describe("resolveAutoDeployBranch", () => {
   it("deploys only the configured branch", () => {
     expect(resolveAutoDeployBranch("main", "main")).toEqual({ deploy: true, branch: "main" });
-    expect(resolveAutoDeployBranch("perf/gateway", "main")).toEqual({ deploy: false, reason: "Push do perf/gateway; auto-deploy obejmuje tylko main." });
+    expect(resolveAutoDeployBranch("perf/gateway", "main")).toEqual({ deploy: false, reason: "Push to perf/gateway; only main deploys automatically." });
     expect(resolveAutoDeployBranch("main", "develop")).toMatchObject({ deploy: false });
   });
 

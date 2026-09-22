@@ -39,20 +39,20 @@ export async function POST(request: Request) {
       if (action === "delete") {
         const [variable] = vars;
         if (!variable || typeof variable.key !== "string" || !ENV_KEY_PATTERN.test(variable.key)) {
-          return NextResponse.json({ success: false, error: "Nieprawidłowy klucz zmiennej." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "Invalid variable name." }, { status: 400 });
         }
       } else if (!validateVars(vars)) {
-        return NextResponse.json({ success: false, error: "Nieprawidłowy klucz lub wartość zmiennej." }, { status: 400 });
+        return NextResponse.json({ success: false, error: "Invalid variable name or value." }, { status: 400 });
       }
       if (action !== "write" && vars.length !== 1) {
-        return NextResponse.json({ success: false, error: "Ta akcja przyjmuje dokładnie jedną zmienną." }, { status: 400 });
+        return NextResponse.json({ success: false, error: "This takes exactly one variable." }, { status: 400 });
       }
       if (action !== "delete") vars.forEach((variable: EnvVar) => formatEnvValue(variable.value));
 
       // Only agent projects can change env files: the agent writes the file and recreates containers behind a health gate.
       const agentProject = await findAgentProjectByRepoPath(target.repoPath);
       if (!agentProject) {
-        return NextResponse.json({ success: false, error: "Ten katalog nie należy do projektu wdrażanego przez agenta." }, { status: 409 });
+        return NextResponse.json({ success: false, error: "This directory does not belong to a project the agent deploys." }, { status: 409 });
       }
       const original = (await readAgentEnvFile(target.repoPath, target.filename)).content;
       const current = parseEnvEntries(original);
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, action, count: next.length, filePath: target.filePath, unchanged: true });
       }
       // History first: the previous file is kept as a version before the agent replaces it.
-      await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content: original, note: "Stan pliku przed zmianą", createdBy: user.email });
-      const version = await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content, note: "Zapis z edytora zmiennych", createdBy: user.email });
+      await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content: original, note: "Before this change", createdBy: user.email });
+      const version = await recordEnvFileVersion({ projectId: agentProject.projectId, fileName: target.filename, content, note: "Saved from the variables editor", createdBy: user.email });
       const queued = await queueAgentEnvApply({
         config: agentProject,
         serviceId: typeof serviceId === "string" ? serviceId : null,
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error instanceof Error && error.message.includes("ręcznie")) {
+    if (error instanceof Error && error.message.includes("by hand")) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 

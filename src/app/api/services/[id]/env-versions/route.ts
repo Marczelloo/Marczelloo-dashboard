@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     await requireAuth();
     const { id } = await params;
     const service = await services.getServiceById(id);
-    if (!service?.project_id) return NextResponse.json({ success: false, error: "Nie znaleziono serwisu." }, { status: 404 });
+    if (!service?.project_id) return NextResponse.json({ success: false, error: "Service not found." }, { status: 404 });
     const config = await getDeploymentConfig(service.project_id);
     const versions = (await appImport.listEnvVersions(service.project_id)).map((row) => ({
       version: row.version,
@@ -28,6 +28,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ success: true, agent: config?.engine === "agent", versions });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ success: false, error: error.message }, { status: 401 });
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Nie udało się odczytać historii." }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not read the history." }, { status: 500 });
   }
 }

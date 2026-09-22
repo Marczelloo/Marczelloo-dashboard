@@ -23,7 +23,7 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
     setLoading(true);
     const result = await getDeployEngineAction(projectId);
     if (result.success && result.data) setData(result.data);
-    else toast.error("Nie udało się odczytać silnika wdrożeń", { description: result.error });
+    else toast.error("Could not read the deploy setup", { description: result.error });
     setLoading(false);
   }, [projectId]);
 
@@ -40,10 +40,10 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
       return;
     }
     if (!result.success) {
-      toast.error("Nie zakolejkowano rollbacku", { description: result.error });
+      toast.error("The rollback was not queued", { description: result.error });
       return;
     }
-    toast.success("Rollback trafił do kolejki agenta");
+    toast.success("Rollback queued on the agent");
     await load();
   }
 
@@ -52,7 +52,7 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
       <Card>
         <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Wczytywanie silnika wdrożeń…
+          Loading the deploy setup…
         </CardContent>
       </Card>
     );
@@ -73,7 +73,7 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
           <CardDescription>
             {agent
               ? "Agent: kolejka, obrazy z tagiem commita, bramka zdrowia i automatyczny rollback."
-              : "Ten projekt nie jest jeszcze wdrażany przez agenta — zapisz jego konfigurację ponownie."}
+              : "This project is not deployed by the agent yet. Save its deploy settings again."}
           </CardDescription>
         </CardHeader>
         {agent && (
@@ -94,7 +94,7 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
                 <span className="text-muted-foreground">{formatDate(current.deployedAt)}</span>
               </div>
             ) : (
-              <p className="text-muted-foreground">Agent nie wdrożył jeszcze tego projektu.</p>
+              <p className="text-muted-foreground">The agent has not deployed this project yet.</p>
             )}
             {previous.length > 0 && (
               <ul className="space-y-1">
@@ -105,7 +105,7 @@ export function ProjectDeployEngine({ projectId }: { projectId: string }) {
                     </span>
                     <Button variant="outline" size="sm" disabled={busy || Boolean(data.activeJob)} onClick={() => execute({ kind: "rollback", sha: release.sha })}>
                       <RotateCcw className="h-4 w-4" />
-                      Przywróć
+                      Restore
                     </Button>
                   </li>
                 ))}

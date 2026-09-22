@@ -85,7 +85,7 @@ describe("detectBuild", () => {
 
   it("returns a useful reason for an unknown repository", () => {
     const result = detectBuild({ files: ["README.md"], packageJson: null, dockerfileContent: null, requirementsTxt: null, pyprojectToml: null }, "web");
-    expect(result).toEqual({ spec: null, reasons: ["Nie rozpoznano typu projektu — dodaj Dockerfile albo docker-compose.yml."] });
+    expect(result).toEqual({ spec: null, reasons: ["Could not tell what kind of project this is. Add a Dockerfile or docker-compose.yml."] });
   });
 });
 

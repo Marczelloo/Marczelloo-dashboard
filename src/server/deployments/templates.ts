@@ -28,7 +28,7 @@ const safeCopy = "COPY --exclude=.env --exclude=.env.* --exclude=.git --exclude=
 export function renderDockerfile(spec: BuildSpec): string {
   validSpec(spec);
   if (spec.kind !== "node" && spec.kind !== "static" && spec.kind !== "python") {
-    throw new Error("Dockerfile można wygenerować tylko dla aplikacji Node.js, statycznej lub Python.");
+    throw new Error("A Dockerfile can only be generated for Node.js, static or Python apps.");
   }
 
   if (spec.kind === "node") {
@@ -89,12 +89,12 @@ export function renderGeneratedCompose(input: {
   localPort: number | null;
 }): string {
   validSpec(input.spec);
-  if (!/^[a-z0-9][a-z0-9_-]*$/.test(input.composeProject)) throw new Error("Nazwa projektu Compose jest nieprawidłowa.");
-  if (!isAbsolutePathWithoutParent(input.repoPath)) throw new Error("Ścieżka repozytorium musi być bezwzględna i nie może zawierać „..”.");
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(input.composeProject)) throw new Error("Invalid Compose project name.");
+  if (!isAbsolutePathWithoutParent(input.repoPath)) throw new Error("The repository path must be absolute and cannot contain \"..\".");
   if (input.localPort !== null && (!Number.isInteger(input.localPort) || input.localPort < 1 || input.localPort > 65535)) {
-    throw new Error("Port lokalny musi być liczbą całkowitą od 1 do 65535.");
+    throw new Error("The local port must be a whole number from 1 to 65535.");
   }
-  if (input.spec.kind === "compose") throw new Error("Nie można wygenerować Compose dla istniejącego pliku Compose.");
+  if (input.spec.kind === "compose") throw new Error("Cannot generate Compose for a project that has its own Compose file.");
 
   const build = input.spec.kind === "dockerfile"
     ? { context: input.repoPath, dockerfile: input.spec.dockerfile }

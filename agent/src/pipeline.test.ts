@@ -90,7 +90,7 @@ describe("runDeploy", () => {
   it("builds the exact commit with SHA-tagged images and records the release", async () => {
     const { deps, steps, writes } = harness();
     const outcome = await runDeploy(job("deploy", NEW), "ghs_token", previous, deps);
-    expect(labels(steps)).toEqual(["Aktualny commit", "Sprawdzenie lokalnych zmian", "Git fetch bbbbbbb", "Git checkout bbbbbbb", "Compose config", "Walidacja Compose", "Build", "Uruchomienie"]);
+    expect(labels(steps)).toEqual(["Current commit", "Check local changes", "Git fetch bbbbbbb", "Git checkout bbbbbbb", "Compose config", "Validate Compose", "Build", "Start containers"]);
     expect(steps[2].env?.GIT_CONFIG_VALUE_0).toBeDefined();
     expect(steps.at(-1)?.args.slice(-4)).toEqual(["-d", "--no-build", "--pull", "missing"]);
     expect(steps.find((step) => step.label === "Compose config")?.quiet).toBe(true);
@@ -113,16 +113,16 @@ describe("runDeploy", () => {
     const { deps, steps } = harness({ failLabel: "Build" });
     const outcome = await runDeploy(job("deploy", NEW), null, previous, deps);
     expect(outcome).toMatchObject({ status: "failed", rolledBackTo: null });
-    expect(outcome.error).toContain("Build: kod 1");
-    expect(labels(steps)).not.toContain("Uruchomienie");
+    expect(outcome.error).toContain("Build: code 1");
+    expect(labels(steps)).not.toContain("Start containers");
   });
 
   it("refuses to overwrite local changes or a directory that is not a Git checkout", async () => {
     const dirty = harness({ dirty: true });
-    expect((await runDeploy(job("deploy", NEW), null, previous, dirty.deps)).error).toContain("lokalne zmiany");
+    expect((await runDeploy(job("deploy", NEW), null, previous, dirty.deps)).error).toContain("local changes");
     expect(dirty.steps).toHaveLength(2);
     const notGit = harness({ notGit: true });
-    expect((await runDeploy(job("deploy", NEW), null, previous, notGit.deps)).error).toContain("nie jest repozytorium Git");
+    expect((await runDeploy(job("deploy", NEW), null, previous, notGit.deps)).error).toContain("is not a Git repository");
     expect(notGit.steps).toHaveLength(0);
   });
 
@@ -130,8 +130,8 @@ describe("runDeploy", () => {
     const { deps, steps, writes } = harness({ samples: [[crashed]] });
     const outcome = await runDeploy(job("deploy", NEW), null, previous, deps);
     expect(outcome).toMatchObject({ status: "rolled_back", rolledBackTo: OLD, release: null, orphanImages: ["marczelloo-tools-app:bbbbbbbbbbbb"] });
-    expect(outcome.error).toContain("kodem 1");
-    expect(labels(steps).slice(-3)).toEqual(["Git checkout aaaaaaa", "Compose config", "Uruchomienie"]);
+    expect(outcome.error).toContain("code 1");
+    expect(labels(steps).slice(-3)).toEqual(["Git checkout aaaaaaa", "Compose config", "Start containers"]);
     expect(writes.at(-1)?.content).toContain("marczelloo-tools-app:aaaaaaaaaaaa");
   });
 
@@ -156,7 +156,7 @@ describe("runDeploy", () => {
     const base = job("deploy", NEW);
     const outcome = await runDeploy({ ...base, target: { ...base.target, tunnel: { hostname: "tools.marczelloo.dev", localPort: 3202, probe: false } } }, null, previous, pending.deps);
     expect(outcome.status).toBe("succeeded");
-    expect(pending.logs.some((line) => line.startsWith("Sonda"))).toBe(false);
+    expect(pending.logs.some((line) => line.startsWith("Probe"))).toBe(false);
   });
 
   it("fails without a previous release and keeps the new images", async () => {
@@ -169,12 +169,12 @@ describe("runDeploy", () => {
   it("retries the public probe and reports a rollback that also fails", async () => {
     const retried = harness({ probes: [502, 200] });
     expect((await runDeploy(job("deploy", NEW), null, previous, retried.deps)).status).toBe("succeeded");
-    expect(retried.logs).toContain("Sonda https://tools.marczelloo.dev/: 502");
+    expect(retried.logs).toContain("Probe https://tools.marczelloo.dev/: 502");
 
     const down = harness({ probes: [503] });
     const outcome = await runDeploy(job("deploy", NEW), null, previous, down.deps);
     expect(outcome.status).toBe("failed");
-    expect(outcome.error).toContain("nie odpowiada");
+    expect(outcome.error).toContain("did not respond");
     expect(outcome.error).toContain("did not pass the health check");
   });
 });
@@ -183,7 +183,7 @@ describe("runRollback", () => {
   it("restores a release without building", async () => {
     const { deps, steps } = harness();
     const outcome = await runRollback(job("rollback", OLD), previous, deps);
-    expect(labels(steps)).toEqual(["Git checkout aaaaaaa", "Compose config", "Uruchomienie"]);
+    expect(labels(steps)).toEqual(["Git checkout aaaaaaa", "Compose config", "Start containers"]);
     expect(outcome).toMatchObject({ status: "succeeded", release: { sha: OLD, images: previous.images } });
   });
 });
@@ -196,7 +196,7 @@ describe("runApplyEnv", () => {
     const outcome = await runApplyEnv(job("apply-env", OLD), previous, envFile, deps);
     expect(outcome).toEqual({ status: "succeeded", error: null, rolledBackTo: null, release: null, baseline: null, orphanImages: [] });
     expect(replacements).toEqual([{ file: "/p/tools/env/prod.env", content: "NEW_TOKEN=secret" }]);
-    expect(logs).toContain("=== Zapis env/prod.env ===");
+    expect(logs).toContain("=== Write env/prod.env ===");
     expect(logs.join("\n")).not.toContain("NEW_TOKEN=secret");
   });
 
@@ -209,7 +209,7 @@ describe("runApplyEnv", () => {
       { file: "/p/tools/env/prod.env", content: "NEW_TOKEN=secret" },
       { file: "/p/tools/env/prod.env", content: "OLD_TOKEN=secret" },
     ]);
-    expect(logs).toContain("=== Przywracanie poprzedniego env/prod.env ===");
+    expect(logs).toContain("=== Restore previous env/prod.env ===");
   });
 
   it("removes a newly created file while restoring", async () => {

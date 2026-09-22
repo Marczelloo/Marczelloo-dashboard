@@ -16,15 +16,15 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     const user = await requirePinVerification();
     const { id } = await params;
     const service = await services.getServiceById(id);
-    if (!service) return NextResponse.json({ success: false, error: "Nie znaleziono serwisu." }, { status: 404 });
+    if (!service) return NextResponse.json({ success: false, error: "Service not found." }, { status: 404 });
 
     const config = service.project_id ? await getDeploymentConfig(service.project_id) : null;
     if (config?.engine !== "agent") {
-      return NextResponse.json({ success: false, error: "Zmienne można zastosować tylko w projekcie wdrażanym przez agenta." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Variables can only be applied to a project the agent deploys." }, { status: 400 });
     }
 
     const file = await readAgentEnvFile(config.repoPath, ".env");
-    if (!file.exists || !file.content) return NextResponse.json({ success: false, error: "Projekt nie ma pliku .env do zastosowania." }, { status: 404 });
+    if (!file.exists || !file.content) return NextResponse.json({ success: false, error: "The project has no .env file to apply." }, { status: 404 });
     const queued = await queueAgentEnvApply({ config, serviceId: id, triggeredBy: user.email, fileName: ".env", content: file.content, previous: file.content });
     await auditLogs.logAction(user.email, "update", "service", id, { apply_env: true, engine: "agent", deploy_id: queued.deployId, job_id: queued.jobId });
     return NextResponse.json({ success: true, agent: queued });
@@ -35,6 +35,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         { status: error.code === "NOT_AUTHENTICATED" ? 401 : 403 }
       );
     }
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Nie udało się zastosować zmiennych." }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not apply the variables." }, { status: 500 });
   }
 }

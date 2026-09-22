@@ -11,7 +11,7 @@ export function isAgentConfigured(): boolean {
 
 async function agentFetch<T>(pathname: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<T> {
   const token = process.env.AGENT_TOKEN;
-  if (!token) throw new Error("Agent wdrożeń nie jest skonfigurowany (brak AGENT_TOKEN).");
+  if (!token) throw new Error("The deploy agent is not configured (AGENT_TOKEN is missing).");
   const response = await fetch(`${AGENT_URL}${pathname}`, {
     ...init,
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -19,7 +19,7 @@ async function agentFetch<T>(pathname: string, init: RequestInit = {}, timeoutMs
     signal: AbortSignal.timeout(timeoutMs),
   });
   const body: unknown = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error((body as { error?: string }).error || `Agent odpowiedział statusem ${response.status}.`);
+  if (!response.ok) throw new Error((body as { error?: string }).error || `The agent answered with status ${response.status}.`);
   return body as T;
 }
 

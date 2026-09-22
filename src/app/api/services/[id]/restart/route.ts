@@ -12,19 +12,19 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     const { id } = await params;
 
     const service = await services.getServiceById(id);
-    if (!service) return NextResponse.json({ success: false, error: "Nie znaleziono serwisu." }, { status: 404 });
+    if (!service) return NextResponse.json({ success: false, error: "Service not found." }, { status: 404 });
     if (service.type !== "docker" || !service.container_id) {
-      return NextResponse.json({ success: false, error: "Serwis nie ma przypisanego kontenera Docker." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "The service has no Docker container." }, { status: 400 });
     }
 
     if (service.container_id === DASHBOARD_CONTAINER) {
       // The response would be cut off by the restart itself, so answer first.
       restartAgentContainer(service.container_id).catch((error) => console.error("[Restart] Dashboard restart failed:", error instanceof Error ? error.message : error));
-      return NextResponse.json({ success: true, message: "Dashboard uruchamia się ponownie…", selfRestart: true }, { status: 202 });
+      return NextResponse.json({ success: true, message: "The dashboard is restarting…", selfRestart: true }, { status: 202 });
     }
 
     await restartAgentContainer(service.container_id);
-    return NextResponse.json({ success: true, message: `Kontener ${service.container_id} został zrestartowany.` });
+    return NextResponse.json({ success: true, message: `Container ${service.container_id} restarted.` });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(
@@ -33,6 +33,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
     }
     console.error("[Restart] Error:", error instanceof Error ? error.message : error);
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Nie udało się zrestartować kontenera." }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not restart the container." }, { status: 500 });
   }
 }

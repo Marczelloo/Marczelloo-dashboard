@@ -32,7 +32,7 @@ export async function handleAgentEvent(event: AgentEvent): Promise<void> {
     const project = await projects.getProjectById(event.projectId);
     const name = project?.name ?? event.composeProject;
     if (plan.notify === "success") await notifyDeploySuccess(event.kind === "apply-env" ? `${name} (zmienne)` : name, event.sha.slice(0, 7));
-    if (plan.notify === "failed") await notifyDeployFailed(name, plan.errorMessage ?? "Nieznany błąd");
+    if (plan.notify === "failed") await notifyDeployFailed(name, plan.errorMessage ?? "Unknown error");
 
     await auditLogs.logAction("deploy-agent", event.kind === "rollback" ? "rollback" : event.kind === "apply-env" ? "update" : "deploy", "project", event.projectId, {
       kind: event.kind,

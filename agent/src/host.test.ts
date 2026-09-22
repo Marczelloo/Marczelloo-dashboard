@@ -58,7 +58,7 @@ describe("environment files", () => {
     }
     expect(caught).toMatchObject({
       status: 413,
-      message: "Plik środowiskowy jest zbyt duży.",
+      message: "The environment file is too large.",
     });
     expect((caught as Error).message).not.toContain("sss");
   });

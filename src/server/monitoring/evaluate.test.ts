@@ -23,7 +23,7 @@ describe("evaluateDomain", () => {
 
   it("fails on server errors, Cloudflare origin errors and network errors", () => {
     expect(evaluateDomain({ statusCode: 502, latencyMs: 40, error: null })).toMatchObject({ outcome: "fail", reason: "HTTP 502" });
-    expect(evaluateDomain({ statusCode: 530, latencyMs: 40, error: null })).toMatchObject({ outcome: "fail", reason: "HTTP 530 (Cloudflare nie łączy się z Pi)" });
+    expect(evaluateDomain({ statusCode: 530, latencyMs: 40, error: null })).toMatchObject({ outcome: "fail", reason: "HTTP 530 (Cloudflare cannot connect to Pi)" });
     expect(evaluateDomain({ statusCode: null, latencyMs: 10000, error: "timeout" })).toMatchObject({ outcome: "fail", reason: "timeout" });
   });
 });
@@ -37,7 +37,7 @@ describe("evaluateContainers", () => {
   });
 
   it("fails without containers", () => {
-    expect(evaluateContainers([], undefined)).toMatchObject({ outcome: "fail", reason: "Projekt nie ma żadnych kontenerów." });
+    expect(evaluateContainers([], undefined)).toMatchObject({ outcome: "fail", reason: "The project has no containers." });
   });
 
   it("ignores containers that exited cleanly", () => {
@@ -45,23 +45,23 @@ describe("evaluateContainers", () => {
   });
 
   it.each([
-    [container({ status: "exited", exitCode: 137 }), "app-web-1 zakończył działanie z kodem 137"],
-    [container({ status: "restarting" }), "app-web-1 jest w stanie restarting"],
-    [container({ status: "dead" }), "app-web-1 jest w stanie dead"],
-    [container({ health: "unhealthy" }), "app-web-1 zgłasza unhealthy"],
-    [container({ status: "exited", exitCode: 137, oomKilled: true }), "app-web-1 zabity przez brak pamięci (OOM)"],
+    [container({ status: "exited", exitCode: 137 }), "app-web-1 exited with code 137"],
+    [container({ status: "restarting" }), "app-web-1 is restarting"],
+    [container({ status: "dead" }), "app-web-1 is dead"],
+    [container({ health: "unhealthy" }), "app-web-1 reports unhealthy"],
+    [container({ status: "exited", exitCode: 137, oomKilled: true }), "app-web-1 was killed by out-of-memory (OOM)"],
   ])("fails for %o", (sample, reason) => {
     expect(evaluateContainers([sample], undefined)).toMatchObject({ outcome: "fail", reason });
   });
 
   it("fails when the restart counter grew since the previous check", () => {
-    expect(evaluateContainers([container({ restartCount: 5 })], { "app-web-1": 4 })).toMatchObject({ outcome: "fail", reason: "app-web-1 zrestartował się (1× od ostatniego sprawdzenia)" });
+    expect(evaluateContainers([container({ restartCount: 5 })], { "app-web-1": 4 })).toMatchObject({ outcome: "fail", reason: "app-web-1 restarted (1× since the last check)" });
     expect(evaluateContainers([container({ name: "app-web-2", restartCount: 5 })], { "app-web-1": 1 }).outcome).toBe("ok");
   });
 
   it("lists every problem in one reason", () => {
     const result = evaluateContainers([container({ status: "restarting" }), container({ name: "app-bot-1", health: "unhealthy" })], undefined);
-    expect(result).toMatchObject({ outcome: "fail", reason: "app-web-1 jest w stanie restarting; app-bot-1 zgłasza unhealthy" });
+    expect(result).toMatchObject({ outcome: "fail", reason: "app-web-1 is restarting; app-bot-1 reports unhealthy" });
   });
 });
 
@@ -69,13 +69,13 @@ describe("evaluateTls", () => {
   const now = new Date("2026-09-17T12:00:00Z");
   it("classifies by days left", () => {
     expect(evaluateTls({ validTo: "2026-11-17T12:00:00Z", error: null }, now)).toEqual({ outcome: "ok", detail: { daysLeft: 61, validTo: "2026-11-17T12:00:00.000Z" } });
-    expect(evaluateTls({ validTo: "2026-09-27T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "warning", reason: "Certyfikat wygasa za 10 dni" });
-    expect(evaluateTls({ validTo: "2026-09-19T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "fail", reason: "Certyfikat wygasa za 2 dni" });
-    expect(evaluateTls({ validTo: "2026-09-10T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "fail", reason: "Certyfikat wygasł" });
+    expect(evaluateTls({ validTo: "2026-09-27T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "warning", reason: "Certificate expires in 10 days" });
+    expect(evaluateTls({ validTo: "2026-09-19T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "fail", reason: "Certificate expires in 2 days" });
+    expect(evaluateTls({ validTo: "2026-09-10T12:00:00Z", error: null }, now)).toMatchObject({ outcome: "fail", reason: "Certificate expired" });
   });
 
   it("fails when the handshake fails", () => {
-    expect(evaluateTls({ validTo: null, error: "ECONNRESET" }, now)).toMatchObject({ outcome: "fail", reason: "Nie udało się sprawdzić certyfikatu: ECONNRESET" });
+    expect(evaluateTls({ validTo: null, error: "ECONNRESET" }, now)).toMatchObject({ outcome: "fail", reason: "Could not check the certificate: ECONNRESET" });
   });
 });
 
@@ -83,7 +83,7 @@ describe("evaluateDisk", () => {
   const GB = 1_000_000_000;
   it("warns below 10% and fails below 5% free", () => {
     expect(evaluateDisk({ path: "/p", totalBytes: 100 * GB, freeBytes: 50 * GB }, 12 * GB)).toEqual({ outcome: "ok", detail: { totalBytes: 100 * GB, freeBytes: 50 * GB, freePercent: 50, buildCacheBytes: 12 * GB } });
-    expect(evaluateDisk({ path: "/p", totalBytes: 100 * GB, freeBytes: 8 * GB }, null)).toMatchObject({ outcome: "warning", reason: "Wolne 8% dysku (8.0 GB)" });
-    expect(evaluateDisk({ path: "/p", totalBytes: 100 * GB, freeBytes: 4 * GB }, null)).toMatchObject({ outcome: "fail", reason: "Wolne 4% dysku (4.0 GB)" });
+    expect(evaluateDisk({ path: "/p", totalBytes: 100 * GB, freeBytes: 8 * GB }, null)).toMatchObject({ outcome: "warning", reason: "8% of the disk free (8.0 GB)" });
+    expect(evaluateDisk({ path: "/p", totalBytes: 100 * GB, freeBytes: 4 * GB }, null)).toMatchObject({ outcome: "fail", reason: "4% of the disk free (4.0 GB)" });
   });
 });

@@ -91,7 +91,7 @@ export async function runMonitorCycle(deps: CycleDependencies, options: { record
   const observe = async (target: MonitorTarget, previous: TargetState | undefined): Promise<Observation | null> => {
     switch (target.kind) {
       case "agent":
-        return agent ? { outcome: "ok", detail: { generatedAt: agent.generatedAt } } : { outcome: "fail", reason: `Agent nie odpowiada: ${agentError ?? "brak danych"}`, detail: {} };
+        return agent ? { outcome: "ok", detail: { generatedAt: agent.generatedAt } } : { outcome: "fail", reason: `The agent does not answer: ${agentError ?? "no data"}`, detail: {} };
       case "disk":
         return agent?.disk ? evaluateDisk(agent.disk, agent.buildCacheBytes) : null;
       case "containers": {
@@ -172,7 +172,7 @@ export async function runMonitorCycle(deps: CycleDependencies, options: { record
     if ((state.kind === "domain" || state.kind === "tls") && (!ingressAvailable || services === null)) continue;
     try {
       const incident = incidentByKey.get(state.key);
-      if (incident) await deps.updateIncident(incident.id, { open: false, ended_at: nowIso, reason: "Cel usunięty z monitoringu" });
+      if (incident) await deps.updateIncident(incident.id, { open: false, ended_at: nowIso, reason: "Target removed from monitoring" });
       await deps.deleteState(state.id);
     } catch (error) {
       errors.push(`usuwanie ${state.key}: ${errorMessage(error)}`);

@@ -15,5 +15,5 @@ export async function GET(request: NextRequest) {
   if (!logFile) return new Response("logFile parameter required", { status: 400 });
   const agentJobId = parseAgentLogRef(logFile);
   if (agentJobId) return agentLogStream(agentJobId, request.signal);
-  return new Response("Log tego wdrożenia pochodzi ze starego systemu wdrożeń i nie jest już dostępny.", { status: 410 });
+  return new Response("This deploy's log came from the old deploy system and is no longer available.", { status: 410 });
 }

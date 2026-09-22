@@ -12,6 +12,6 @@ export async function listCloudflareZonesAction(): Promise<{ success: boolean; z
     if (!getManagedTunnelSettings()) return { success: true, zones: [] };
     return { success: true, zones: (await listManagedZones()).map((zone) => zone.name) };
   } catch (error) {
-    return { success: false, zones: [], error: error instanceof Error ? error.message : "Nie udało się pobrać domen z Cloudflare." };
+    return { success: false, zones: [], error: error instanceof Error ? error.message : "Could not load the domains from Cloudflare." };
   }
 }

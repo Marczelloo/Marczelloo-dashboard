@@ -6,7 +6,7 @@ import { isSafeHostname, localService, removeHostnameRoutes, sameIngress, upsert
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACCOUNT = /^[0-9a-f]{32}$/i;
-const DNS_COMMENT = "Zarządzane przez Marczelloo Dashboard";
+const DNS_COMMENT = "Managed by Marczelloo Dashboard";
 
 export interface ManagedTunnelSettings {
   accountId: string;
@@ -38,7 +38,7 @@ export function getManagedTunnelSettings(): ManagedTunnelSettings | null {
 
 function requireResolved(): Resolved {
   const resolved = resolve();
-  if (!resolved) throw new Error("Cloudflare API nie jest skonfigurowane (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
+  if (!resolved) throw new Error("The Cloudflare API is not configured (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_TUNNEL_ID).");
   return resolved;
 }
 
@@ -86,16 +86,16 @@ export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promi
   const { client, tunnelId } = settings;
   const hostname = update.hostname?.trim().toLowerCase() || null;
   const removals = [...new Set((update.removeHostnames ?? []).map((value) => value.trim().toLowerCase()).filter((value) => value && value !== hostname))];
-  if (hostname && !isSafeHostname(hostname)) throw new Error("Nieprawidłowa domena Cloudflare Tunnel.");
-  if (removals.some((value) => !isSafeHostname(value))) throw new Error("Nieprawidłowa domena do usunięcia z Cloudflare Tunnel.");
-  if (update.service && !CONTAINER_ORIGIN.test(update.service)) throw new Error("Nieprawidłowy cel trasy Cloudflare Tunnel.");
+  if (hostname && !isSafeHostname(hostname)) throw new Error("Invalid tunnel domain.");
+  if (removals.some((value) => !isSafeHostname(value))) throw new Error("Invalid domain to remove from the tunnel.");
+  if (update.service && !CONTAINER_ORIGIN.test(update.service)) throw new Error("Invalid tunnel route target.");
   const service = hostname ? update.service || localService(update.localPort ?? 0) : null;
 
   return serialized(async () => {
     const zones = await listManagedZones();
     const zoneOf = (host: string) => {
       const zone = zoneForHostname(zones, host);
-      if (!zone) throw new Error(`Domena ${host} nie należy do żadnej strefy tego konta Cloudflare.`);
+      if (!zone) throw new Error(`${host} is not in any zone of this Cloudflare account.`);
       return zone;
     };
 
@@ -107,7 +107,7 @@ export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promi
     if (dnsPlan?.action.kind === "conflict") throw new Error(dnsPlan.action.message);
 
     const current = await client.getTunnelConfiguration(tunnelId);
-    if (!current.config) throw new Error("Tunel nie ma jeszcze konfiguracji w Cloudflare.");
+    if (!current.config) throw new Error("The tunnel has no configuration in Cloudflare yet.");
     let ingress = current.config.ingress;
     if (removals.length) ingress = removeHostnameRoutes(ingress, removals);
     if (hostname && service) ingress = upsertHostnameRoute(ingress, hostname, service);
@@ -121,7 +121,7 @@ export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promi
         dns.push(`utworzono CNAME ${hostname}`);
       } else if (dnsPlan.action.kind === "update") {
         await client.updateCname(dnsPlan.zone.id, dnsPlan.action.recordId, hostname, tunnelTarget(tunnelId), DNS_COMMENT);
-        dns.push(`przepięto CNAME ${hostname}`);
+        dns.push(`moved CNAME ${hostname}`);
       }
     }
     for (const host of removals) {
@@ -129,7 +129,7 @@ export async function applyManagedRouteUpdate(update: ManagedRouteUpdate): Promi
       if (!zone) continue;
       for (const recordId of dnsRecordsToRemove(host, await client.listDnsRecords(zone.id, host), tunnelId)) {
         await client.deleteDnsRecord(zone.id, recordId);
-        dns.push(`usunięto CNAME ${host}`);
+        dns.push(`removed CNAME ${host}`);
       }
     }
     return { changed, dns };

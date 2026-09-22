@@ -11,7 +11,7 @@ import { enqueueAgentJob, getAgentHost, getAgentJob, getAgentStatus, readAgentJo
 import { agentLogRef } from "./refs";
 import { toAgentTarget, tunnelRouteState } from "./target";
 
-const describeError = (error: unknown) => (error instanceof Error ? error.message : "Agent odrzucił zadanie.");
+const describeError = (error: unknown) => (error instanceof Error ? error.message : "The agent refused the job.");
 
 /**
  * Decide whether the health gate may probe the public hostname. An existing
@@ -43,7 +43,7 @@ export async function resolveEdge(config: DeploymentConfig): Promise<DeployTarge
   const { network, dropPorts } = edgeSettings();
   if (!network) return null;
   const [ingress, host, status] = await Promise.all([listCloudflareTunnelRoutes(), getAgentHost(), getAgentStatus()]);
-  if (ingress.error) throw new Error(`Nie można ustalić usług dla sieci ${network}: ${ingress.error}`);
+  if (ingress.error) throw new Error(`Could not work out the services for network ${network}: ${ingress.error}`);
   const containers = status.projects[config.composeProject]?.containers ?? [];
   return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers), dropPorts };
 }

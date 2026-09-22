@@ -84,7 +84,7 @@ export function formatEnvValue(value: string): string {
   if (!/[\s#"'$\\`]/.test(value)) return value;
   if (!value.includes("'") && !value.includes("\n")) return `'${value}'`;
   if (value.includes("$")) {
-    throw new Error("Wartość zawiera jednocześnie znak $ oraz apostrof lub nową linię — wpisz ją ręcznie w pliku na serwerze.");
+    throw new Error("The value has both $ and an apostrophe or a newline; enter it by hand in the file on the server.");
   }
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
 }

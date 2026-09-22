@@ -23,11 +23,11 @@ async function readFile(owner: string, repo: string, name: string, ref: string, 
 /** Reads the repository root through the GitHub App and suggests how to build it. */
 export async function detectRepositoryBuildAction(input: z.input<typeof inputSchema>): Promise<{ success: boolean; spec: BuildSpec | null; reasons: string[]; error?: string }> {
   try {
-    if (isDemoMode()) return { success: true, spec: null, reasons: ["Wykrywanie jest wyłączone w trybie demo."] };
+    if (isDemoMode()) return { success: true, spec: null, reasons: ["Detection is off in the demo."] };
     await requireAuth();
     const parsed = inputSchema.parse(input);
     const repository = parseGitHubUrl(parsed.githubUrl);
-    if (!repository) return { success: false, spec: null, reasons: [], error: "To nie jest adres repozytorium GitHub." };
+    if (!repository) return { success: false, spec: null, reasons: [], error: "This is not a GitHub repository address." };
 
     const root = await getContents(repository.owner, repository.repo, "", parsed.branch);
     const files = (Array.isArray(root) ? root : [root]).map((entry: GitHubContent) => (entry.type === "dir" ? `${entry.name}/` : entry.name));
@@ -48,9 +48,9 @@ export async function detectRepositoryBuildAction(input: z.input<typeof inputSch
       { files, packageJson, dockerfileContent: dockerfile ?? lowerDockerfile, requirementsTxt, pyprojectToml },
       parsed.runtime as DeploymentRuntimeKind
     );
-    if (packageJsonText && !packageJson) result.reasons.push("package.json nie jest poprawnym JSON-em — pominięty.");
+    if (packageJsonText && !packageJson) result.reasons.push("package.json is not valid JSON, so it was skipped.");
     return { success: true, ...result };
   } catch (error) {
-    return { success: false, spec: null, reasons: [], error: error instanceof Error ? error.message : "Nie udało się odczytać repozytorium." };
+    return { success: false, spec: null, reasons: [], error: error instanceof Error ? error.message : "Could not read the repository." };
   }
 }

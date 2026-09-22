@@ -41,7 +41,7 @@ async function deployServiceId(config: DeploymentConfig, preferredServiceId?: st
   const rows = await services.getServicesByProjectId(config.projectId);
   const preferred = preferredServiceId ? rows.find((row) => row.id === preferredServiceId) : undefined;
   const service = preferred ?? rows.find((row) => row.type === "docker" && row.compose_project === config.composeProject) ?? rows.find((row) => row.type === "docker");
-  if (!service) throw new Error("Projekt nie ma serwisu Docker — wykonaj najpierw wdrożenie.");
+  if (!service) throw new Error("The project has no Docker service yet. Deploy it first.");
   return service.id;
 }
 
@@ -72,7 +72,7 @@ export async function queueAgentEnvApply(input: {
     await deploys.setDeployLogFile(deploy.id, agentLogRef(job.id));
     return { deployId: deploy.id, jobId: job.id };
   } catch (error) {
-    await deploys.completeDeploy(deploy.id, false, { error_message: error instanceof Error ? error.message : "Agent odrzucił zadanie." });
+    await deploys.completeDeploy(deploy.id, false, { error_message: error instanceof Error ? error.message : "The agent refused the job." });
     throw error;
   }
 }

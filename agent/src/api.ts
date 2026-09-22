@@ -13,7 +13,7 @@ export const deployTargetSchema = z.object({
     .regex(/^\/[A-Za-z0-9._/@+-]+$/)
     .refine((value) => !value.split("/").includes(".."), "repoPath cannot contain ..")
     .transform((value) => value.replace(/\/+$/, "")),
-  githubUrl: z.string().regex(/github\.com[/:][A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/, "Wymagane repozytorium GitHub."),
+  githubUrl: z.string().regex(/github\.com[/:][A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/, "A GitHub repository is required."),
   branch: z
     .string()
     .regex(/^[A-Za-z0-9._/-]+$/)

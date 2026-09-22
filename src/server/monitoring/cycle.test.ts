@@ -92,12 +92,12 @@ describe("runMonitorCycle", () => {
     expect(h.notifications).toEqual([]);
     await h.cycle();
     await h.cycle();
-    expect(h.notifications).toEqual(["🔴 Kontenery mewbit: awaria"]);
+    expect(h.notifications).toEqual(["🔴 Containers mewbit: down"]);
     expect(h.incidents).toMatchObject([{ target_key: "containers:mewbit", open: true, severity: "down" }]);
 
     h.world.project = { ...h.world.project, containers: [{ ...running, restartCount: 3 }] };
     await h.cycle();
-    expect(h.notifications).toEqual(["🔴 Kontenery mewbit: awaria", "✅ Kontenery mewbit: znowu działa"]);
+    expect(h.notifications).toEqual(["🔴 Containers mewbit: down", "✅ Containers mewbit: back up"]);
     expect(h.incidents[0]).toMatchObject({ open: false });
   });
 
@@ -119,7 +119,7 @@ describe("runMonitorCycle", () => {
     h.world.agentUp = false;
     await h.cycle();
     await h.cycle();
-    expect(h.notifications).toEqual(["🔴 Agent wdrożeń: awaria"]);
+    expect(h.notifications).toEqual(["🔴 Deploy agent: down"]);
     expect(h.states().find((state) => state.key === "containers:mewbit")?.status).toBe("ok");
   });
 

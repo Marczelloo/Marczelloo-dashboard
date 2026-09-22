@@ -40,7 +40,7 @@ function readBody(request: http.IncomingMessage, limit = 6_300_000): Promise<unk
     request.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > limit) {
-        reject(new Error("Zbyt duże żądanie."));
+        reject(new Error("The request is too large."));
         request.destroy();
         return;
       }
@@ -84,10 +84,10 @@ export function createAgentServer(context: ServerContext): http.Server {
 
       if (request.method === "POST" && url.pathname === "/jobs") {
         const parsed = jobRequestSchema.safeParse(await readBody(request));
-        if (!parsed.success) return send(response, 400, { error: parsed.error.issues[0]?.message ?? "Nieprawidłowe żądanie." });
+        if (!parsed.success) return send(response, 400, { error: parsed.error.issues[0]?.message ?? "Invalid request." });
         const body = parsed.data;
         if (!body.target.repoPath.startsWith(`${context.allowedRoot}/`)) {
-          return send(response, 400, { error: "Katalog repozytorium musi leżeć w katalogu projektów." });
+          return send(response, 400, { error: "The repository directory must be inside the projects directory." });
         }
 
         let sha: string;
@@ -95,11 +95,11 @@ export function createAgentServer(context: ServerContext): http.Server {
           sha = body.sha;
         } else if (body.kind === "rollback") {
           const release = rollbackRelease(context.getState(), body.target.composeProject, body.sha ?? undefined);
-          if (!release) return send(response, 409, { error: "Brak wcześniejszej wersji do przywrócenia." });
+          if (!release) return send(response, 409, { error: "No earlier version to restore." });
           sha = release.sha;
         } else {
           const release = context.getState().projects[body.target.composeProject]?.releases[0];
-          if (!release) return send(response, 409, { error: "Projekt nie ma jeszcze wydania agenta — najpierw wykonaj deploy." });
+          if (!release) return send(response, 409, { error: "The project has no agent release yet. Deploy it first." });
           sha = release.sha;
         }
 
@@ -118,7 +118,7 @@ export function createAgentServer(context: ServerContext): http.Server {
       const jobMatch = /^\/jobs\/([0-9a-f-]{36})(\/log)?$/.exec(url.pathname);
       if (request.method === "GET" && jobMatch) {
         const job = context.getState().jobs.find((candidate) => candidate.id === jobMatch[1]);
-        if (!job) return send(response, 404, { error: "Nie znaleziono zadania." });
+        if (!job) return send(response, 404, { error: "Job not found." });
         if (!jobMatch[2]) return send(response, 200, job);
         const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0);
         return send(response, 200, context.store.readLog(job.id, offset));
@@ -137,7 +137,7 @@ export function createAgentServer(context: ServerContext): http.Server {
       return send(response, 404, { error: "Not found" });
     } catch (error) {
       if (error instanceof HostOperationError) return send(response, error.status, { error: error.message });
-      return send(response, 500, { error: error instanceof Error ? error.message : "Błąd agenta." });
+      return send(response, 500, { error: error instanceof Error ? error.message : "Agent error." });
     }
   });
 }

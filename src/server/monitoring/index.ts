@@ -65,7 +65,7 @@ export function runMonitoring(): Promise<CycleResult> {
 }
 
 export function incidentRetentionCutoff(now: Date, days: number): string {
-  if (!Number.isFinite(days) || days < 1) throw new Error("Retencja musi wynosić co najmniej 1 dzień.");
+  if (!Number.isFinite(days) || days < 1) throw new Error("Retention must be at least 1 day.");
   return new Date(now.getTime() - days * DAY_MS).toISOString();
 }
 

@@ -47,7 +47,7 @@ export function createCloudflareClient({ apiToken, accountId, fetchImpl = fetch 
       signal: AbortSignal.timeout(20_000),
     });
     const parsed = envelope.safeParse(await response.json().catch(() => null));
-    if (!parsed.success) throw new CloudflareApiError(`Cloudflare API: nieoczekiwana odpowiedź (${response.status}).`, response.status);
+    if (!parsed.success) throw new CloudflareApiError(`Cloudflare API: unexpected response (${response.status}).`, response.status);
     if (!response.ok || !parsed.data.success) {
       const message = parsed.data.errors.map((error) => error.message).join("; ") || `HTTP ${response.status}`;
       throw new CloudflareApiError(`Cloudflare API: ${message}`, response.status);

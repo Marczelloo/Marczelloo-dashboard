@@ -103,7 +103,7 @@ async function handlePushEvent(payload: GitHubPushPayload, deliveryId: string) {
   for (const project of projectsWithGitHub) {
     const deploymentConfig = await getDeploymentConfig(project.id);
     if (!deploymentConfig) {
-      results.push({ projectId: project.id, projectName: project.name, deployed: false, reason: "Projekt nie ma konfiguracji wdrożenia." });
+      results.push({ projectId: project.id, projectName: project.name, deployed: false, reason: "The project has no deploy configuration." });
       continue;
     }
     const decision = resolveAutoDeployBranch(branch, deploymentConfig?.branch ?? null);

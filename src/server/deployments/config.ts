@@ -107,7 +107,7 @@ export async function saveDeploymentConfig(
 
   const saved = await settings.setSetting(settingKey(input.projectId), JSON.stringify(config));
   if (!saved) {
-    throw new Error('Nie udało się zapisać konfiguracji wdrożenia. Tabela "settings" musi być dostępna.');
+    throw new Error('Could not save the deploy configuration. The "settings" table must be available.');
   }
 
   return config;

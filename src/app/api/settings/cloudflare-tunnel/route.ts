@@ -61,7 +61,7 @@ export async function GET() {
     }
 
     const managedTunnel = getManagedTunnelSettings()
-      ? await getManagedTunnelStatus().catch((error: unknown) => ({ error: error instanceof Error ? error.message : "Cloudflare API niedostępne." }))
+      ? await getManagedTunnelStatus().catch((error: unknown) => ({ error: error instanceof Error ? error.message : "The Cloudflare API is unavailable." }))
       : null;
 
     return NextResponse.json(

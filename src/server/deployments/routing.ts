@@ -12,10 +12,10 @@ export function resolveAutoDeployBranch(
   if (configuredBranch) {
     return pushBranch === configuredBranch
       ? { deploy: true, branch: configuredBranch }
-      : { deploy: false, reason: `Push do ${pushBranch}; auto-deploy obejmuje tylko ${configuredBranch}.` };
+      : { deploy: false, reason: `Push to ${pushBranch}; only ${configuredBranch} deploys automatically.` };
   }
 
   return pushBranch === "main" || pushBranch === "master"
     ? { deploy: true, branch: pushBranch }
-    : { deploy: false, reason: `Push do ${pushBranch}; projekt bez konfiguracji wdraża tylko main/master.` };
+    : { deploy: false, reason: `Push to ${pushBranch}; a project without a branch set deploys main or master only.` };
 }

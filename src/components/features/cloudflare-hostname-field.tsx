@@ -56,7 +56,7 @@ export function CloudflareHostnameField({ id, value, onChange, placeholder = "ap
         if (parts.label) compose(parts.label, zone);
         else if (parsed) onChange(zone);
       }}>
-        <SelectTrigger className="w-44" aria-label="Domena Cloudflare">
+        <SelectTrigger className="w-44" aria-label="Cloudflare zone">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -125,7 +125,7 @@ const projectTunnelSchema = z.object({
 }).superRefine((value, context) => {
   if (!value.enabled) return;
   if (!value.hostname || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value.hostname)) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "Podaj prawidłową domenę, np. app.marczelloo.dev.", path: ["hostname"] });
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid domain, such as app.marczelloo.dev.", path: ["hostname"] });
   }
   if (!value.localPort) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Podaj lokalny port aplikacji.", path: ["localPort"] });
@@ -190,8 +190,8 @@ async function queueConfiguredDeployment(
   const project = await projects.getProjectById(projectId);
   if (!project) return { success: false, error: "Project not found" };
   let stored = await getDeploymentConfig(projectId);
-  if (!stored) return { success: false, error: "Projekt nie ma jeszcze konfiguracji Docker/GitHub." };
-  if (stored.engine !== "agent") return { success: false, error: "Projekt nie jest wdrażany przez agenta. Przełącz silnik wdrożeń na agenta." };
+  if (!stored) return { success: false, error: "The project has no Docker/GitHub setup yet." };
+  if (stored.engine !== "agent") return { success: false, error: "The project is not deployed by the agent. Switch it to the agent first." };
 
   let reallocatedPort: number | null = null;
   // Without host ports there is nothing to collide with.
@@ -206,7 +206,7 @@ async function queueConfiguredDeployment(
         });
       }
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : "Nie udało się przydzielić portu wdrożenia." };
+      return { success: false, error: error instanceof Error ? error.message : "Could not assign a deploy port." };
     }
   }
   const config: DeploymentConfig = branchOverride ? { ...stored, branch: branchOverride } : stored;
@@ -236,7 +236,7 @@ async function queueConfiguredDeployment(
       deployId: queued.deployId,
       logFile,
       branch: config.branch,
-      output: `Wdrożenie ${queued.sha.slice(0, 7)} trafiło do kolejki agenta.\nLog file: ${logFile}\n\nEtapy: git fetch → Compose config → build → up → bramka zdrowia → rollback przy błędzie.`,
+      output: `Deploy of ${queued.sha.slice(0, 7)} queued on the agent.\nLog file: ${logFile}\n\nSteps: git fetch → Compose config → build → up → health check → rollback on failure.`,
     },
   };
 }
@@ -280,16 +280,16 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
     validateRepoPath(parsed.repoPath);
 
     const existing = await projects.getProjectBySlug(parsed.slug);
-    if (existing) return { success: false, error: `Projekt o slugu „${parsed.slug}” już istnieje.` };
+    if (existing) return { success: false, error: `A project with the slug "${parsed.slug}" already exists.` };
     const allProjects = await projects.getProjects();
     if (allProjects.some((project) => project.github_url?.replace(/\.git$/, "").toLowerCase() === parsed.githubUrl.replace(/\.git$/, "").toLowerCase())) {
-      return { success: false, error: "To repozytorium GitHub jest już połączone z projektem." };
+      return { success: false, error: "This GitHub repository is already linked to a project." };
     }
     if (parsed.exposure === "cloudflare" && parsed.hostname) {
       const conflict = await findHostnameConflict("new", parsed.hostname, []);
       if (conflict) return { success: false, error: conflict };
     }
-    if (!isAgentConfigured()) return { success: false, error: "Agent wdrożeń nie jest skonfigurowany (brak AGENT_TOKEN)." };
+    if (!isAgentConfigured()) return { success: false, error: "The deploy agent is not configured (AGENT_TOKEN is missing)." };
 
     const project = await projects.createProject({
       name: parsed.name,
@@ -338,7 +338,7 @@ export async function provisionGitHubProjectAction(input: DeploymentSetupInput):
     };
   } catch (error) {
     console.error("provisionGitHubProjectAction error:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Nie udało się przygotować projektu" };
+    return { success: false, error: error instanceof Error ? error.message : "Could not set up the project" };
   }
 }
 
@@ -431,7 +431,7 @@ export async function deleteProjectAction(id: string): Promise<ActionResult> {
       try {
         await updateCloudflareTunnelRoute({ hostname: null, localPort: null, removeHostnames: [deploymentConfig.tunnel.hostname] });
       } catch (error) {
-        return { success: false, error: `Nie usunięto projektu: trasa ${deploymentConfig.tunnel.hostname} nie została zdjęta (${error instanceof Error ? error.message : "błąd Cloudflare"}).` };
+        return { success: false, error: `The project was not deleted: the route ${deploymentConfig.tunnel.hostname} could not be removed (${error instanceof Error ? error.message : "Cloudflare error"}).` };
       }
     }
     if (deploymentConfig) await deleteDeploymentConfig(id);
@@ -542,7 +542,7 @@ export async function getProjectTunnelStatusAction(id: string): Promise<ActionRe
       },
     };
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Nie udało się odczytać statusu Cloudflare Tunnel." };
+    return { success: false, error: error instanceof Error ? error.message : "Could not read the tunnel status." };
   }
 }
 
@@ -555,7 +555,7 @@ export async function updateProjectTunnelAction(
     const parsed = projectTunnelSchema.parse(input);
     const [project, existing] = await Promise.all([projects.getProjectById(id), getDeploymentConfig(id)]);
     if (!project) return { success: false, error: "Project not found" };
-    if (!existing) return { success: false, error: "Ten projekt nie ma jeszcze zarządzanej konfiguracji GitHub/Docker." };
+    if (!existing) return { success: false, error: "This project has no managed GitHub/Docker setup yet." };
 
     const hostname = parsed.enabled ? parsed.hostname!.trim().toLowerCase() : null;
     if (hostname) {
@@ -585,7 +585,7 @@ export async function updateProjectTunnelAction(
       let changed = false;
       if (deployQueued) {
         const deployment = await queueConfiguredDeployment(id, user.email);
-        if (!deployment.success) throw new Error(deployment.error || "Nie udało się zakolejkować wdrożenia z nowym portem.");
+        if (!deployment.success) throw new Error(deployment.error || "Could not queue a deploy with the new port.");
       } else {
         const result = await updateCloudflareTunnelRoute({
           hostname,
@@ -613,7 +613,7 @@ export async function updateProjectTunnelAction(
       throw error;
     }
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Nie udało się zapisać ustawień Cloudflare Tunnel." };
+    return { success: false, error: error instanceof Error ? error.message : "Could not save the tunnel route." };
   }
 }
 
@@ -656,7 +656,7 @@ export async function checkDeployLogAction(
 
     const agentJobId = parseAgentLogRef(logFile);
     if (!agentJobId) {
-      return { success: true, data: { log: "Log tego wdrożenia pochodzi ze starego systemu wdrożeń i nie jest już dostępny.", isComplete: true } };
+      return { success: true, data: { log: "This deploy's log came from the old deploy system and is no longer available.", isComplete: true } };
     }
     const agentLog = await readAgentDeployLog(agentJobId);
     return { success: true, data: { log: agentLog.log, isComplete: agentLog.isComplete } };

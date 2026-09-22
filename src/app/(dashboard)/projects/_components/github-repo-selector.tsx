@@ -180,16 +180,16 @@ export function GitHubRepoSelector() {
     try {
       const result = await preflightDeploymentAction(input);
       if (!result.success || !result.data) {
-        toast.error("Preflight nie przeszedł", { description: result.error });
+        toast.error("Preflight failed", { description: result.error });
         return;
       }
       setPreflight(result.data);
       if (result.data.composeFile && !composeFile) setComposeFile(result.data.composeFile);
       if (result.data.profiles.length && !profiles) setProfiles(result.data.profiles.join(", "));
-      if (result.data.ok) toast.success("Preflight zakończony poprawnie");
-      else toast.error("Preflight wykrył problem wymagający poprawy");
+      if (result.data.ok) toast.success("Preflight passed");
+      else toast.error("Preflight found something to fix");
     } catch (reason) {
-      toast.error("Nie udało się wykonać preflight", { description: reason instanceof Error ? reason.message : undefined });
+      toast.error("Could not run the preflight", { description: reason instanceof Error ? reason.message : undefined });
     } finally {
       setChecking(false);
     }
@@ -210,14 +210,14 @@ export function GitHubRepoSelector() {
         deployNow: true,
       });
       if (!result.success || !result.data) {
-        toast.error("Nie udało się przygotować projektu", { description: result.error });
+        toast.error("Could not set up the project", { description: result.error });
         return;
       }
-      toast.success(result.data.deployId ? "Projekt został utworzony, a deploy wystartował" : "Projekt został zapisany — popraw wskazane elementy preflight");
+      toast.success(result.data.deployId ? "Project created and the first deploy started" : "Project saved; fix what the preflight flagged");
       router.push(`/projects/${result.data.projectId}`);
       router.refresh();
     } catch (reason) {
-      toast.error("Nie udało się przygotować projektu", { description: reason instanceof Error ? reason.message : undefined });
+      toast.error("Could not set up the project", { description: reason instanceof Error ? reason.message : undefined });
     } finally {
       setProvisioning(false);
     }

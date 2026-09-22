@@ -70,7 +70,7 @@ describe("assessContainers", () => {
 
   it("fails on crashes, restarts and unhealthy containers", () => {
     expect(assessContainers([[sample({ status: "exited", exitCode: 1 })]], 1_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("code 1") });
-    expect(assessContainers([[sample()], [sample({ restartCount: 1 })]], 10_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("restartuje") });
+    expect(assessContainers([[sample()], [sample({ restartCount: 1 })]], 10_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("restarting") });
     expect(assessContainers([[sample({ status: "restarting" })]], 1_000, options)).toMatchObject({ state: "fail" });
     expect(assessContainers([[sample({ health: "unhealthy" })]], 1_000, options)).toMatchObject({ state: "fail", reason: expect.stringContaining("unhealthy") });
     expect(assessContainers([[]], 1_000, options)).toMatchObject({ state: "fail" });

@@ -34,9 +34,9 @@ describe("upsertHostnameRoute", () => {
   });
 
   it("rejects unsafe input and configs without a catch-all", () => {
-    expect(() => upsertHostnameRoute(rules, "bad host", localService(1))).toThrow(/domena/);
+    expect(() => upsertHostnameRoute(rules, "bad host", localService(1))).toThrow(/domain/);
     expect(() => upsertHostnameRoute(rules.slice(0, -1), "a.pl", localService(1))).toThrow(/catch-all/);
-    expect(() => localService(70000)).toThrow(/Port/);
+    expect(() => localService(70000)).toThrow(/port/);
   });
 });
 
