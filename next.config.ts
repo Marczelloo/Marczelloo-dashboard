@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
       { source: "/pi", destination: "/host", permanent: true },
       { source: "/todos", destination: "/tasks", permanent: true },
       { source: "/containers", destination: "/host?tab=containers", permanent: true },
+      { source: "/features", destination: "/docs", permanent: true },
       { source: "/projects/:id/edit", destination: "/projects/:id?tab=settings", permanent: true },
     ];
   },

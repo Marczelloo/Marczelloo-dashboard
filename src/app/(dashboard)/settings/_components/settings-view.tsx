@@ -140,9 +140,9 @@ export function SettingsView({ data }: { data: SettingsData }) {
                     How the pieces fit
                   </Link>
                 </Fact>
-                <Fact label="Features">
-                  <Link href="/features" className="hover:underline">
-                    What is built
+                <Fact label="Configuration">
+                  <Link href="/docs#env-vars" className="hover:underline">
+                    Every variable it reads
                   </Link>
                 </Fact>
               </div>
