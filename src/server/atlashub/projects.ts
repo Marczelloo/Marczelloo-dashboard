@@ -8,6 +8,13 @@ import type { Project, CreateProjectInput, UpdateProjectInput, QueryOptions } fr
 
 const TABLE = "projects";
 
+/** The projects table has no technologies column; writing it fails the whole insert or update. */
+function withoutTechnologies<T extends { technologies?: unknown }>(input: T): Omit<T, "technologies"> {
+  const rest = { ...input };
+  delete rest.technologies;
+  return rest;
+}
+
 export async function getProjects(options?: QueryOptions): Promise<Project[]> {
   const response = await db.select<Project>(TABLE, {
     order: { column: "created_at", direction: "desc" },
@@ -31,7 +38,7 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
 export async function createProject(input: CreateProjectInput): Promise<Project> {
   const now = new Date().toISOString();
   const response = await db.insert<Project>(TABLE, {
-    ...input,
+    ...withoutTechnologies(input),
     tags: input.tags || [],
     status: input.status || "active",
     created_at: now,
@@ -42,7 +49,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
 
 export async function updateProject(id: string, input: UpdateProjectInput): Promise<Project | null> {
   return db.updateById<Project>(TABLE, id, {
-    ...input,
+    ...withoutTechnologies(input),
     updated_at: new Date().toISOString(),
   });
 }

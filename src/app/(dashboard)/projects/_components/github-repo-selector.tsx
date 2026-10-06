@@ -25,6 +25,7 @@ import { CloudflareHostnameField } from "@/components/features/cloudflare-hostna
 import { toast } from "sonner";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Chip } from "@/components/ui";
 import { preflightDeploymentAction, provisionGitHubProjectAction } from "@/app/actions/projects";
+import { usePinGuard } from "@/components/features/use-pin-guard";
 import { slugify } from "@/lib/utils";
 import type { BuildSpec } from "@/server/deployments/detect";
 import { BuildPlan } from "./build-plan";
@@ -76,6 +77,7 @@ function technologiesFrom(repo: GitHubRepo) {
 
 export function GitHubRepoSelector() {
   const router = useRouter();
+  const { run: withPin, dialog: pinDialog } = usePinGuard();
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +164,8 @@ export function GitHubRepoSelector() {
     setChecking(true);
     setPreflight(null);
     try {
-      const result = await preflightDeploymentAction(input);
+      const result = await withPin(() => preflightDeploymentAction(input));
+      if (!result) return;
       if (!result.success || !result.data) {
         toast.error("Preflight failed", { description: result.error });
         return;
@@ -184,7 +187,7 @@ export function GitHubRepoSelector() {
     if (!selected || !config) return;
     setProvisioning(true);
     try {
-      const result = await provisionGitHubProjectAction({
+      const result = await withPin(() => provisionGitHubProjectAction({
         name: selected.name,
         slug: slugify(selected.name),
         description: selected.description || undefined,
@@ -192,7 +195,8 @@ export function GitHubRepoSelector() {
         technologies: technologiesFrom(selected),
         ...config,
         deployNow: true,
-      });
+      }));
+      if (!result) return;
       if (!result.success || !result.data) {
         toast.error("Could not set up the project", { description: result.error });
         return;
@@ -213,6 +217,7 @@ export function GitHubRepoSelector() {
 
   return (
     <div className="space-y-6">
+      {pinDialog}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
