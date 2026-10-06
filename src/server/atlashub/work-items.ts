@@ -4,6 +4,7 @@
 
 import "server-only";
 import * as db from "./client";
+import { jsonbColumns } from "./jsonb";
 import type {
   WorkItem,
   CreateWorkItemInput,
@@ -81,7 +82,7 @@ export async function createWorkItem(input: CreateWorkItemInput): Promise<WorkIt
   if (input.priority) insertData.priority = input.priority;
   if (input.labels && input.labels.length > 0) insertData.labels = input.labels;
 
-  const response = await db.insert<WorkItem>(TABLE, insertData);
+  const response = await db.insert<WorkItem>(TABLE, jsonbColumns(insertData, ["labels"]));
   return response.data[0];
 }
 
@@ -96,7 +97,7 @@ export async function updateWorkItem(id: string, input: UpdateWorkItemInput): Pr
   if (input.priority !== undefined) updateData.priority = input.priority;
   if (input.labels !== undefined) updateData.labels = input.labels;
 
-  return db.updateById<WorkItem>(TABLE, id, updateData);
+  return db.updateById<WorkItem>(TABLE, id, jsonbColumns(updateData, ["labels"]));
 }
 
 export async function deleteWorkItem(id: string): Promise<boolean> {

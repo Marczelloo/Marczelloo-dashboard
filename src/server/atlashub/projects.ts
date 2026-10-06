@@ -4,15 +4,19 @@
 
 import "server-only";
 import * as db from "./client";
+import { jsonbColumns } from "./jsonb";
 import type { Project, CreateProjectInput, UpdateProjectInput, QueryOptions } from "@/types";
 
 const TABLE = "projects";
 
-/** The projects table has no technologies column; writing it fails the whole insert or update. */
-function withoutTechnologies<T extends { technologies?: unknown }>(input: T): Omit<T, "technologies"> {
+/**
+ * The row as the table takes it: there is no technologies column, and tags is
+ * jsonb, which rejects the array literal node-pg would send for a JS array.
+ */
+function toRow<T extends { technologies?: unknown; tags?: unknown }>(input: T): Record<string, unknown> {
   const rest = { ...input };
   delete rest.technologies;
-  return rest;
+  return jsonbColumns(rest, ["tags"]);
 }
 
 export async function getProjects(options?: QueryOptions): Promise<Project[]> {
@@ -37,21 +41,21 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
   const now = new Date().toISOString();
-  const response = await db.insert<Project>(TABLE, {
-    ...withoutTechnologies(input),
+  const response = await db.insert<Project>(TABLE, toRow({
+    ...input,
     tags: input.tags || [],
     status: input.status || "active",
     created_at: now,
     updated_at: now,
-  });
+  }));
   return response.data[0];
 }
 
 export async function updateProject(id: string, input: UpdateProjectInput): Promise<Project | null> {
-  return db.updateById<Project>(TABLE, id, {
-    ...withoutTechnologies(input),
+  return db.updateById<Project>(TABLE, id, toRow({
+    ...input,
     updated_at: new Date().toISOString(),
-  });
+  }));
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
