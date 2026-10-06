@@ -5,7 +5,7 @@ import type { DeploymentConfig } from "@/server/deployments/config";
 import { resolveBranchHead } from "@/server/deployments/commit";
 import type { DeployTarget } from "@agent/types";
 import { edgeServicesForProject } from "@/server/deployments/edge";
-import { edgeSettings, listCloudflareTunnelRoutes, resolveTunnelOrigin, updateCloudflareTunnelRoute } from "@/server/deployments/host";
+import { edgeSettings, listCloudflareTunnelRoutes, resolveTunnelOrigin, tunnelTarget, updateCloudflareTunnelRoute } from "@/server/deployments/host";
 import { getRepositoryCloneToken } from "@/server/github/client";
 import { enqueueAgentJob, getAgentHost, getAgentJob, getAgentStatus, readAgentJobLogToEnd } from "./client";
 import { agentLogRef } from "./refs";
@@ -41,12 +41,19 @@ export async function prepareTunnelProbe(config: DeploymentConfig, createMissing
  * With sharedNetwork every other service joins as well.
  */
 export async function resolveEdge(config: DeploymentConfig): Promise<DeployTarget["edge"]> {
-  const { network, dropPorts } = edgeSettings();
+  const { network, containerOrigins, dropPorts } = edgeSettings();
   if (!network) return null;
   const [ingress, host, status] = await Promise.all([listCloudflareTunnelRoutes(), getAgentHost(), getAgentStatus()]);
   if (ingress.error) throw new Error(`Could not work out the services for network ${network}: ${ingress.error}`);
   const containers = status.projects[config.composeProject]?.containers ?? [];
-  return { network, services: edgeServicesForProject(ingress.routes, host.publishedPorts, containers), dropPorts, joinAll: config.sharedNetwork === true };
+  const services = new Set(edgeServicesForProject(ingress.routes, host.publishedPorts, containers));
+  // Before the first deploy there is no container for the routes to name; the
+  // project's own route target still has to join, or the tunnel cannot reach it.
+  if (containerOrigins) {
+    const target = await tunnelTarget(config).catch(() => null);
+    if (target) services.add(target.service);
+  }
+  return { network, services: [...services].sort(), dropPorts, joinAll: config.sharedNetwork === true };
 }
 
 export async function queueAgentDeployment(input: { config: DeploymentConfig; serviceId: string; triggeredBy: string; commitSha?: string }): Promise<{ deployId: string; jobId: string; sha: string }> {

@@ -29,15 +29,19 @@ export function edgeSettings(): { network: string | null; containerOrigins: bool
 export async function ensureTunnelTarget(config: DeploymentConfig): Promise<DeploymentConfig> {
   const tunnel = config.tunnel;
   if (!tunnel?.enabled || (tunnel.service && tunnel.port) || !edgeSettings().containerOrigins) return config;
-  let target: { service: string; port: number } | null = null;
-  if (config.build && config.build.kind !== "compose") {
-    target = config.build.port ? { service: "app", port: config.build.port } : null;
-  } else {
-    const probe = await agentPreflight(config.repoPath, config.composeFile);
-    target = pickTunnelPort(probe.ports, tunnel.localPort);
-  }
+  const target = await tunnelTarget(config);
   if (!target) return config;
   return saveDeploymentConfig({ ...config, tunnel: { ...tunnel, service: target.service, port: target.port } });
+}
+
+/** The service and container port the route reaches, known before the first deploy creates any container. */
+export async function tunnelTarget(config: DeploymentConfig): Promise<{ service: string; port: number } | null> {
+  const tunnel = config.tunnel;
+  if (!tunnel?.enabled) return null;
+  if (tunnel.service && tunnel.port) return { service: tunnel.service, port: tunnel.port };
+  if (config.build && config.build.kind !== "compose") return config.build.port ? { service: "app", port: config.build.port } : null;
+  const probe = await agentPreflight(config.repoPath, config.composeFile);
+  return pickTunnelPort(probe.ports, tunnel.localPort);
 }
 
 /** Container origin of the project's route: by remembered service, else by published loopback port. */
